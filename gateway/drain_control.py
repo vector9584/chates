@@ -218,6 +218,14 @@ def drain_requested(*, home: Optional[Path] = None) -> bool:
     lenient (see :func:`_marker_epoch_is_stale`): a legacy/corrupt marker with
     no epoch, or an environment without ``/proc``, still reads as drain-active.
     """
+    # A panel restart lease is specific to this Gateway PID incarnation and
+    # expires automatically. It does not alter the legacy DATA marker.
+    try:
+        from panel_drain_bridge import panel_drain_requested
+        if panel_drain_requested():
+            return True
+    except ImportError:
+        pass
     body = read_drain_request(home=home)
     if body is None:
         return False

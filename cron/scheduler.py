@@ -2241,6 +2241,11 @@ def _run_job_script(
         (success, output) — on failure *output* contains the error message so the
         LLM can report the problem to the user.
     """
+    from cron.panel_echo import script_result
+    _echo_result = script_result(script_path)
+    if _echo_result is not None:
+        return _echo_result
+
     scripts_dir = _get_hermes_home() / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
     scripts_dir_resolved = scripts_dir.resolve()
@@ -2761,6 +2766,10 @@ def _guard_job_credential_exfil(job: dict) -> None:
         raise RuntimeError(f"Cron job '{job_id}' blocked for safety: {err}")
 
 
+from cron.panel_echo import guarded as _echo_guarded
+
+
+@_echo_guarded
 def run_job(
     job: dict, *, defer_agent_teardown: Optional[list] = None
 ) -> tuple[bool, str, str, Optional[str]]:
@@ -3013,6 +3022,9 @@ def run_job(
         logger.info("Job '%s': script produced no output, skipping AI call.", job_name)
         return True, "", SILENT_MARKER, None
     _cron_session_id = f"cron_{job_id}_{_hermes_now().strftime('%Y%m%d_%H%M%S')}"
+
+    from cron.panel_echo import session_started
+    session_started(_cron_session_id)
 
     logger.info("Running job '%s' (ID: %s)", job_name, job_id)
     logger.info("Prompt: %s", prompt[:100])
@@ -3580,6 +3592,8 @@ def run_job(
         # thread used for inactivity timeout monitoring.
         _cron_context = contextvars.copy_context()
         _cron_future = _cron_pool.submit(_cron_context.run, agent.run_conversation, prompt)
+        from cron.panel_echo import agent_started
+        agent_started(agent, _cron_future)
         _inactivity_timeout = False
         try:
             if _cron_inactivity_limit is None:
@@ -3846,7 +3860,11 @@ def run_job(
             except (Exception, KeyboardInterrupt) as e:
                 logger.debug("Job '%s': failed to end session: %s", job_id, e)
             try:
-                _session_db.close()
+                from cron.panel_echo import session_finishing
+                try:
+                    session_finishing(_session_db, _final_cron_session_id)
+                finally:
+                    _session_db.close()
             except (Exception, KeyboardInterrupt) as e:
                 logger.debug("Job '%s': failed to close SQLite session store: %s", job_id, e)
         # Release subprocesses, terminal sandboxes, browser daemons, and the
