@@ -690,6 +690,7 @@ def get_container_exec_info() -> Optional[dict]:
 # Re-export from hermes_constants — canonical definition lives there.
 from hermes_constants import get_hermes_home, get_process_hermes_home  # noqa: F811,E402
 from utils import atomic_replace, fast_safe_load
+from panel_config_bridge import empty_mapping as _panel_empty_mapping
 
 def get_config_path() -> Path:
     """Get the main config file path."""
@@ -1804,7 +1805,7 @@ def _raw_config_has_explicit_version() -> bool:
         return False
     try:
         with open(config_path, encoding="utf-8") as f:
-            raw = fast_safe_load(f) or {}
+            raw = _panel_empty_mapping(fast_safe_load(f))
     except Exception:
         return False
     return isinstance(raw, dict) and "_config_version" in raw
@@ -1829,7 +1830,7 @@ def check_config_version() -> Tuple[int, int]:
 
     try:
         with open(config_path, encoding="utf-8") as f:
-            config = fast_safe_load(f) or {}
+            config = _panel_empty_mapping(fast_safe_load(f))
     except Exception as e:
         # Invalid YAML needs a parse warning, not an automatic schema rewrite
         # that could replace the user's broken file with defaults.
@@ -2791,7 +2792,8 @@ def _normalize_root_model_keys(config: Dict[str, Any]) -> Dict[str, Any]:
     if not has_root and not model_has_alias and not model_needs_canon:
         return config
 
-    config = dict(config)
+    from panel_config_bridge import inherit as _panel_inherit
+    config = _panel_inherit(dict(config), config)
     model = config.get("model")
     if not isinstance(model, dict):
         model = {"default": model} if model else {}
@@ -2836,7 +2838,8 @@ def _normalize_max_turns_config(config: Dict[str, Any]) -> Dict[str, Any]:
     materialise ``agent.max_turns`` in config.yaml when the user never set
     it — that makes the default sticky and blocks future schema changes.
     """
-    config = dict(config)
+    from panel_config_bridge import inherit as _panel_inherit
+    config = _panel_inherit(dict(config), config)
     agent_config = dict(config.get("agent") or {})
 
     had_root = "max_turns" in config
@@ -2930,7 +2933,7 @@ def cfg_get(cfg: Optional[Dict[str, Any]], *keys: str, default: Any = None) -> A
 
 
 
-def read_raw_config() -> Dict[str, Any]:
+def _panel_original_read_raw_config() -> Dict[str, Any]:
     """Read ~/.hermes/config.yaml as-is, without merging defaults or migrating.
 
     Returns the raw YAML dict, or ``{}`` if the file doesn't exist or can't
@@ -2957,7 +2960,7 @@ def read_raw_config() -> Dict[str, Any]:
 
         try:
             with open(config_path, encoding="utf-8") as f:
-                data = fast_safe_load(f) or {}
+                data = _panel_empty_mapping(fast_safe_load(f))
         except Exception as e:
             _warn_config_parse_failure(config_path, e)
             return {}
@@ -2968,7 +2971,12 @@ def read_raw_config() -> Dict[str, Any]:
         return data
 
 
-def read_user_config_raw(config_path: Optional[Path] = None) -> Dict[str, Any]:
+def read_raw_config() -> Dict[str, Any]:
+    from panel_config_bridge import capture as _panel_capture
+    return _panel_capture(get_config_path(), lambda: _panel_original_read_raw_config())
+
+
+def _panel_original_read_user_config_raw(config_path: Optional[Path] = None) -> Dict[str, Any]:
     """Read a user ``config.yaml`` EXACTLY as written on disk.
 
     No DEFAULT_CONFIG merge, no managed-scope overlay, no ``${ENV_VAR}``
@@ -3011,10 +3019,15 @@ def read_user_config_raw(config_path: Optional[Path] = None) -> Dict[str, Any]:
         config_path = get_config_path()
     try:
         with open(config_path, encoding="utf-8") as f:
-            data = fast_safe_load(f) or {}
+            data = _panel_empty_mapping(fast_safe_load(f))
     except FileNotFoundError:
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def read_user_config_raw(config_path: Optional[Path] = None) -> Dict[str, Any]:
+    from panel_config_bridge import capture as _panel_capture
+    return _panel_capture(config_path or get_config_path(), lambda: _panel_original_read_user_config_raw(config_path))
 
 
 def read_raw_config_readonly() -> Dict[str, Any]:
@@ -3047,7 +3060,7 @@ def read_raw_config_readonly() -> Dict[str, Any]:
 
         try:
             with open(config_path, encoding="utf-8") as f:
-                data = fast_safe_load(f) or {}
+                data = _panel_empty_mapping(fast_safe_load(f))
         except Exception as e:
             _warn_config_parse_failure(config_path, e)
             return {}
@@ -3126,7 +3139,8 @@ def load_config() -> Dict[str, Any]:
     defensive deepcopy — that path matters in agent-loop hot spots like
     ``get_provider_request_timeout`` which is called once per API turn.
     """
-    return _load_config_impl(want_deepcopy=True)
+    from panel_config_bridge import capture as _panel_capture
+    return _panel_capture(get_config_path(), lambda: _load_config_impl(want_deepcopy=True))
 
 
 def load_config_readonly() -> Dict[str, Any]:
@@ -3281,6 +3295,8 @@ def apply_terminal_config_to_env(
 
 
 def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
+    from panel_config_bridge import ensure_recovered as _panel_ensure_recovered
+    _panel_ensure_recovered(get_config_path())
     with _CONFIG_LOCK:
         ensure_hermes_home()
         config_path = get_config_path()
@@ -3335,7 +3351,7 @@ def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
         if user_sig is not None:
             try:
                 with open(config_path, encoding="utf-8") as f:
-                    user_config = fast_safe_load(f) or {}
+                    user_config = _panel_empty_mapping(fast_safe_load(f))
 
                 if "max_turns" in user_config:
                     agent_user_config = dict(user_config.get("agent") or {})
@@ -3527,95 +3543,72 @@ def save_config(
         if is_managed():
             managed_error("save configuration")
             return
-        # Managed scope: strip any leaf the managed layer pins, so a bulk write
-        # (wizard / programmatic save) never persists a user value that would
-        # silently lose to managed on the next load. Single-key `config set`
-        # hard-rejects (see set_config_value); this is the mechanical safety net
-        # for bulk writes so the unmanaged remainder still lands.
         from hermes_cli import managed_scope
-
-        managed_keys = managed_scope.managed_config_keys()
-        if managed_keys:
-            config, _stripped = _strip_dotted_keys(copy.deepcopy(config), managed_keys)
-            if _stripped:
-                print(
-                    f"Note: {len(_stripped)} managed setting(s) were not saved "
-                    f"(managed by your administrator): {', '.join(sorted(_stripped))}",
-                    file=sys.stderr,
-                )
-        from utils import atomic_yaml_write
-
+        from panel_config_bridge import snapshot_of as _panel_snapshot_of, missing_snapshot as _panel_missing_snapshot, write as _panel_write
         ensure_hermes_home()
         config_path = get_config_path()
         require_readable_config_before_write(config_path)
-        # Compute explicit user paths BEFORE any normalisation --------
-        # _normalize_max_turns_config may inject agent.max_turns from
-        # DEFAULT_CONFIG; using the raw dict preserves which paths the
-        # user actually set so _strip_default_values can keep them.
-        _raw_for_paths = read_raw_config()
-        explicit_raw_paths: Optional[Set[Tuple[str, ...]]] = (
-            _explicit_config_paths(_raw_for_paths) if _raw_for_paths else None
-        )
-        if merge_existing and _raw_for_paths:
-            config = _merge_partial_save(_raw_for_paths, config)
-        # ----------------------------------------------------------------
+        _panel_snapshot = _panel_snapshot_of(config) or _panel_missing_snapshot(config_path)
+        managed_keys = managed_scope.managed_config_keys()
 
-        current_normalized = _normalize_root_model_keys(_normalize_max_turns_config(config))
-        normalized = current_normalized
-        raw_existing = (
-            _normalize_root_model_keys(_normalize_max_turns_config(_raw_for_paths))
-            if _raw_for_paths
-            else {}
-        )
-        if raw_existing:
-            normalized = _preserve_env_ref_templates(
-                normalized,
-                raw_existing,
-                _LAST_EXPANDED_CONFIG_BY_PATH.get(str(config_path)),
+        def _panel_normalize(config):
+            if managed_keys:
+                config, _stripped = _strip_dotted_keys(copy.deepcopy(config), managed_keys)
+            # Compute explicit user paths BEFORE any normalisation --------
+            # _normalize_max_turns_config may inject agent.max_turns from
+            # DEFAULT_CONFIG; using the raw dict preserves which paths the
+            # user actually set so _strip_default_values can keep them.
+            _raw_for_paths = copy.deepcopy(_panel_snapshot["raw"])
+            explicit_raw_paths: Optional[Set[Tuple[str, ...]]] = (
+                _explicit_config_paths(_raw_for_paths) if _raw_for_paths else None
             )
+            if merge_existing and _raw_for_paths:
+                config = _merge_partial_save(_raw_for_paths, config)
+            # ----------------------------------------------------------------
 
-        # Strip schema-default values so the user's custom settings are not
-        # silently reset on every save.  Keys the user explicitly set (paths
-        # from the raw pre-normalisation config) are always preserved.
-        effective_preserve_keys: Set[Tuple[str, ...]] = {("_config_version",)}
-        if explicit_raw_paths:
-            effective_preserve_keys.update(explicit_raw_paths)
-        if preserve_keys:
-            effective_preserve_keys.update(preserve_keys)
-
-        if strip_defaults and effective_preserve_keys:
-            # _preserve_env_ref_templates may return Any; cast for type-checker.
-            from typing import cast as _cast
-            normalized = _cast(Dict[str, Any], normalized)
-            normalized = _strip_default_values(
-                normalized,  # type: ignore[arg-type]
-                DEFAULT_CONFIG,
-                preserve_keys=effective_preserve_keys,
+            current_normalized = _normalize_root_model_keys(_normalize_max_turns_config(config))
+            normalized = current_normalized
+            raw_existing = (
+                _normalize_root_model_keys(_normalize_max_turns_config(_raw_for_paths))
+                if _raw_for_paths
+                else {}
             )
+            if raw_existing:
+                normalized = _preserve_env_ref_templates(
+                    normalized,
+                    raw_existing,
+                    _panel_snapshot["value"],
+                )
 
-        # Build optional commented-out sections for features that are off by
-        # default or only relevant when explicitly configured.
-        parts = []
-        sec = normalized.get("security", {})
-        if not sec or sec.get("redact_secrets") is None:
-            parts.append(_SECURITY_COMMENT)
-        fb = normalized.get("fallback_model", {})
-        fb_is_valid = False
-        if isinstance(fb, list):
-            fb_is_valid = any(isinstance(e, dict) and e.get("provider") and e.get("model") for e in fb)
-        elif isinstance(fb, dict):
-            fb_is_valid = bool(fb.get("provider") and fb.get("model"))
-        if not fb_is_valid:
-            parts.append(_FALLBACK_COMMENT)
+            # Strip schema-default values so the user's custom settings are not
+            # silently reset on every save.  Keys the user explicitly set (paths
+            # from the raw pre-normalisation config) are always preserved.
+            effective_preserve_keys: Set[Tuple[str, ...]] = {("_config_version",)}
+            if explicit_raw_paths:
+                effective_preserve_keys.update(explicit_raw_paths)
+            if preserve_keys:
+                effective_preserve_keys.update(preserve_keys)
 
-        atomic_yaml_write(
-            config_path,
-            normalized,
-            extra_content="".join(parts) if parts else None,
-        )
+            if strip_defaults and effective_preserve_keys:
+                # _preserve_env_ref_templates may return Any; cast for type-checker.
+                from typing import cast as _cast
+                normalized = _cast(Dict[str, Any], normalized)
+                normalized = _strip_default_values(
+                    normalized,  # type: ignore[arg-type]
+                    DEFAULT_CONFIG,
+                    preserve_keys=effective_preserve_keys,
+                )
+
+            return normalized, current_normalized
+
+        _panel_before, _ = _panel_normalize(copy.deepcopy(_panel_snapshot["value"]))
+        normalized, current_normalized = _panel_normalize(config)
+        _panel_write(config_path, normalized, snapshot=_panel_snapshot, baseline=_panel_before, managed_keys=managed_keys, effective_after=config)
         _secure_file(config_path)
         _RAW_CONFIG_CACHE.pop(str(config_path), None)
+        _LOAD_CONFIG_CACHE.pop(str(config_path), None)
         _LAST_EXPANDED_CONFIG_BY_PATH[str(config_path)] = copy.deepcopy(current_normalized)
+        return _panel_snapshot["raw_hash"] or "missing"
 
 
 def _parse_env_value(raw_value: str) -> str:
@@ -3657,6 +3650,10 @@ def load_env() -> Dict[str, str]:
     """
     global _env_cache
     env_path = get_env_path()
+    from panel_config_bridge import read_env as _panel_read_env
+    _panel_values = _panel_read_env(env_path)
+    if _panel_values is not None:
+        return _panel_values
 
     try:
         mtime = env_path.stat().st_mtime
@@ -3749,6 +3746,11 @@ def sanitize_env_file() -> int:
     0 when no changes are needed.
     """
     env_path = get_env_path()
+    from panel_config_bridge import config_path as _panel_config_path
+    if _panel_config_path(env_path.with_name("config.yaml")):
+        # Reading already normalizes safely. Formatting-only migration must
+        # not rewrite credential files or race real edits in this deployment.
+        return 0
     if not env_path.exists():
         return 0
 
@@ -3888,6 +3890,12 @@ def save_env_value(key: str, value: str):
     value = _check_non_ascii_credential(key, value)
     ensure_hermes_home()
     env_path = get_env_path()
+    from panel_config_bridge import update_env as _panel_update_env
+    _panel_result = _panel_update_env(env_path, key, value)
+    if _panel_result is not None:
+        os.environ[key] = value
+        invalidate_env_cache()
+        return
 
     # On Windows, open() defaults to the system locale (cp1252) which can
     # cause OSError errno 22 on UTF-8 .env files.
@@ -3998,6 +4006,12 @@ def remove_env_value(key: str) -> bool:
     if not _ENV_VAR_NAME_RE.match(key):
         raise ValueError(f"Invalid environment variable name: {key!r}")
     env_path = get_env_path()
+    from panel_config_bridge import update_env as _panel_update_env
+    _panel_result = _panel_update_env(env_path, key, remove=True)
+    if _panel_result is not None:
+        os.environ.pop(key, None)
+        invalidate_env_cache()
+        return _panel_result["found"]
     if not env_path.exists():
         os.environ.pop(key, None)
         return False
@@ -4881,7 +4895,7 @@ def set_config_value(key: str, value: str, force: bool = False):
     if config_path.exists():
         try:
             with open(config_path, encoding="utf-8") as f:
-                user_config = fast_safe_load(f) or {}
+                user_config = _panel_empty_mapping(fast_safe_load(f))
         except Exception as exc:
             print(
                 f"✗ Cannot parse {config_path}: {exc}\n"
@@ -5096,7 +5110,7 @@ def unset_config_value(key: str):
     if config_path.exists():
         try:
             with open(config_path, encoding="utf-8") as f:
-                user_config = fast_safe_load(f) or {}
+                user_config = _panel_empty_mapping(fast_safe_load(f))
         except Exception as exc:
             print(
                 f"✗ Cannot parse {config_path}: {exc}\n"
@@ -5389,7 +5403,7 @@ def _inject_platform_plugin_env_vars() -> None:
                 continue
             try:
                 with open(manifest_path, "r", encoding="utf-8") as f:
-                    manifest = fast_safe_load(f) or {}
+                    manifest = _panel_empty_mapping(fast_safe_load(f))
             except Exception:
                 continue
             label = manifest.get("label") or manifest.get("name") or child.name

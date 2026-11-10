@@ -322,6 +322,9 @@ def atomic_yaml_write(
         extra_content: Optional string to append after the YAML dump
             (e.g. commented-out sections for user reference).
     """
+    from panel_config_bridge import write as _panel_config_write
+    if _panel_config_write(path, data):
+        return
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -381,6 +384,9 @@ def atomic_roundtrip_yaml_update(
     should survive a single setting mutation.  Writes still use the same temp
     file + fsync + atomic replace pattern.
     """
+    from panel_config_bridge import dotted_update as _panel_dotted_update
+    if _panel_dotted_update(path, key_path, value):
+        return
     from ruamel.yaml import YAML
     from ruamel.yaml.comments import CommentedMap
 
@@ -477,7 +483,8 @@ def fast_safe_load(stream: Any) -> Any:
     back to PyYAML's pure-Python ``SafeLoader`` when ``CSafeLoader`` isn't
     available, so behavior is identical everywhere — only the speed differs.
     """
-    return yaml.load(stream, Loader=_get_fast_yaml_loader())
+    from panel_config_bridge import raw_stream as _panel_raw_stream
+    return _panel_raw_stream(stream, lambda source: yaml.load(source, Loader=_get_fast_yaml_loader()))
 
 
 # ─── Environment Variable Helpers ─────────────────────────────────────────────
