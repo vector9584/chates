@@ -704,10 +704,11 @@ def build_subprocess_env(
         # _sanitize_subprocess_env already performs HERMES_HOME override
         # bridging + apply_subprocess_home_env unconditionally; delegating
         # wholesale keeps one owner and zero drift.
-        return _sanitize_subprocess_env(
+        from cron.panel_echo import child_env
+        return child_env(_sanitize_subprocess_env(
             dict(base) if base is not None else os.environ.copy(),
             dict(extra) if extra else None,
-        )
+        ))
 
     env: dict[str, str] = dict(base) if base is not None else os.environ.copy()
     if inherit_profile_home:
@@ -1486,6 +1487,8 @@ class LocalEnvironment(BaseEnvironment):
     def _run_bash(self, cmd_string: str, *, login: bool = False,
                   timeout: int = 120,
                   stdin_data: str | None = None) -> subprocess.Popen:
+        from cron.panel_echo import rewrite_command
+        cmd_string = rewrite_command(cmd_string)
         bash = _find_bash()
         # For login-shell invocations (used by init_session to build the
         # environment snapshot), prepend sources for the user's bashrc /
@@ -1498,7 +1501,8 @@ class LocalEnvironment(BaseEnvironment):
             if init_files:
                 cmd_string = _prepend_shell_init(cmd_string, init_files)
         args = [bash, "-l", "-c", cmd_string] if login else [bash, "-c", cmd_string]
-        run_env = _make_run_env(self.env)
+        from cron.panel_echo import child_env
+        run_env = child_env(_make_run_env(self.env))
 
         # Recover when the cwd has been deleted out from under us — usually by
         # a previous tool call that ran ``rm -rf`` on its own working dir

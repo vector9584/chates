@@ -17,6 +17,7 @@ from pydantic import BaseModel, SecretStr, field_validator
 
 class ConfigUpdate(BaseModel):
     config: dict
+    revision: Optional[str] = None
     profile: Optional[str] = None
 
 
@@ -672,6 +673,7 @@ class TerminalBackendSelect(BaseModel):
 
 class RawConfigUpdate(BaseModel):
     yaml_text: str
+    revision: Optional[str] = None
     profile: Optional[str] = None
 
 

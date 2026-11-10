@@ -6091,10 +6091,13 @@ async def update_memory_provider_config(
 
 @app.get("/api/config")
 async def get_config(profile: Optional[str] = None):
+    from panel_config_bridge import revision_of
     with _profile_scope(profile):
-        config = _normalize_config_for_web(load_config())
-    # Strip internal keys that the frontend shouldn't see or send back
-    return {k: v for k, v in config.items() if not k.startswith("_")}
+        loaded = load_config()
+        config = _normalize_config_for_web(loaded)
+    result = {k: v for k, v in config.items() if not k.startswith("_")}
+    result["_panel_revision"] = revision_of(loaded)
+    return result
 
 
 @app.get("/api/config/defaults")
@@ -6878,23 +6881,22 @@ def _denormalize_config_from_web(config: Dict[str, Any]) -> Dict[str, Any]:
 
 @app.put("/api/config")
 async def update_config(body: ConfigUpdate, profile: Optional[str] = None):
+    from panel_config_bridge import expect_revision, ConfigError
     try:
         with _profile_scope(body.profile or profile):
-            # The dashboard form is schema-driven (see CONFIG_SCHEMA). Any root
-            # key absent from the schema — most visibly ``custom_providers``, but
-            # also ``agent.personalities``, ``terminal.lifetime_seconds``, etc. —
-            # is not sent in the PUT body. A full-replace save would silently
-            # drop those keys. Deep-merge incoming over what's on disk so the
-            # frontend can only overwrite what it explicitly sends.
-            existing = read_raw_config()
-            incoming = _denormalize_config_from_web(body.config)
-            save_config(_deep_merge(existing, incoming))
-        return {"ok": True}
+            existing = expect_revision(load_config(), body.revision)
+            incoming = dict(body.config)
+            incoming.pop("_panel_revision", None)
+            incoming = _denormalize_config_from_web(incoming)
+            revision = save_config(_deep_merge(existing, incoming))
+        return {"ok": True, "revision": revision}
+    except ConfigError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
     except HTTPException:
         raise
     except Exception:
         _log.exception("PUT /api/config failed")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="配置未收到保存确认，请重新读取核对")
 
 
 def _catalog_provider_env_metadata() -> dict:
@@ -7069,6 +7071,7 @@ async def get_env_vars(profile: Optional[str] = None):
 
 @app.put("/api/env")
 async def set_env_var(body: EnvVarUpdate, profile: Optional[str] = None):
+    from panel_config_bridge import ConfigError
     try:
         with _profile_scope(body.profile or profile):
             # Unified credential lifecycle: writes .env AND reconciles any
@@ -7080,6 +7083,8 @@ async def set_env_var(body: EnvVarUpdate, profile: Optional[str] = None):
 
             result = save_provider_env_credential(body.key, body.value)
         return result
+    except ConfigError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
     except ValueError as exc:
         # save_env_value raises ValueError for invalid names and for keys
         # on the denylist (LD_PRELOAD, PATH, PYTHONPATH, …). Surface the
@@ -7536,6 +7541,7 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
 
 @app.delete("/api/env")
 async def remove_env_var(body: EnvVarDelete, profile: Optional[str] = None):
+    from panel_config_bridge import ConfigError
     try:
         with _profile_scope(body.profile or profile):
             # Unified credential lifecycle: clears the .env entry AND every
@@ -7552,6 +7558,8 @@ async def remove_env_var(body: EnvVarDelete, profile: Optional[str] = None):
         return result
     except HTTPException:
         raise
+    except ConfigError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
     except ValueError as exc:
         # remove_env_value raises ValueError for invalid key names. Surface
         # the message to the SPA so the user understands why the delete was
@@ -13944,33 +13952,28 @@ def _probe_terminal_backend(name: str, terminal_cfg: dict) -> tuple:
 
 @app.get("/api/config/raw")
 async def get_config_raw(profile: Optional[str] = None):
-    """Raw config.yaml text plus its resolved path.
-
-    ``path`` is resolved inside ``_profile_scope`` so the Config page header
-    shows the file the switched profile actually reads/writes — /api/status's
-    ``config_path`` is machine-global and always reports the dashboard
-    process's own profile, which is wrong under the global profile switcher.
-    """
-    with _profile_scope(profile):
-        path = get_config_path()
-    if not path.exists():
-        return {"yaml": "", "path": str(path)}
-    return {"yaml": path.read_text(encoding="utf-8"), "path": str(path)}
+    from panel_config_bridge import raw_document, ConfigError
+    try:
+        with _profile_scope(profile):
+            return raw_document(get_config_path())
+    except ConfigError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
 
 @app.put("/api/config/raw")
 async def update_config_raw(body: RawConfigUpdate, profile: Optional[str] = None):
+    from panel_config_bridge import replace_raw, ConfigError
+    from hermes_cli.config import is_managed
+    from hermes_cli import managed_scope
     try:
-        parsed = yaml.safe_load(body.yaml_text)
-        if not isinstance(parsed, dict):
-            raise HTTPException(status_code=400, detail="YAML must be a mapping")
         with _profile_scope(body.profile or profile):
-            # Full-document replacement: the editor owns the whole file; do not
-            # merge omitted sections back from disk (#62723).
-            save_config(parsed, merge_existing=False)
-        return {"ok": True}
-    except yaml.YAMLError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid YAML: {e}")
+            if is_managed():
+                raise HTTPException(status_code=403, detail="当前配置由运行环境管理")
+            revision = replace_raw(get_config_path(), body.yaml_text, body.revision,
+                                   managed_scope.managed_config_keys())
+        return {"ok": True, "revision": revision}
+    except ConfigError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -16059,6 +16062,14 @@ def mount_spa(application: FastAPI):
                 {"error": "Frontend not built. Run: cd web && npm run build"},
                 status_code=404,
             )
+        import json as _panel_json
+        _panel_assets = ("api-CUjvYA_E.js", "ConfigPage-DNVi6bFP.js")
+        _panel_imports = {
+            f"{prefix}/assets/{name}": f"{prefix}/assets/{name}?panel=config18"
+            for name in _panel_assets
+        }
+        _panel_map = '<script type="importmap">' + _panel_json.dumps({"imports": _panel_imports}) + '</script>'
+        html = html.replace("<head>", "<head>" + _panel_map, 1)
         chat_js = "true" if _DASHBOARD_EMBEDDED_CHAT_ENABLED else "false"
         gated = bool(getattr(app.state, "auth_required", False))
         gated_js = "true" if gated else "false"
