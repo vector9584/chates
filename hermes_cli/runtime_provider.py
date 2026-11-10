@@ -1110,7 +1110,12 @@ def _resolve_named_custom_runtime(
         return None
 
     # Check if a credential pool exists for this custom endpoint
-    pool_result = _try_resolve_from_custom_pool(base_url, "custom", custom_provider.get("api_mode"), provider_name=custom_provider.get("name"))
+    from panel_custom_pool import resolve as _panel_custom_pool
+    _panel_key = (str(custom_provider.get("api_key") or "").strip()
+                  or _getenv(str(custom_provider.get("key_env") or "").strip(), "").strip())
+    pool_result = _panel_custom_pool(base_url, custom_provider, requested_provider, _panel_key)
+    if pool_result and not custom_provider.get("api_mode"):
+        pool_result["api_mode"] = _detect_api_mode_for_url(base_url) or "chat_completions"
     if pool_result:
         # Propagate the model name even when using pooled credentials —
         # the pool doesn't know about the custom_providers model field.

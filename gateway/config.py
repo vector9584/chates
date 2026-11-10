@@ -1740,8 +1740,19 @@ def load_gateway_config() -> GatewayConfig:
         )
 
     config = GatewayConfig.from_dict(gw_data)
+    # Persisted gateway.json and merged YAML share the same explicit-disable
+    # contract. Some env bridges previously unconditionally enabled platforms.
+    _panel_disabled = {
+        name for name, block in (gw_data.get("platforms") or {}).items()
+        if isinstance(block, dict) and "enabled" in block
+        and not _coerce_bool(block["enabled"], default=True)
+    }
+    for platform, platform_config in config.platforms.items():
+        if platform.value in _panel_disabled:
+            platform_config.enabled = False
+            platform_config.extra["_enabled_explicit"] = True
 
-    # Override with environment variables
+    # Override credentials and other env settings; explicit disable survives.
     _apply_env_overrides(config)
     
     # --- Validate loaded values ---
@@ -1816,6 +1827,10 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
     """Apply environment variable overrides to config."""
     getenv = _getenv_str
     getenv_int = _getenv_int
+    _panel_disabled = {
+        platform for platform, value in config.platforms.items()
+        if not value.enabled and bool(value.extra.get("_enabled_explicit", False))
+    }
 
     def _enable_from_env(platform: Platform) -> PlatformConfig:
         if platform not in config.platforms:
@@ -2529,6 +2544,10 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
     # noisy retry-forever errors.  ``_platform_status`` was already fixed
     # for the same bug class in commit 7849a3d73; this is the runtime
     # counterpart.
+    for _panel_platform in _panel_disabled:
+        if _panel_platform in config.platforms:
+            config.platforms[_panel_platform].enabled = False
+
     try:
         from hermes_cli.plugins import discover_plugins
         discover_plugins()  # idempotent
@@ -2684,5 +2703,8 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
         relay_config = _enable_from_env(Platform.RELAY)
         relay_config.extra["relay_url"] = relay_url_val.rstrip("/")
 
+    for _panel_platform in _panel_disabled:
+        if _panel_platform in config.platforms:
+            config.platforms[_panel_platform].enabled = False
     for platform_config in config.platforms.values():
         platform_config.extra.pop("_enabled_explicit", None)

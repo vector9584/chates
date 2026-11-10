@@ -137,14 +137,15 @@ def load_yaml_file(path: Path) -> Dict[str, Any]:
         ) from exc
     # An empty file parses to None — a legitimate state with nothing to lose.
     if data is None:
-        return {}
+        data = {}
     if not isinstance(data, dict):
         raise ConfigReadError(
             f"Refusing to overwrite {path}: expected the existing file to hold a "
             f"YAML mapping but found {type(data).__name__}. Fix it with "
             f"`hermes config edit` (or move it aside), then re-run the import."
         )
-    return data
+    from panel_config_bridge import attach_raw as _panel_attach_raw
+    return _panel_attach_raw(path, data, raw)
 
 
 def dump_yaml_file(path: Path, data: Dict[str, Any]) -> None:

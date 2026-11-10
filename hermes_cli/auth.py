@@ -1160,7 +1160,8 @@ def _auth_store_lock(
     """
     auth_path = target_path if target_path is not None else _auth_file_path()
     lock_path = auth_path.with_suffix(".lock") if target_path is not None else _auth_lock_path()
-    with _file_lock(
+    from panel_config_bridge import auth_guard
+    with auth_guard(auth_path), _file_lock(
         lock_path,
         _auth_lock_holder_for(auth_path),
         timeout_seconds,
@@ -1169,7 +1170,7 @@ def _auth_store_lock(
         yield
 
 
-def _load_auth_store(auth_file: Optional[Path] = None) -> Dict[str, Any]:
+def _panel_original_load_auth_store(auth_file: Optional[Path] = None) -> Dict[str, Any]:
     auth_file = auth_file or _auth_file_path()
     if not auth_file.exists():
         return {"version": AUTH_STORE_VERSION, "providers": {}}
@@ -1238,7 +1239,7 @@ def _load_auth_store(auth_file: Optional[Path] = None) -> Dict[str, Any]:
     return {"version": AUTH_STORE_VERSION, "providers": {}}
 
 
-def _save_auth_store(auth_store: Dict[str, Any], target_path: Optional[Path] = None) -> Path:
+def _panel_original_save_auth_store(auth_store: Dict[str, Any], target_path: Optional[Path] = None) -> Path:
     # target_path=None preserves the existing contract (write the active
     # store at _auth_file_path()). An explicit path lets callers persist a
     # specific store — e.g. the global-root write-through for rotating xAI
@@ -1667,7 +1668,8 @@ def write_credential_pool(
             if not disk_id or disk_id in new_ids or disk_id in removed:
                 continue
             merged.append(sanitize_borrowed_credential_payload(disk_entry, provider_id))
-        pool[provider_id] = merged
+        from panel_config_bridge import filter_auth_entries
+        pool[provider_id] = filter_auth_entries(auth_store, merged)
         return _save_auth_store(auth_store)
 
 
@@ -9178,3 +9180,15 @@ def logout_command(args) -> None:
             print("Model provider configuration was unchanged.")
     else:
         print(f"No auth state found for {provider_name}.")
+
+
+def _load_auth_store(auth_file: Optional[Path] = None):
+    from panel_config_bridge import auth_guard
+    with auth_guard(auth_file or _auth_file_path()):
+        return _panel_original_load_auth_store(auth_file)
+
+
+def _save_auth_store(auth_store: Dict[str, Any], target_path: Optional[Path] = None):
+    from panel_config_bridge import auth_guard
+    with auth_guard(target_path or _auth_file_path()):
+        return _panel_original_save_auth_store(auth_store, target_path)

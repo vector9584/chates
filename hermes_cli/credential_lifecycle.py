@@ -210,7 +210,7 @@ def purge_env_credential_references(
     return {"pool_pruned": pruned, "providers": providers}
 
 
-def save_provider_env_credential(env_var: str, value: str) -> Dict[str, Any]:
+def _panel_original_save_provider_env_credential(env_var: str, value: str) -> Dict[str, Any]:
     """Save/update a credential in ``.env`` and reconcile every mirror.
 
     After the ``.env`` write, any config.yaml mirror that held the PREVIOUS
@@ -242,7 +242,7 @@ def save_provider_env_credential(env_var: str, value: str) -> Dict[str, Any]:
     return {"ok": True, "key": env_var, "config_updates": config_updates}
 
 
-def remove_provider_env_credential(env_var: str) -> Dict[str, Any]:
+def _panel_original_remove_provider_env_credential(env_var: str) -> Dict[str, Any]:
     """Remove a credential from EVERY store it lives in.
 
     Clears the ``.env`` entry (and process env), prunes env-seeded
@@ -270,3 +270,15 @@ def remove_provider_env_credential(env_var: str) -> Dict[str, Any]:
         "config_scrubbed": config_scrubbed,
         "found": bool(removed_from_env or refs["pool_pruned"] or config_scrubbed),
     }
+
+
+def save_provider_env_credential(env_var: str, value: str):
+    from panel_config_bridge import provider_credential
+    result = provider_credential(env_var, value)
+    return result if result is not None else _panel_original_save_provider_env_credential(env_var, value)
+
+
+def remove_provider_env_credential(env_var: str):
+    from panel_config_bridge import provider_credential
+    result = provider_credential(env_var, remove=True)
+    return result if result is not None else _panel_original_remove_provider_env_credential(env_var)
