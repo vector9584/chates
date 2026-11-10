@@ -115,6 +115,7 @@ export default function ConfigPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [yamlMode, setYamlMode] = useState(false);
   const [yamlText, setYamlText] = useState("");
+  const yamlRevision = useRef<string | undefined>(undefined);
   const [yamlLoading, setYamlLoading] = useState(false);
   const [yamlSaving, setYamlSaving] = useState(false);
   const [configPath, setConfigPath] = useState<string | null>(null);
@@ -215,7 +216,7 @@ export default function ConfigPage() {
       setYamlLoading(true);
       api
         .getConfigRaw()
-        .then((resp) => setYamlText(resp.yaml))
+        .then((resp) => { setYamlText(resp.yaml); yamlRevision.current = resp.revision; })
         .catch(() => showToast(t.config.failedToLoadRaw, "error"))
         .finally(() => setYamlLoading(false));
     }
@@ -283,7 +284,7 @@ export default function ConfigPage() {
       await api.saveConfig(config);
       showToast(t.config.configSaved, "success");
     } catch (e) {
-      showToast(`${t.config.failedToSave}: ${e}`, "error");
+      showToast(`${t.config.failedToSave}: ${e instanceof Error ? e.message : e}`, "error");
     } finally {
       setSaving(false);
     }
@@ -292,14 +293,16 @@ export default function ConfigPage() {
   const handleYamlSave = async () => {
     setYamlSaving(true);
     try {
-      await api.saveConfigRaw(yamlText);
+      const result = await api.saveConfigRaw(yamlText, undefined, yamlRevision.current);
+      yamlRevision.current = result.revision;
       showToast(t.config.yamlConfigSaved, "success");
       api
         .getConfig()
         .then(setConfig)
         .catch(() => {});
     } catch (e) {
-      showToast(`${t.config.failedToSaveYaml}: ${e}`, "error");
+      if (e && typeof e === "object" && "panelRevision" in e) yamlRevision.current = String(e.panelRevision);
+      showToast(`${t.config.failedToSaveYaml}: ${e instanceof Error ? e.message : e}`, "error");
     } finally {
       setYamlSaving(false);
     }
@@ -339,7 +342,7 @@ export default function ConfigPage() {
 
   const handleExport = () => {
     if (!config) return;
-    const blob = new Blob([JSON.stringify(config, null, 2)], {
+    const blob = new Blob([JSON.stringify(Object.fromEntries(Object.entries(config).filter(([key]) => key !== "_panel_revision")), null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -357,7 +360,7 @@ export default function ConfigPage() {
     reader.onload = () => {
       try {
         const imported = JSON.parse(reader.result as string);
-        setConfig(imported);
+        setConfig({ ...imported, _panel_revision: config?._panel_revision });
         showToast(t.config.configImported, "success");
       } catch {
         showToast(t.config.invalidJson, "error");

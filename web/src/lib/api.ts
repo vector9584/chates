@@ -1,3 +1,4 @@
+import { reviewConfig } from "./panel-config-review.js";
 import { buildHermesWebSocketUrl } from "@hermes/shared";
 
 // The dashboard can be served either at the root of its host (e.g.
@@ -567,22 +568,31 @@ export const api = {
         body: JSON.stringify(body),
       },
     ),
-  saveConfig: (config: Record<string, unknown>, profile = getManagementProfile()) =>
-    fetchJSON<{ ok: boolean }>(appendProfileParam("/api/config", profile), {
+  saveConfig: async (config: Record<string, unknown>, profile = getManagementProfile()) => {
+    const { _panel_revision: revision, ...fields } = config;
+    let result: { ok: boolean; revision: string };
+    try { result = await fetchJSON<{ ok: boolean; revision: string }>(appendProfileParam("/api/config", profile), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config }),
-    }),
+      body: JSON.stringify({ config: fields, revision }),
+    }); } catch (error) {
+      try { await reviewConfig(error, {draft: config, latest: () => api.getConfig(profile)}); }
+      catch (conflict: any) { if (conflict.panelRevision) config._panel_revision = conflict.panelRevision; throw conflict; }
+      throw error;
+    }
+    config._panel_revision = result.revision;
+    return result;
+  },
   getConfigRaw: (profile = getManagementProfile()) =>
-    fetchJSON<{ yaml: string; path?: string }>(
+    fetchJSON<{ yaml: string; path?: string; revision: string }>(
       appendProfileParam("/api/config/raw", profile),
     ),
-  saveConfigRaw: (yaml_text: string, profile = getManagementProfile()) =>
-    fetchJSON<{ ok: boolean }>(appendProfileParam("/api/config/raw", profile), {
+  saveConfigRaw: (yaml_text: string, profile = getManagementProfile(), revision?: string) =>
+    fetchJSON<{ ok: boolean; revision: string }>(appendProfileParam("/api/config/raw", profile), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ yaml_text }),
-    }),
+      body: JSON.stringify({ yaml_text, revision }),
+    }).catch((error) => reviewConfig(error, {draft: yaml_text, raw: true, latest: () => api.getConfigRaw(profile)})),
   getEnvVars: () => fetchJSON<Record<string, EnvVarInfo>>("/api/env"),
   setEnvVar: (key: string, value: string) =>
     fetchJSON<{ ok: boolean }>("/api/env", {
