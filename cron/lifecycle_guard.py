@@ -170,6 +170,25 @@ def contains_launchctl_submit_command(command: str) -> bool:
     return False
 
 
+def _looks_like_text_script(path: Path) -> bool:
+    """True only for readable regular files with no NUL in the head.
+
+    A "/" in the executable token is not proof of a script: absolute
+    interpreter paths (``/vol1/.../venv/bin/python3``) look identical.
+    Reading one yields a binary blob full of NULs, and the recursive
+    re-scan then tokenizes that blob as a path — ``Path(...).expanduser()``
+    raises ``ValueError: embedded null byte`` and the guard dies instead of
+    guarding (#76762 fixed the os.open layer, not this one).
+    """
+    try:
+        if not path.is_file():
+            return False
+        with path.open("rb") as handle:
+            return b"\x00" not in handle.read(8192)
+    except (OSError, ValueError):
+        return False
+
+
 def _resolve_terminal_script_path(candidate: str, cwd: Optional[str]) -> Path:
     path = Path(candidate).expanduser()
     if not path.is_absolute():
@@ -226,7 +245,9 @@ def _iter_referenced_shell_scripts(
         # (#77131). Skip pure-separator tokens.
         if executable.strip("/"):
             if "/" in executable or executable.endswith((".sh", ".bash", ".zsh")):
-                yield _resolve_terminal_script_path(executable, cwd)
+                candidate = _resolve_terminal_script_path(executable, cwd)
+                if _looks_like_text_script(candidate):
+                    yield candidate
 
 
 def _iter_shell_command_payloads(command: str) -> Iterator[str]:
