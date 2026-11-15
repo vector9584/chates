@@ -70,16 +70,34 @@ _SIZES: Dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def _image_gen_cfg() -> Dict[str, Any]:
+def _root_cfg() -> Dict[str, Any]:
     try:
         from hermes_cli.config import load_config
 
         cfg = load_config()
-        section = cfg.get("image_gen") if isinstance(cfg, dict) else None
-        return section if isinstance(section, dict) else {}
+        return cfg if isinstance(cfg, dict) else {}
     except Exception as exc:  # pragma: no cover - config always present in prod
-        logger.debug("image_gen config unreadable: %s", exc)
+        logger.debug("config unreadable: %s", exc)
         return {}
+
+
+def _image_gen_cfg() -> Dict[str, Any]:
+    section = _root_cfg().get("image_gen")
+    return section if isinstance(section, dict) else {}
+
+
+def _provider_cfg() -> Dict[str, Any]:
+    """``image_gen.custom.provider_id`` 指向的那条 ``providers.<id>``。
+
+    地址和密钥全部从这条 provider 上取 —— 图像生成卡自己不存第二份，
+    免得同一把 key、同一个域名在面板里配两遍。
+    """
+    pid = _custom_cfg().get("provider_id")
+    if not isinstance(pid, str) or not pid.strip():
+        return {}
+    providers = _root_cfg().get("providers")
+    entry = providers.get(pid.strip()) if isinstance(providers, dict) else None
+    return entry if isinstance(entry, dict) else {}
 
 
 def _custom_cfg() -> Dict[str, Any]:
@@ -88,8 +106,12 @@ def _custom_cfg() -> Dict[str, Any]:
 
 
 def _base_url() -> str:
-    value = _custom_cfg().get("base_url")
-    return value.strip().rstrip("/") if isinstance(value, str) else ""
+    # provider 那条优先；只有 provider_id 空着时才回落到旧的 custom.base_url。
+    for source in (_provider_cfg(), _custom_cfg()):
+        value = source.get("base_url")
+        if isinstance(value, str) and value.strip():
+            return value.strip().rstrip("/")
+    return ""
 
 
 def _api_model() -> str:
@@ -105,6 +127,12 @@ def _api_model() -> str:
 
 
 def _key_env() -> str:
+    # provider 的 api_key 存的是 ${VAR} 占位符，那个变量名就是这把 key 在 .env 里的名字。
+    inline = _provider_cfg().get("api_key")
+    if isinstance(inline, str):
+        inline = inline.strip()
+        if inline.startswith("${") and inline.endswith("}"):
+            return inline[2:-1]
     value = _custom_cfg().get("api_key_env")
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -112,6 +140,10 @@ def _key_env() -> str:
 
 
 def _api_key() -> str:
+    # provider 上直接写了明文的情况（少见但合法）先用它，否则按变量名去取。
+    inline = _provider_cfg().get("api_key")
+    if isinstance(inline, str) and inline.strip() and not inline.strip().startswith("${"):
+        return inline.strip()
     try:
         from agent.secret_scope import get_secret
 
@@ -331,7 +363,7 @@ class CustomGatewayImageGenProvider(ImageGenProvider):
                 "id": model,
                 "display": f"{model}（自定义中转站）",
                 "speed": "取决于中转站",
-                "strengths": "你自己配置的 base_url / 模型 / 密钥",
+                "strengths": "复用 LLM 服务商里的地址和密钥",
                 "price": "varies",
             }
         ]
@@ -412,7 +444,7 @@ class CustomGatewayImageGenProvider(ImageGenProvider):
 
         if not base:
             return error_response(
-                error="image_gen.custom.base_url 未配置。到面板「模型 → 能力后端 → 图像生成」填中转站地址。",
+                error="没找到可用的中转站地址。到面板「模型 → 能力后端 → 图像生成」挑一条已经配好的 LLM 服务。",
                 error_type="auth_required",
                 provider=PROVIDER_NAME,
                 aspect_ratio=aspect,
@@ -426,7 +458,7 @@ class CustomGatewayImageGenProvider(ImageGenProvider):
             )
         if not api_key:
             return error_response(
-                error=f"{_key_env()} 未配置。到面板「密钥」页填入中转站的 key。",
+                error=f"取不到密钥（{_key_env()}）。确认「LLM 服务商」里那条服务的密钥已经配好。",
                 error_type="auth_required",
                 provider=PROVIDER_NAME,
                 model=model,

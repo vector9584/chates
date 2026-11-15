@@ -951,6 +951,15 @@ def detect_local_server_type(base_url: str, api_key: str = "") -> Optional[str]:
     import httpx
 
     normalized = _normalize_base_url(base_url)
+    if not normalized:
+        return None
+    if not is_local_endpoint(normalized):
+        # Remote endpoints (e.g. a cloud API gateway) are never a local
+        # Ollama / LM Studio / vLLM / llama.cpp server.  Probing them would
+        # burn up to 5 HTTP timeouts (~5s) on every toolsets enumeration,
+        # because a failed probe is not cached and _toolset_has_keys("vision")
+        # calls resolve_vision_provider_client() on every panel request.
+        return None
 
     # Resolve localhost to IPv4 to avoid 2s IPv6 timeout on Windows dual-stack.
     # Applied to ``normalized`` before deriving server/LM Studio URLs AND

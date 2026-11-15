@@ -1955,6 +1955,7 @@ class APIServerAdapter(BasePlatformAdapter):
             ("POST", "/api/sessions/{session_id}/chat/stream", self._handle_session_chat_stream),
             ("POST", "/api/sessions/{session_id}/model", self._handle_session_model_lock),
             ("POST", "/v1/chat/completions", self._handle_chat_completions),
+            ("POST", "/api/clarify/respond", self._handle_clarify_respond),
             ("POST", "/v1/responses", self._handle_responses),
             ("GET", "/v1/responses/{response_id}", self._handle_get_response),
             ("DELETE", "/v1/responses/{response_id}", self._handle_delete_response),
@@ -2805,7 +2806,243 @@ class APIServerAdapter(BasePlatformAdapter):
                 else "global"
             ),
         }
+        # Clarify (interactive question) support for the panel UI.
+        #
+        # The default hermes-api-server toolset deliberately omits `clarify`
+        # because a plain HTTP endpoint has no interactive UI.  When the panel
+        # opts in via `platform_toolsets.api_server` (see config.yaml) we wire
+        # the same sync callback the native gateway uses: register the pending
+        # clarify, push a `clarify.request` SSE event into the live stream, then
+        # block the agent thread until POST /api/clarify/respond resolves it.
+        if "clarify" in enabled_toolsets:
+            try:
+                agent.clarify_callback = self._make_clarify_callback(
+                    session_id=session_id,
+                    gateway_session_key=gateway_session_key,
+                )
+            except Exception:
+                logger.debug("Failed to wire clarify callback", exc_info=True)
         return agent
+
+    # ------------------------------------------------------------------
+    # Clarify (interactive question) plumbing for the panel UI
+    # ------------------------------------------------------------------
+    def _clarify_sink_map(self) -> Dict[str, Any]:
+        """Lazy registry: session key → live SSE stream sink."""
+        sinks = getattr(self, "_clarify_sinks", None)
+        if sinks is None:
+            sinks = {}
+            self._clarify_sinks = sinks
+        return sinks
+
+    def _register_clarify_sink(
+        self,
+        stream_q,
+        *,
+        session_id: Optional[str] = None,
+        gateway_session_key: Optional[str] = None,
+        alive_check=None,
+    ) -> List[str]:
+        """Publish a live SSE stream as a clarify sink for this session."""
+        sinks = self._clarify_sink_map()
+        entry = {"q": stream_q, "alive": alive_check}
+        keys: List[str] = []
+        if gateway_session_key:
+            keys.append(f"key:{gateway_session_key}")
+        if session_id:
+            keys.append(f"sid:{session_id}")
+        for key in keys:
+            sinks[key] = entry
+        self._clarify_recent = entry
+        return keys
+
+    def _unregister_clarify_sink(self, keys: Optional[List[str]], stream_q) -> None:
+        sinks = self._clarify_sink_map()
+        for key in keys or []:
+            cur = sinks.get(key)
+            if cur is not None and cur.get("q") is stream_q:
+                sinks.pop(key, None)
+        recent = getattr(self, "_clarify_recent", None)
+        if recent is not None and recent.get("q") is stream_q:
+            self._clarify_recent = None
+
+    def _clarify_sink_for(
+        self,
+        session_key: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ):
+        """Pick a live sink: session key → session id → most recent stream."""
+        sinks = self._clarify_sink_map()
+        candidates = []
+        if session_key:
+            candidates.append(sinks.get(f"key:{session_key}"))
+        if session_id:
+            candidates.append(sinks.get(f"sid:{session_id}"))
+        candidates.append(getattr(self, "_clarify_recent", None))
+        for entry in candidates:
+            if not entry:
+                continue
+            alive = entry.get("alive")
+            try:
+                if alive is not None and not alive():
+                    continue
+            except Exception:
+                continue
+            return entry
+        return None
+
+    def _clarify_deliver(
+        self,
+        *,
+        clarify_id: str,
+        question: str,
+        choices,
+        multi_select: bool,
+        session_key: str = "",
+        session_id: Optional[str] = None,
+    ) -> bool:
+        """Push a clarify prompt into the live panel stream. True on success."""
+        entry = self._clarify_sink_for(session_key, session_id)
+        if entry is None:
+            return False
+        payload = {
+            "clarify_id": clarify_id,
+            "question": question,
+            "choices": list(choices) if choices else [],
+            "multi_select": bool(multi_select),
+            "max_choices": 4,
+            "session_key": session_key or "",
+        }
+        try:
+            entry["q"].put_nowait(("__clarify__", payload))
+        except Exception:
+            logger.debug("Clarify event enqueue failed", exc_info=True)
+            return False
+        return True
+
+    async def send_clarify(
+        self,
+        chat_id: str,
+        question: str,
+        choices: Optional[list],
+        clarify_id: str,
+        session_key: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> SendResult:
+        """Render a clarify prompt in the panel (SSE ``clarify.request``)."""
+        is_multi = False
+        try:
+            from tools import clarify_gateway as _cg
+
+            with _cg._lock:
+                _entry = _cg._entries.get(clarify_id)
+            is_multi = bool(_entry and getattr(_entry, "multi_select", False))
+        except Exception:
+            is_multi = False
+        ok = self._clarify_deliver(
+            clarify_id=clarify_id,
+            question=question,
+            choices=choices,
+            multi_select=is_multi,
+            session_key=session_key or "",
+            session_id=chat_id,
+        )
+        if not ok:
+            return SendResult(
+                success=False,
+                error="no active panel stream for this session",
+            )
+        return SendResult(success=True)
+
+    def _make_clarify_callback(
+        self,
+        *,
+        session_id: Optional[str] = None,
+        gateway_session_key: Optional[str] = None,
+    ):
+        """Build the sync clarify callback handed to AIAgent.
+
+        Runs on the agent's worker thread (clarify_tool's contract), so it
+        blocks on the clarify primitive's threading.Event — the asyncio stream
+        keeps draining keepalives while the user decides.
+        """
+
+        def _callback(question: str, choices=None, multi_select: bool = False) -> str:
+            from tools import clarify_gateway as _cg
+            import uuid as _uuid
+
+            scoped_key = gateway_session_key or session_id or ""
+            clarify_id = _uuid.uuid4().hex[:10]
+            _cg.register(
+                clarify_id=clarify_id,
+                session_key=scoped_key,
+                question=question,
+                choices=list(choices) if choices else None,
+                multi_select=bool(multi_select),
+            )
+            delivered = self._clarify_deliver(
+                clarify_id=clarify_id,
+                question=question,
+                choices=list(choices) if choices else [],
+                multi_select=bool(multi_select),
+                session_key=gateway_session_key or "",
+                session_id=session_id,
+            )
+            if not delivered:
+                try:
+                    _cg.clear_session(scoped_key)
+                except Exception:
+                    pass
+                return (
+                    "[clarify prompt could not be delivered: no interactive "
+                    "panel stream is attached to this session]"
+                )
+            timeout = float(_cg.get_clarify_timeout())
+            response = _cg.wait_for_response(clarify_id, timeout=timeout)
+            if response is None or response == "":
+                return f"[user did not respond within {int(timeout / 60)}m]"
+            return response
+
+        return _callback
+
+    async def _handle_clarify_respond(self, request: "web.Request") -> "web.Response":
+        """POST /api/clarify/respond — resolve a pending clarify prompt.
+
+        Body: ``{"clarify_id": "...", "response": "text"}`` or
+        ``{"clarify_id": "...", "response": ["A", "C"]}`` for multi-select.
+        Lists are JSON-encoded so clarify_tool's multi-select parser sees the
+        exact labels the user picked (plus any ``Other`` free text).
+        """
+        auth_err = self._check_auth(request)
+        if auth_err:
+            return auth_err
+        body, err = await self._read_json_body(request)
+        if err:
+            return err
+        body = body or {}
+        clarify_id = str(body.get("clarify_id") or "").strip()
+        if not clarify_id:
+            return web.json_response(
+                _openai_error("clarify_id is required", code="invalid_request"),
+                status=400,
+            )
+        raw = body.get("response")
+        if isinstance(raw, list):
+            response = json.dumps([str(x).strip() for x in raw if str(x).strip()], ensure_ascii=False)
+        else:
+            response = "" if raw is None else str(raw).strip()
+        if not response:
+            return web.json_response(
+                _openai_error("response is empty", code="invalid_request"),
+                status=400,
+            )
+        from tools import clarify_gateway as _cg
+
+        resolved = _cg.resolve_gateway_clarify(clarify_id, response)
+        return web.json_response(
+            {"ok": bool(resolved), "clarify_id": clarify_id},
+            status=200 if resolved else 409,
+        )
 
     # ------------------------------------------------------------------
     # HTTP Handlers
@@ -4226,6 +4463,15 @@ class APIServerAdapter(BasePlatformAdapter):
         response = web.StreamResponse(status=200, headers=sse_headers)
         await response.prepare(request)
 
+        # Register this stream as the clarify sink for the session so
+        # send_clarify() can push a clarify.request event into it.
+        _clarify_keys = self._register_clarify_sink(
+            stream_q,
+            session_id=session_id,
+            gateway_session_key=gateway_session_key,
+            alive_check=lambda: not agent_task.done(),
+        )
+
         try:
             last_activity = time.monotonic()
 
@@ -4253,6 +4499,15 @@ class APIServerAdapter(BasePlatformAdapter):
                     event_data = json.dumps(item[1])
                     await response.write(
                         f"event: hermes.tool.progress\ndata: {event_data}\n\n".encode()
+                    )
+                elif isinstance(item, tuple) and len(item) == 2 and item[0] == "__clarify__":
+                    # Interactive clarify prompt (panel UI).  Emitted as its own
+                    # SSE event so the browser can render radio/checkbox cards
+                    # instead of a numbered text list.  The agent thread stays
+                    # blocked in tools.clarify_gateway.wait_for_response() until
+                    # POST /api/clarify/respond resolves the clarify_id.
+                    await response.write(
+                        f"event: clarify.request\ndata: {json.dumps(item[1])}\n\n".encode()
                     )
                 else:
                     content_chunk = {
@@ -4389,6 +4644,9 @@ class APIServerAdapter(BasePlatformAdapter):
                 await response.write(b"data: [DONE]\n\n")
             except Exception:
                 pass
+
+        finally:
+            self._unregister_clarify_sink(_clarify_keys, stream_q)
 
         return response
 
