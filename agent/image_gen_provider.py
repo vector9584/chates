@@ -228,12 +228,66 @@ def normalize_reference_images(value: Any) -> Optional[List[str]]:
 
 
 def _images_cache_dir() -> Path:
-    """Return ``$HERMES_HOME/cache/images/``, creating parents as needed."""
-    from hermes_constants import get_hermes_home
+    """Return the directory generated images are written to.
 
-    path = get_hermes_home() / "cache" / "images"
+    Defaults to ``$HERMES_HOME/cache/images/`` — but that directory is shared
+    with inbound chat attachments (``img_<hash>.*``) and is safe to clear, so
+    a durable library can be pointed at with ``HERMES_IMAGE_DIR``.
+
+    2026-11-16: added the override so generated art lands in a real library
+    instead of the disposable cache. Default behaviour is unchanged when the
+    variable is unset.
+    """
+    import os
+
+    override = os.environ.get("HERMES_IMAGE_DIR", "").strip()
+    if override:
+        path = Path(override).expanduser()
+    else:
+        from hermes_constants import get_hermes_home
+
+        path = get_hermes_home() / "cache" / "images"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _write_thumbnail(path: Path) -> Optional[Path]:
+    """Write a small WebP next to a saved image. Best-effort, never raises.
+
+    ``image_generate`` hands back 4K PNGs (1–2 MB each) while the chat panel
+    renders them in a 220px card — so every session switch re-decodes megabytes
+    to fill a thumbnail slot. A 480px WebP beside the original cuts that to a
+    few tens of KB; the lightbox still opens the full file.
+
+    A missing Pillow or an unreadable format just leaves the original as the
+    only artifact, which is exactly the pre-existing behaviour.
+    """
+    try:
+        from PIL import Image
+    except Exception:
+        return None
+    target = path.with_name(path.stem + ".thumb.webp")
+    try:
+        if target.is_file() and target.stat().st_mtime >= path.stat().st_mtime:
+            return target
+        with Image.open(path) as image:
+            image.load()
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGBA")
+            width, height = image.size
+            if width > 480:
+                image = image.resize(
+                    (480, max(1, round(height * 480 / width))),
+                    Image.LANCZOS,
+                )
+            image.save(target, "WEBP", quality=78, method=4)
+        return target
+    except Exception:
+        try:
+            target.unlink()
+        except OSError:
+            pass
+        return None
 
 
 def save_b64_image(
@@ -253,6 +307,7 @@ def save_b64_image(
     short = uuid.uuid4().hex[:8]
     path = _images_cache_dir() / f"{prefix}_{ts}_{short}.{extension}"
     path.write_bytes(raw)
+    _write_thumbnail(path)
     return path
 
 
@@ -335,6 +390,7 @@ def save_url_image(
             pass
         raise ValueError(f"Image at {url} returned 0 bytes; refusing to cache.")
 
+    _write_thumbnail(path)
     return path
 
 
