@@ -252,59 +252,28 @@ def _images_cache_dir() -> Path:
 
 
 def _session_generated_dir() -> Optional[Path]:
-    """会话工作区里的 generated 目录（2026-11-19）。
+    """会话产物目录（默认 artifacts）：AI 生图挂这里（2026-11-20 改）。
 
-    需求原话：「每个会话产生的所有的附件、生成的图都应该由它所属的工作区管理」。
-    归类规则与 ``app/server/panel-workspace.js`` 的 ``sessionGroupDir`` 保持一致：
-    ``<hermes_home>/sessions/<归类文件夹名 slug>/<会话id>/generated``。
-    读的是面板同一份数据（panel-workspace.json + panel-state 覆盖层）。
+    原实现只取末级归类名、写 ``generated`` 子目录，和面板的三类
+    （uploads/artifacts/code）对不上，也和会话目录全链规则不一致。
+    现在统一走 ``agent/session_artifact_dir.py`` —— 全链归类、artifacts 落点，
+    与面板、语音共用一套路径算法。
+
     设 ``HERMES_SESSION_IMAGE_SCOPE=0`` 退回全局 ``HERMES_IMAGE_DIR`` 行为。
     """
-    import json
     import os
-    import re
 
     if os.environ.get("HERMES_SESSION_IMAGE_SCOPE", "1").strip().lower() in {"0", "false", "no", "off"}:
         return None
     try:
-        from gateway.session_context import get_session_env
+        from agent.session_artifact_dir import current_ui_session_id, session_artifact_dir
 
-        sid = (
-            get_session_env("HERMES_UI_SESSION_ID")
-            or get_session_env("HERMES_SESSION_ID")
-            or ""
-        ).strip()
-    except Exception:
-        return None
-    # 只认面板那种 id：既防路径穿越，也避免把 platform 的 chat id 当目录名
-    if not re.fullmatch(r"[A-Za-z0-9_-]{6,64}", sid):
-        return None
-    try:
-        from hermes_constants import get_hermes_home
-
-        home = get_hermes_home()
-        var = Path(os.environ.get("HERMES_VAR_DIR") or "/vol1/@appdata/hermes-agent")
-        folders: list = []
-        sessions: dict = {}
-        for file in (home / "panel-workspace.json", var / "panel-state" / "workspace.json"):
-            if not file.is_file():
-                continue
-            try:
-                data = json.loads(file.read_text("utf-8")) or {}
-            except Exception:
-                continue
-            if isinstance(data.get("folders"), list):
-                folders = data["folders"]
-            if isinstance(data.get("sessions"), dict):
-                sessions.update(data["sessions"])
-        meta = sessions.get(sid) or {}
-        fid = meta.get("folder_id") or ""
-        folder = next((f for f in folders if isinstance(f, dict) and f.get("id") == fid), None)
-        group = (
-            re.sub(r"[^\w\u4e00-\u9fa5-]+", "_", str((folder or {}).get("name") or "")).strip("_")[:40]
-            or "未分类"
-        )
-        target = home / "sessions" / group / sid / "generated"
+        sid = current_ui_session_id()
+        if not sid:
+            return None
+        target = session_artifact_dir(sid, "artifacts")
+        if target is None:
+            return None
         target.mkdir(parents=True, exist_ok=True)
         return target
     except Exception:

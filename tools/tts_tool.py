@@ -3127,6 +3127,18 @@ def text_to_speech_tool(
         file_size = os.path.getsize(file_str)
         logger.info("TTS audio saved: %s (%s bytes, provider: %s)", file_str, f"{file_size:,}", provider)
 
+        # 挂一份进会话产物目录（2026-11-20）：原路径不动，发送链路照旧按
+        # cache/audio 找文件；会话目录那份是给「这个会话产出了什么」看的。
+        # 归类全链规则与面板 sessionGroupDir 一致，见 agent/session_artifact_dir.py。
+        try:
+            from agent.session_artifact_dir import current_ui_session_id, link_into_session
+
+            _sid = current_ui_session_id()
+            if _sid:
+                link_into_session(Path(file_str), _sid, "artifacts")
+        except Exception:
+            pass
+
         # Build response with MEDIA tag for platform delivery
         media_tag = f"MEDIA:{file_str}"
         if voice_compatible:
