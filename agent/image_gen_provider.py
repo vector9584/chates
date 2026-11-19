@@ -251,6 +251,94 @@ def _images_cache_dir() -> Path:
     return path
 
 
+def _session_generated_dir() -> Optional[Path]:
+    """会话工作区里的 generated 目录（2026-11-19）。
+
+    需求原话：「每个会话产生的所有的附件、生成的图都应该由它所属的工作区管理」。
+    归类规则与 ``app/server/panel-workspace.js`` 的 ``sessionGroupDir`` 保持一致：
+    ``<hermes_home>/sessions/<归类文件夹名 slug>/<会话id>/generated``。
+    读的是面板同一份数据（panel-workspace.json + panel-state 覆盖层）。
+    设 ``HERMES_SESSION_IMAGE_SCOPE=0`` 退回全局 ``HERMES_IMAGE_DIR`` 行为。
+    """
+    import json
+    import os
+    import re
+
+    if os.environ.get("HERMES_SESSION_IMAGE_SCOPE", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    try:
+        from gateway.session_context import get_session_env
+
+        sid = (
+            get_session_env("HERMES_UI_SESSION_ID")
+            or get_session_env("HERMES_SESSION_ID")
+            or ""
+        ).strip()
+    except Exception:
+        return None
+    # 只认面板那种 id：既防路径穿越，也避免把 platform 的 chat id 当目录名
+    if not re.fullmatch(r"[A-Za-z0-9_-]{6,64}", sid):
+        return None
+    try:
+        from hermes_constants import get_hermes_home
+
+        home = get_hermes_home()
+        var = Path(os.environ.get("HERMES_VAR_DIR") or "/vol1/@appdata/hermes-agent")
+        folders: list = []
+        sessions: dict = {}
+        for file in (home / "panel-workspace.json", var / "panel-state" / "workspace.json"):
+            if not file.is_file():
+                continue
+            try:
+                data = json.loads(file.read_text("utf-8")) or {}
+            except Exception:
+                continue
+            if isinstance(data.get("folders"), list):
+                folders = data["folders"]
+            if isinstance(data.get("sessions"), dict):
+                sessions.update(data["sessions"])
+        meta = sessions.get(sid) or {}
+        fid = meta.get("folder_id") or ""
+        folder = next((f for f in folders if isinstance(f, dict) and f.get("id") == fid), None)
+        group = (
+            re.sub(r"[^\w\u4e00-\u9fa5-]+", "_", str((folder or {}).get("name") or "")).strip("_")[:40]
+            or "未分类"
+        )
+        target = home / "sessions" / group / sid / "generated"
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+    except Exception:
+        return None
+
+
+def _link_to_session(path: Path) -> None:
+    """把刚生成的图挂进会话工作区（硬链接，跨设备退化成复制）。
+
+    只挂副本、不动原路径：面板画廊和历史消息仍按 ``HERMES_IMAGE_DIR`` 找图，
+    会话目录里那份是给「这个会话产生了什么」看的。同一 inode，不额外占盘。
+    任何失败都吞掉 —— 图已经写成功了，不能因为归档失败把结果丢掉。
+    """
+    import os
+    import shutil
+
+    try:
+        target_dir = _session_generated_dir()
+        if not target_dir:
+            return
+        for src in (path, path.with_name(path.stem + ".thumb.webp")):
+            if not src.is_file():
+                continue
+            dst = target_dir / src.name
+            if dst.exists():
+                continue
+            try:
+                os.link(src, dst)
+            except OSError:
+                shutil.copy2(src, dst)
+    except Exception:
+        return
+
+
 def _write_thumbnail(path: Path) -> Optional[Path]:
     """Write a small WebP next to a saved image. Best-effort, never raises.
 
@@ -308,6 +396,7 @@ def save_b64_image(
     path = _images_cache_dir() / f"{prefix}_{ts}_{short}.{extension}"
     path.write_bytes(raw)
     _write_thumbnail(path)
+    _link_to_session(path)
     return path
 
 
@@ -391,6 +480,7 @@ def save_url_image(
         raise ValueError(f"Image at {url} returned 0 bytes; refusing to cache.")
 
     _write_thumbnail(path)
+    _link_to_session(path)
     return path
 
 
