@@ -214,7 +214,16 @@ class RelayRuntime:
 
         # A copy permits a helper called by an existing Relay callback to
         # re-enter the same logical session without re-entering Context.
-        return context.run(invoke)
+        #
+        # 本地补丁 2026-11-18：锁必须覆盖 context.run。
+        # session.context.copy() 是浅拷贝，_scope_stack_var 指向同一个可变栈对象；
+        # 原来 context.run(invoke) 跑在锁外，两个并发 turn 会同时对同一个栈
+        # push/pop，栈顶错位后 end_turn 的 pop 就抛
+        # "scope handle is not at the top of the stack" 或 "scope handle not found"，
+        # 连带 turn finalization 失败、回复被标成 Recovered reply 重发。
+        # session.lock 是 RLock，同线程可重入，回调内再次进入本 session 不会死锁。
+        with session.lock:
+            return context.run(invoke)
 
     async def run_in_session_async(
         self,
