@@ -114,13 +114,15 @@ def _apply_deepseek_reasoning_override(
         return
     extra_body["thinking"] = {"type": "enabled"}
     effort = str(reasoning_config.get("effort") or "").strip().lower()
-    if effort in {"low", "medium", "high"}:
+    # DeepSeek 官方文档里 reasoning_effort 只有 none / low / high / max（默认 high）。
+    # 「medium」不在枚举里，直接发有被判非法参数的风险 —— 夹到 high，语义上最接近。
+    _map = {"minimal": "low", "low": "low", "medium": "high", "high": "high",
+            "xhigh": "max", "max": "max", "ultra": "max"}
+    if effort in _map:
         # 必须同时写 extra_body：provider 那份静态 extra_body 在 SDK 里是最后合并的，
         # 只写顶层 reasoning_effort 会被它盖掉（实测 low 仍按 high 发）。
-        extra_body["reasoning_effort"] = effort
-        api_kwargs["reasoning_effort"] = effort
-    elif effort in {"xhigh", "max", "ultra"}:
-        api_kwargs["reasoning_effort"] = "max"
+        extra_body["reasoning_effort"] = _map[effort]
+        api_kwargs["reasoning_effort"] = _map[effort]
 
 
 def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> dict | None:
