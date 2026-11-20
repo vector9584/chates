@@ -3254,6 +3254,26 @@ def sanitize_api_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
         filtered.append(msg)
     messages = filtered
 
+    # --- Keep the conversation user-first after the system prompt ---
+    # After context compaction the live history can start with an assistant
+    # tool-call chain (system -> assistant -> tool ... -> user summary).
+    # DeepSeek with ``title: {enabled: true}`` in extra_body rejects that with
+    # HTTP 400 "an assistant message must follow a user message" (verified
+    # 2026-11-20: same body without title -> 200, with title -> 400, with a
+    # leading user turn -> 200). A session on DeepSeek then fails every turn
+    # and burns the whole fallback chain. Anthropic already gets this repair
+    # in its adapter (_ensure_leading_user_turn); do it here for every
+    # OpenAI-compatible provider. Per-call copy only, history is untouched.
+    _first = next((i for i, m in enumerate(messages) if m.get("role") != "system"), None)
+    if _first is not None and messages[_first].get("role") != "user":
+        messages = messages[:_first] + [
+            {"role": "user", "content": "[earlier context continues below]"}
+        ] + messages[_first:]
+        _ra().logger.debug(
+            "Pre-call sanitizer: inserted leading user turn before %r",
+            messages[_first + 1].get("role"),
+        )
+
     # --- Heal empty-content non-final messages (self-recovery) ---
     # A dead stream can leave an empty assistant stub (or an empty user turn)
     # mid-transcript; the provider then 400s EVERY subsequent request until it
