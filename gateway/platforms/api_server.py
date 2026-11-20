@@ -4185,6 +4185,13 @@ class APIServerAdapter(BasePlatformAdapter):
             except Exception as e:
                 logger.warning("Failed to load session history for %s: %s", session_id, e)
                 history = []
+            # 2026-11-19：面板会话在网关侧还没有记录时，上面这句会把 history 覆盖成空列表。
+            # 触发条件是 11-17 之前创建的老面板会话：那时 monitor 不透传面板 UUID，网关按
+            # sha256(系统提示 + 首条用户消息)[:16] 建档成 api-<hash>，与面板 UUID 是两个 id。
+            # 续写这类会话 = 网关按 UUID 查库 = 查不到 = AI 完全失忆（用户报「你串台了吗」）。
+            # 回退用请求体带来的面板历史；本轮结束后 agent 会按该 session_id 写库，下一轮自然接上。
+            if not history and conversation_messages:
+                history = conversation_messages[:-1]
         else:
             # Derive a stable session ID from the conversation fingerprint so
             # that consecutive messages from the same Open WebUI (or similar)
