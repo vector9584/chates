@@ -230,15 +230,19 @@ def normalize_reference_images(value: Any) -> Optional[List[str]]:
 def _images_cache_dir() -> Path:
     """Return the directory generated images are written to.
 
-    Defaults to ``$HERMES_HOME/cache/images/`` — but that directory is shared
-    with inbound chat attachments (``img_<hash>.*``) and is safe to clear, so
-    a durable library can be pointed at with ``HERMES_IMAGE_DIR``.
+    2026-11-20（主人定：文件跟着会话走）—— **会话 artifacts 优先**：
+    能解析出当前会话，图就直接落在 ``sessions/<归类全链>/<sid>/artifacts/``，
+    同一张图不再往公共图库复制一份。解析不到会话（cron / 无 sid 的调用）
+    才回落到 ``HERMES_IMAGE_DIR``（默认 ``$HERMES_HOME/cache/images``）。
 
-    2026-11-16: added the override so generated art lands in a real library
-    instead of the disposable cache. Default behaviour is unchanged when the
-    variable is unset.
+    这个目录同时是缩略图的落点（``_write_thumbnail`` 写在原图旁边），
+    所以缩略图和原图永远同目录、一起被文件列表看到、一起能删。
     """
     import os
+
+    session_dir = _session_generated_dir()
+    if session_dir is not None:
+        return session_dir
 
     override = os.environ.get("HERMES_IMAGE_DIR", "").strip()
     if override:
@@ -278,34 +282,6 @@ def _session_generated_dir() -> Optional[Path]:
         return target
     except Exception:
         return None
-
-
-def _link_to_session(path: Path) -> None:
-    """把刚生成的图挂进会话工作区（硬链接，跨设备退化成复制）。
-
-    只挂副本、不动原路径：面板画廊和历史消息仍按 ``HERMES_IMAGE_DIR`` 找图，
-    会话目录里那份是给「这个会话产生了什么」看的。同一 inode，不额外占盘。
-    任何失败都吞掉 —— 图已经写成功了，不能因为归档失败把结果丢掉。
-    """
-    import os
-    import shutil
-
-    try:
-        target_dir = _session_generated_dir()
-        if not target_dir:
-            return
-        for src in (path, path.with_name(path.stem + ".thumb.webp")):
-            if not src.is_file():
-                continue
-            dst = target_dir / src.name
-            if dst.exists():
-                continue
-            try:
-                os.link(src, dst)
-            except OSError:
-                shutil.copy2(src, dst)
-    except Exception:
-        return
 
 
 def _write_thumbnail(path: Path) -> Optional[Path]:
@@ -353,7 +329,7 @@ def save_b64_image(
     prefix: str = "image",
     extension: str = "png",
 ) -> Path:
-    """Decode base64 image data and write it under ``$HERMES_HOME/cache/images/``.
+    """Decode base64 image data and write it to the current session or fallback cache.
 
     Returns the absolute :class:`Path` to the saved file.
 
@@ -365,7 +341,6 @@ def save_b64_image(
     path = _images_cache_dir() / f"{prefix}_{ts}_{short}.{extension}"
     path.write_bytes(raw)
     _write_thumbnail(path)
-    _link_to_session(path)
     return path
 
 
@@ -449,7 +424,6 @@ def save_url_image(
         raise ValueError(f"Image at {url} returned 0 bytes; refusing to cache.")
 
     _write_thumbnail(path)
-    _link_to_session(path)
     return path
 
 
