@@ -86,12 +86,33 @@ def group_chain(sid: str, data: Optional[dict] = None) -> list[str]:
     return chain or ["未分类"]
 
 
+def _find_workdir(sid: str) -> Optional[Path]:
+    """按会话 ID 在 sessions/ 下找已存在的目录（最多 7 层）。
+
+    归类链是从文件夹名现算的，文件夹改名/换父级之后旧目录还留着旧名字。
+    只按名字算路径会让新产物写进第二个同名目录，文件列表随后只能认一个
+    —— 表现为「图片凭空少了一半」。所以已存在的目录优先，算出来的只做兜底。
+    """
+    root = _home() / "sessions"
+    best: Optional[Path] = None
+    for depth_prefix in range(1, 8):
+        for candidate in root.glob("/".join(["*"] * depth_prefix) + "/" + sid):
+            if candidate.is_dir() and not any(part.startswith(".") for part in candidate.relative_to(root).parts):
+                if any((candidate / sub).is_dir() for sub in ("artifacts", "uploads", "code", "stickers")):
+                    return candidate
+                best = best or candidate
+    return best
+
+
 def session_workdir(sid: str) -> Optional[Path]:
     """``<home>/sessions/<归类全链>/<sid>``；sid 不像面板 ID 时返回 None。"""
     sid = str(sid or "").strip()
     if not _SID_RE.fullmatch(sid):
         return None
-    return _home() / "sessions" / Path(*group_chain(sid)) / sid
+    computed = _home() / "sessions" / Path(*group_chain(sid)) / sid
+    if computed.is_dir():
+        return computed
+    return _find_workdir(sid) or computed
 
 
 def session_artifact_dir(sid: str, kind: str = "artifacts") -> Optional[Path]:
