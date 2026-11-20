@@ -125,6 +125,65 @@ def _apply_deepseek_reasoning_override(
         api_kwargs["reasoning_effort"] = _map[effort]
 
 
+def _apply_openai_compat_reasoning_override(
+    extra_body: dict[str, Any],
+    api_kwargs: dict[str, Any],
+    reasoning_config: dict | None,
+    model: str | None,
+    base_url: str | None = None,
+) -> None:
+    """非 DeepSeek 官方的 OpenAI 兼容渠道：把 reasoning_config 落成通用参数。
+
+    背景（2026-11-21 实测）：`_apply_deepseek_reasoning_override` 只认
+    ``api.deepseek.com``，于是第三方中转（ZeroAPI 等）和 Claude/GPT 走
+    OpenAI 兼容协议时，面板选「关/低/中/高」一个字也发不出去 —— 功能等于摆设。
+
+    实测结论（ZeroAPI · direct.saviour.cc.cd）：
+      - DeepSeek：认 ``thinking.type=disabled``（推理 token 31 → 0），
+        认 ``reasoning_effort``（不报错，但档位差异很小）
+      - Claude（OpenAI 兼容）：认 ``reasoning_effort``（high 时返回
+        reasoning_content），不认 anthropic 的 ``thinking`` 结构
+
+    所以这里的策略是「按模型家族发它认的参数」，都发不出去就不发（宁可不思考，
+    也不能拿 400 换功能）。DeepSeek 官方端已由上一条函数处理，这里跳过。
+    """
+    if not isinstance(reasoning_config, dict):
+        return
+    base_url_l = str(base_url or "").lower()
+    if "api.deepseek.com" in base_url_l:
+        return  # 官方端点走专门的 override，别重复覆盖
+    _m = (model or "").strip().lower()
+    if not _m:
+        return
+
+    enabled = reasoning_config.get("enabled") is not False
+    effort = str(reasoning_config.get("effort") or "").strip().lower()
+    _map = {"minimal": "low", "low": "low", "medium": "medium", "high": "high",
+            "xhigh": "high", "max": "high", "ultra": "high"}
+    effort_norm = _map.get(effort, "medium")
+
+    _ds = _m.startswith("deepseek")
+    _claude = _m.startswith(("claude", "anthropic"))
+    _gpt = _m.startswith(("gpt", "o1", "o3", "o4", "chatgpt"))
+
+    if not enabled:
+        if _ds:
+            # 中转的 DeepSeek 同样认 thinking.disabled（实测把推理压到 0）
+            extra_body["thinking"] = {"type": "disabled"}
+            api_kwargs.pop("reasoning_effort", None)
+        else:
+            # 大多数 OpenAI 兼容网关认这一条；不认的会忽略而非报错
+            extra_body["reasoning_effort"] = "none"
+            api_kwargs.pop("reasoning_effort", None)
+        return
+
+    if _ds or _claude or _gpt:
+        # 三家在中转站上共同的交集就是 reasoning_effort（实测均接受）
+        api_kwargs["reasoning_effort"] = effort_norm
+        if _ds:
+            extra_body["thinking"] = {"type": "enabled"}
+
+
 def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> dict | None:
     """Translate Hermes/OpenRouter-style reasoning config to Gemini thinkingConfig."""
     if reasoning_config is None or not isinstance(reasoning_config, dict):
@@ -615,6 +674,10 @@ class ChatCompletionsTransport(ProviderTransport):
         _apply_deepseek_reasoning_override(
             extra_body, api_kwargs, reasoning_config, model, params.get("base_url")
         )
+        # 非官方端点（中转/Claude/GPT）：走通用映射，否则档位发不出去
+        _apply_openai_compat_reasoning_override(
+            extra_body, api_kwargs, reasoning_config, model, params.get("base_url")
+        )
 
         if extra_body:
             api_kwargs["extra_body"] = extra_body
@@ -751,6 +814,10 @@ class ChatCompletionsTransport(ProviderTransport):
                     api_kwargs[k] = v
 
         _apply_deepseek_reasoning_override(
+            extra_body, api_kwargs, reasoning_config, model, params.get("base_url")
+        )
+        # 非官方端点（中转/Claude/GPT）：走通用映射，否则档位发不出去
+        _apply_openai_compat_reasoning_override(
             extra_body, api_kwargs, reasoning_config, model, params.get("base_url")
         )
 
