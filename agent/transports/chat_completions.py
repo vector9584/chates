@@ -83,6 +83,46 @@ def _reasoning_config_for_model(model: str, reasoning_config: dict | None) -> di
     return reasoning_config
 
 
+def _apply_deepseek_reasoning_override(
+    extra_body: dict[str, Any],
+    api_kwargs: dict[str, Any],
+    reasoning_config: dict | None,
+    model: str | None,
+    base_url: str | None = None,
+) -> None:
+    """让会话/请求级 reasoning 压过 DeepSeek 官方的静态 extra_body。
+
+    ``config.yaml`` 里 DeepSeek 官方 provider 的 ``extra_body`` 是服务商级写死的
+    （``thinking.type: enabled`` + ``reasoning_effort: high``），而它的合并顺序排在
+    最后，于是会话里选「关」也压不住 —— 用户看到开关动了、请求还是开着思考。
+    这里按 base_url 认 DeepSeek 官方端点，用 reasoning_config 重写这两项；
+    没给 reasoning_config（跟随服务商默认）时一个字节都不动。
+    """
+    if not isinstance(reasoning_config, dict):
+        return
+    base_url_l = str(base_url or "").lower()
+    if "api.deepseek.com" not in base_url_l:
+        return
+    _m = (model or "").strip().lower()
+    if _m.startswith("deepseek-v3") or _m.startswith("deepseek-chat"):
+        # V3 家族没有 thinking 字段，别往上塞
+        return
+    if reasoning_config.get("enabled") is False:
+        extra_body["thinking"] = {"type": "disabled"}
+        extra_body.pop("reasoning_effort", None)
+        api_kwargs.pop("reasoning_effort", None)
+        return
+    extra_body["thinking"] = {"type": "enabled"}
+    effort = str(reasoning_config.get("effort") or "").strip().lower()
+    if effort in {"low", "medium", "high"}:
+        # 必须同时写 extra_body：provider 那份静态 extra_body 在 SDK 里是最后合并的，
+        # 只写顶层 reasoning_effort 会被它盖掉（实测 low 仍按 high 发）。
+        extra_body["reasoning_effort"] = effort
+        api_kwargs["reasoning_effort"] = effort
+    elif effort in {"xhigh", "max", "ultra"}:
+        api_kwargs["reasoning_effort"] = "max"
+
+
 def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> dict | None:
     """Translate Hermes/OpenRouter-style reasoning config to Gemini thinkingConfig."""
     if reasoning_config is None or not isinstance(reasoning_config, dict):
@@ -570,6 +610,10 @@ class ChatCompletionsTransport(ProviderTransport):
         if additions:
             extra_body.update(additions)
 
+        _apply_deepseek_reasoning_override(
+            extra_body, api_kwargs, reasoning_config, model, params.get("base_url")
+        )
+
         if extra_body:
             api_kwargs["extra_body"] = extra_body
 
@@ -703,6 +747,10 @@ class ChatCompletionsTransport(ProviderTransport):
                     extra_body.update(v)
                 else:
                     api_kwargs[k] = v
+
+        _apply_deepseek_reasoning_override(
+            extra_body, api_kwargs, reasoning_config, model, params.get("base_url")
+        )
 
         if extra_body:
             # Native Gemini (generativelanguage.googleapis.com, non-/openai)
