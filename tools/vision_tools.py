@@ -1251,6 +1251,12 @@ async def vision_analyze_tool(
         # Local vision models (llama.cpp, ollama) can take well over 30s.
         vision_timeout = 120.0
         vision_temperature = 0.1
+        # 2026-11-21: 视觉任务默认关掉思考。
+        # 推理模型的 thinking 与正文共享 max_tokens，小预算下推理吃光预算就只剩空正文，
+        # 表现为「模型看不到图」。图片描述不需要链式推理：DeepSeek 官方 deepseek-flash
+        # 实测 1280x720 截图，思考开 5.71s / 678 reasoning tokens，关掉 0.94s 且答得更准。
+        # 留 auxiliary.vision.reasoning_effort 覆盖口（除了 none 都写进 extra_body.reasoning）。
+        vision_extra_body = {"thinking": {"type": "disabled"}}
         try:
             from hermes_cli.config import cfg_get, load_config
             _cfg = load_config()
@@ -1261,14 +1267,24 @@ async def vision_analyze_tool(
             _vtemp = _vision_cfg.get("temperature")
             if _vtemp is not None:
                 vision_temperature = float(_vtemp)
+            _veffort = _vision_cfg.get("reasoning_effort")
+            if _veffort not in (None, ""):
+                from hermes_constants import parse_reasoning_effort
+                _parsed = parse_reasoning_effort(_veffort)
+                if _parsed and _parsed.get("enabled"):
+                    vision_extra_body = {"reasoning": _parsed}
+                elif _parsed and _parsed.get("enabled") is False:
+                    vision_extra_body = {"thinking": {"type": "disabled"}}
         except Exception:
             pass
         call_kwargs = {
             "task": "vision",
             "messages": messages,
             "temperature": vision_temperature,
+            # 2000 是给正文的，不含推理；思考已关，这个额度对一页图足够。
             "max_tokens": 2000,
             "timeout": vision_timeout,
+            "extra_body": vision_extra_body,
         }
         if model:
             call_kwargs["model"] = model

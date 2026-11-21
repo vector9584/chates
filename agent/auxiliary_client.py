@@ -3745,6 +3745,12 @@ def _is_payment_error(exc: Exception) -> bool:
             # 否则会按 rate-limit 先重试同 provider 白花几次往返。
             "余额不足", "无可用资源包", "欠费", "额度不足", "账户余额不",
             "请充值", "余额为0", "余额为零",
+            # 2026-11-21: 余额耗尽的英文习惯说法。DeepSeek 官方/多数中转站余额为 0
+            # 时回的是 HTTP 403 + code INSUFFICIENT_BALANCE，文案 "Insufficient
+            # account balance"——不含 credits/billing 字样，之前判不成 payment，
+            # 于是不回退，整个辅助任务直接失败。
+            "insufficient_balance", "insufficient balance",
+            "insufficient account balance", "account balance",
         )):
             return True
     return False
