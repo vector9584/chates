@@ -7108,7 +7108,18 @@ def run_conversation(
                     length_continue_retries = 0
                 
                 final_response = agent._strip_think_blocks(final_response).strip()
-                
+
+                # 2026-11-23（主人要求）：这轮若发生过 provider 降级，正文末尾留一行
+                # 「本轮已降级到 X」。只加在交付文本上 —— 下面 final_msg 用的是
+                # assistant_message，历史里不会有这一行。一次性，取完即清。
+                _fb_turn_notice = getattr(agent, "_fallback_turn_notice", None)
+                if _fb_turn_notice:
+                    agent._fallback_turn_notice = None
+                    try:
+                        final_response = (final_response or "") + "\n\n" + _fb_turn_notice
+                    except Exception:
+                        pass
+
                 final_msg = agent._build_assistant_message(assistant_message, finish_reason)
 
                 # ── Dropped tool-call recovery (copilot/Claude) ────────

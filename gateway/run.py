@@ -7043,11 +7043,12 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         model = getattr(agent, "model", None)
         if not model:
             return
+        fallback_active = bool(getattr(agent, "_fallback_activated", False))
         runtime = {
             "provider": getattr(agent, "provider", None),
             "base_url": getattr(agent, "base_url", None),
             "api_mode": getattr(agent, "api_mode", None),
-            "fallback_active": bool(getattr(agent, "_fallback_activated", False)),
+            "fallback_active": fallback_active,
         }
         runtime = {k: v for k, v in runtime.items() if v not in (None, "")}
 
@@ -7065,12 +7066,24 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             if not isinstance(config, dict):
                 config = {}
             gateway_runtime = dict(config.get("gateway_runtime") or {})
-            if current_model == model and all(
+            # ``agent.model`` is the route that answered the LAST api call, and
+            # try_activate_fallback() rewrites it in place when the primary
+            # fails.  Writing that value into ``sessions.model`` re-homes the
+            # whole session onto the fallback model: the usage page's residual
+            # bucket and every session-list label then attribute the session's
+            # tokens to a model that merely covered for one outage (task #57 —
+            # session eb1fc6e5 ran gpt-6.2-astra, fell back to deepseek-flash
+            # for 3 calls, and would have been relabelled deepseek-flash).
+            # ``sessions.model`` is the session's OWN model (what /model set and
+            # what create_session recorded); the per-call truth already lives in
+            # session_model_usage.  So only a non-fallback turn may move it.
+            sync_model = None if fallback_active else model
+            if (sync_model is None or current_model == sync_model) and all(
                 gateway_runtime.get(k) == v for k, v in runtime.items()
             ):
                 return
             config["gateway_runtime"] = runtime
-            db.update_session_meta(session_id, json.dumps(config), model=model)
+            db.update_session_meta(session_id, json.dumps(config), model=sync_model)
         except Exception:
             logger.debug("Failed to sync gateway session model metadata", exc_info=True)
 

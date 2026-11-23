@@ -2050,6 +2050,11 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             f"🔄 Switched to fallback model: {old_model} via {old_provider} "
             f"→ {fb_model} via {fb_provider}"
         )
+        # 2026-11-23（主人要求）：降级必须出现在回答正文里，不能只发一条状态行 ——
+        # 状态行在网页面板里一闪就没了，用户以为这轮一直是主模型答的。
+        # 交付层把它追加到 final_response 末尾；持久化用的是 assistant_message，
+        # 不含这一段，所以历史干净、下一轮不会看到「上轮降级过」而自我解释。
+        agent._fallback_turn_notice = f"本轮已降级到 {fb_model}（{fb_provider}）"
         logger.info(
             "Fallback activated: %s → %s (%s)",
             old_model, fb_model, fb_provider,
