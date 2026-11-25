@@ -155,12 +155,22 @@ $panelBat = Join-Path $Root "启动面板.bat"
 $hermesBat = Join-Path $Root "启动Hermes.bat"
 $updateBat = Join-Path $Root "检查更新.bat"
 
+# 面板 bat 有两件事：确保后台在跑（已在跑就不管），然后开浏览器。
+# 后台由计划任务 HermesCustomPanel 常驻，用户点快捷方式只该看见浏览器。
 $lines = @("@echo off","chcp 65001 >nul",
  "set APP_DIR=$App","set DATA_DIR=$Data","set VAR_DIR=$Var",
  "set HERMES_HOME=$Data","set HERMES_VAR_DIR=$Var","set MONITOR_SOCKET_PATH=",
  "set UI_PORT=8650","set PORT=8650","set GATEWAY_PORT=8742","set DASHBOARD_PORT=9219",
+ "set UI_HOST=127.0.0.1",
  "set PATH=$Venv\Scripts;$([System.IO.Path]::GetDirectoryName($node));%PATH%",
- "cd /d $Kernel","`"$node`" `"$App\server\monitor.js`"")
+ "curl -s -o nul -m 2 http://127.0.0.1:8650/api/health >nul 2>&1",
+ "if errorlevel 1 schtasks /Run /TN `"HermesCustomPanel`" >nul 2>&1",
+ "for /l %%i in (1,1,30) do (",
+ "  curl -s -o nul -m 2 http://127.0.0.1:8650/api/health >nul 2>&1 && goto :ready",
+ "  timeout /t 1 /nobreak >nul",
+ ")",
+ ":ready",
+ "start `"`" http://127.0.0.1:8650/")
 Set-Content -Path $panelBat -Value ($lines -join "`r`n") -Encoding Default
 
 $h = @("@echo off","chcp 65001 >nul","set HERMES_HOME=$Data","set APP_DIR=$App","set HERMES_VAR_DIR=$Var",
@@ -174,7 +184,9 @@ Say "launchers written"
 try {
   $ws = New-Object -ComObject WScript.Shell
   $desk = [Environment]::GetFolderPath("Desktop")
-  foreach($pair in @(@($panelBat,"Hermes 面板"), @($hermesBat,"Hermes 终端"))){
+  # 只放一个桌面入口：用户要的是「点开就是操作界面」，后台进程由计划任务在登录时静默拉起，
+  # 不该让他看见命令行窗口。命令行仍可通过 启动Hermes.bat 手动用，但不占桌面。
+  foreach($pair in @(@($panelBat,"Hermes 面板"))){
     $lnk = $ws.CreateShortcut((Join-Path $desk ($pair[1] + ".lnk")))
     $lnk.TargetPath = $pair[0]
     $lnk.WorkingDirectory = $Root
@@ -185,7 +197,10 @@ try {
 } catch { Warn ("shortcut failed: " + $_.Exception.Message) }
 
 try {
-  schtasks /Create /TN "HermesCustomPanel" /SC ONLOGON /RL LIMITED /TR "`"$panelBat`"" /F 2>&1 | Out-Null
+  # 直接跑 node，不经过 bat：cmd 窗口不会闪出来。node.exe 是无控制台窗口的子系统程序。
+  # 计划任务不继承 bat 里的 set，环境变量得在命令行里带全，否则 monitor 找不到 DATA_DIR。
+  $taskCmd = "cmd /c set `"APP_DIR=$App`" && set `"DATA_DIR=$Data`" && set `"VAR_DIR=$Var`" && set `"HERMES_HOME=$Data`" && set `"HERMES_VAR_DIR=$Var`" && set `"MONITOR_SOCKET_PATH=`" && set `"UI_PORT=8650`" && set `"PORT=8650`" && set `"GATEWAY_PORT=8742`" && set `"DASHBOARD_PORT=9219`" && set `"UI_HOST=127.0.0.1`" && set `"PATH=$Venv\Scripts;$([System.IO.Path]::GetDirectoryName($node));%PATH%`" && cd /d `"$Kernel`" && `"$node`" `"$App\server\monitor.js`""
+  schtasks /Create /TN "HermesCustomPanel" /SC ONLOGON /RL LIMITED /TR $taskCmd /F 2>&1 | Out-Null
   Say "autostart registered"
 } catch { Warn ("autostart failed: " + $_.Exception.Message) }
 

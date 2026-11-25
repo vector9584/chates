@@ -55,7 +55,10 @@ function localSource(context){
  // 局域网 192.168.x 仍照旧放行。
  if(!raw)return true;
  if(raw==='unix')return true;
- if(raw==='::1'||raw==='127.0.0.1')return false;
+ // 2026-11-25 Windows 本地部署：没有 fnOS gateway 的 unix socket，浏览器只能走 127.0.0.1:8650。
+ // 原来 loopback 一律拒绝，导致 bootstrap 永远 401、生成授权码又要先登录 —— 死锁。
+ // 只有在「纯 TCP 且监听 loopback 的独立部署」下才信 loopback，公网隧道场景靠 ALLOW_LOOPBACK_TRUST 关掉。
+ if(raw==='::1'||raw==='127.0.0.1')return process.env.HERMES_PANEL_TRUST_LOOPBACK==='1';
  return /^10\./.test(raw)||/^192\.168\./.test(raw)||/^172\.(1[6-9]|2\d|3[01])\./.test(raw);
 }
 export function panelPath(url,base='') {let path=new URL(url).pathname;if(base&&path.startsWith(base+'/'))path=path.slice(base.length);else if(path===base)path='/';return path;}

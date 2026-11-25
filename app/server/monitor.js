@@ -536,9 +536,18 @@ function formatUptime(ms) {
 
 const GATEWAY_PORT   = Number(process.env.GATEWAY_PORT || "8742");
 const UI_PORT        = Number(process.env.UI_PORT || "8650");
+// Windows 本地部署默认只监听 loopback：局域网打不开是刻意的，面板没有密码体系，
+// 靠 loopback + 设备 cookie 挡人。要给局域网用就显式设 UI_HOST=0.0.0.0，
+// 那时浏览器要先用 auth.json 里的设备 cookie，别裸奔。
+const UI_BIND        = process.env.UI_HOST || "127.0.0.1";
 const SOCKET_PATH    = (process.env.MONITOR_SOCKET_PATH || "").trim();
 // 未设置 socket 路径时降级为纯 TCP 模式（跨平台 / 独立部署用；飞牛上始终会设这个变量）
 const UNIX_MODE      = SOCKET_PATH.length > 0;
+// 纯 TCP 独立部署没有 fnos gateway 签名，loopback 就是「本机用户」，应直接放行，
+// 否则 /api/panel-auth/bootstrap 恒 401，而生成授权码又必须先登录 —— 死锁。
+// 走 frp / 公网隧道部署时对端也可能是 127.0.0.1，那种场景把 UI_HOST 设 0.0.0.0
+// 或显式 HERMES_PANEL_TRUST_LOOPBACK=0 关掉。
+if(!UNIX_MODE&&UI_BIND==="127.0.0.1"&&process.env.HERMES_PANEL_TRUST_LOOPBACK===undefined)process.env.HERMES_PANEL_TRUST_LOOPBACK="1";
 if (!UNIX_MODE) {
   console.warn("[WARN] MONITOR_SOCKET_PATH 未设置，进入纯 TCP 模式（UI_PORT 可直连，无 unix socket）");
 }
@@ -9647,8 +9656,8 @@ function startServer() {
     if (err?.code === "EADDRINUSE") log(`[WARN] UI TCP port ${UI_PORT} already in use, standalone access disabled`);
     else log(`TCP server error: ${err?.message || err}`);
   });
-  tcpServer.listen(UI_PORT, "0.0.0.0", () => {
-    log(`Standalone UI available at http://0.0.0.0:${UI_PORT}/`);
+  tcpServer.listen(UI_PORT, UI_BIND, () => {
+    log(`Standalone UI available at http://${UI_BIND}:${UI_PORT}/`);
   });
 
   return server;
