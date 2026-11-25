@@ -1,0 +1,25 @@
+/* 思考强度（2026-11-20 建，2026-11-21 换新版滑块组件）
+   输入框展开栏的「思考」按钮 + 弹层里的四档滑块。
+   滑块本体是自包含组件（js/core/think-intensity.js，Shadow DOM + 内联样式），
+   这里只留「组件挂进弹层」所需的宿主侧两条规则 —— 不引组件内部类名，
+   也不复制它的任何颜色变量，深浅由组件自己的 theme 属性负责。
+
+   组件的配色切换小圆点（.ti-theme）在右上角、只有 16px，手机点不中，
+   而且面板这边已经按 body.theme-dark 自动给 theme 了 —— 把它藏掉。
+   它藏在 Shadow DOM 里，宿主 CSS 进不去，所以组件侧给了 part 钩子：
+   `part="theme"`，用 ::part(theme) 关。 */
+
+/* 弹层标题右侧问号：样式与提示气泡都归 css/ui-components.css（.ui-hint / .mp-hint + data-tip）。
+   标题与问号的成组容器 .mini-popup-titlerow 也在那边。 */
+
+/* 组件宿主：撑满弹层内容区，上下留一点呼吸；不写颜色/尺寸，
+   尺寸完全由组件自己按 max-width 与 60/68px 高度决定。 */
+#popupBody .ti-host{ padding:6px 2px 2px; }
+#popupBody .ti-host think-intensity{ display:block; width:100%; max-width:none; }
+#popupBody .ti-host think-intensity::part(theme){ display:none; }
+/* 组件内 .ti-root 顶部留 26px 给右上角那颗切色小圆点；这里已经用 ::part(theme) 把它藏掉，
+   那 26px 就是纯空档 —— 弹层里只放一条滑块，留着显得上下不齐。改成 6px。 */
+#popupBody .ti-host think-intensity::part(root){ padding-top:6px; }
+
+/* 手机端：弹层是全屏抽屉（base.css 已把 .mini-popup 设成 fixed 左右 8px），
+   组件自己的 520px 断点会把胶囊降到 44px 高，这里不再叠第二套尺寸。 */

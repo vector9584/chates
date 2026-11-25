@@ -1,0 +1,221 @@
+.draft-conflict[hidden]{display:none}
+.draft-conflict button,.durable-draft-dialog button{font:inherit;min-height:40px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:inherit;cursor:pointer;flex-shrink:0}
+.draft-conflict button:hover{background:var(--bg3)}
+.draft-conflict{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--accent-bg);color:var(--text);border:1px solid var(--border);padding:10px;border-radius:10px;font-size:13px;margin-bottom:8px}
+.draft-durability-status{margin:0 0 8px;padding:6px 10px;color:var(--text-muted);font-size:12px}.draft-durability-status:not([hidden]){color:var(--warning)}
+.durable-draft-dialog{background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:18px;padding:24px;width:min(700px,94vw);max-height:90dvh;overflow:auto}.durable-draft-dialog::backdrop{background:var(--shade)}.durable-draft-dialog label{display:grid;gap:8px;margin:16px 0}.durable-draft-dialog textarea{width:100%;min-height:130px;background:var(--bg1);color:inherit;border:1px solid var(--border);border-radius:8px;padding:10px;font:inherit}.durable-draft-dialog>div{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:600px){.draft-conflict{padding:8px;font-size:12px}.durable-draft-dialog{padding:16px}.msg-bubble.ma-host{min-height:72px;min-width:min(240px,100%)}.msg-alarm{padding:8px;gap:4px 8px;font-size:11px}.msg-alarm .ma-btn{min-height:30px;padding:0 10px;font-size:11px}}
+.cron-native-editor { width:min(680px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); display:flex; flex-direction:column; }
+.cron-native-editor .modal-body { overflow:auto; min-height:0; }
+.cron-native-editor .field { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.cron-native-editor input,.cron-native-editor textarea { width:100%; min-height:44px; box-sizing:border-box; }
+.cron-native-editor input[type=checkbox] { width:24px; min-height:24px; }
+.cron-native-editor button { min-height:44px; }
+.cron-editor-feedback { color:var(--text); overflow-wrap:anywhere; }
+.cron-hook-card { border:1px solid var(--border); border-radius:12px; padding:16px; margin:16px 0; min-width:0; }
+.cron-hook-card legend { color:var(--text2); padding:0 8px; }
+.cron-history-summary { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; }
+.cron-history-list { display:grid; gap:8px; margin:16px 0; }
+.cron-history [hidden] { display:none !important; }
+.cron-history-record { text-align:left; overflow-wrap:anywhere; }
+.cron-history-result pre { white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.8 var(--font); background:var(--bg1); padding:16px; border-radius:10px; }
+.echo-toolbar { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+.echo-toolbar label { display:grid; gap:6px; font-size:13px; }
+.echo-toolbar input,.echo-toolbar select { min-height:44px; padding:10px; background:var(--bg1); color:var(--text); border:1px solid var(--border); border-radius:8px; }
+.echo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); gap:16px; }
+.echo-card { background:var(--bg1); border:1px solid var(--border); border-radius:var(--radius-xl); padding:20px; min-width:0; }
+.echo-status { color:var(--accent); font-size:13px; }.echo-card h3 { margin:14px 0; overflow-wrap:anywhere; }
+.echo-excerpt { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; max-height:100px; overflow:hidden; }
+.echo-card button,.echo-dialog button,.echo-toolbar button { min-height:44px; }.echo-dialog .modal-foot { flex-wrap:wrap; }
+.echo-text { white-space:pre-wrap; overflow-wrap:anywhere; font:14px/1.8 var(--font); padding:14px; background:var(--bg1); border-radius:8px; }
+.echo-dialog details { margin:20px 0; }.echo-dialog summary { cursor:pointer; min-height:44px; }
+.echo-dialog input,.echo-dialog select,.echo-dialog textarea { background:var(--bg1); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px; min-height:44px; width:100%; }
+.echo-dialog input[type=checkbox] { width:24px; }.echo-dialog textarea { min-height:140px; }
+.panel-devices{margin-top:24px}
+.panel-devices>button{margin:10px 10px 10px 0;min-height:44px}
+.panel-devices input{box-sizing:border-box;width:100%;min-height:44px;padding:10px;font:16px monospace;background:var(--bg0);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.panel-device-row{display:flex;gap:14px;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding:16px 0}.panel-device-row>div{min-width:0;overflow-wrap:anywhere}.panel-device-row button{min-height:44px;flex-shrink:0}
+.panel-auth-expired .modal{padding:24px;max-width:440px}.panel-auth-expired button{min-height:44px}
+#page-echo [hidden] { display:none !important; }
+body.theme-dark :is(.btn.primary,.btn.primary:hover,.modal-foot .btn.primary,.provider-actions .btn.primary,.persona-actions .btn.primary,.wf-actions .btn.primary,.chip.on,.cron-tab.active,.input-wrap .send,.model-badge,.provider-status.current,.provider-card.active .provider-merchant,.pop-item.active .ico,.agent-row.active .avatar) { color:var(--on-dark-ok); }
+/* 用户气泡不在上面那串里：它是消息，不是按钮。之前被并进来，暗色下整条消息（含引用）变成近黑字，
+ * 压在深色气泡上几乎看不见。这里显式钉死白字，别再让按钮规则串味。 */
+body.theme-dark .chat-body .msg.user .msg-bubble,
+/* 深色主题的 --accent 是 #71dbc0（薄荷绿，相对亮度 0.55），白字只有 1.7:1，
+   远低于 WCAG 4.5:1。给气泡内所有子元素强制白字这条是「绿底白字看不清」的直接原因，
+   而且它权重 0,4,2，压过容器上的 body.theme-dark .msg.user .msg-bubble。改深墨绿字到 12:1。 */
+body.theme-dark .chat-body .msg.user .msg-bubble :is(p,span,div,li,td,th,strong,em,a,code,blockquote){ color:#06251d; }
+body.theme-dark .chat-body .msg.user .msg-bubble .quote-block,
+body.theme-dark .chat-body .msg.user .msg-bubble .quote-block :is(p,span,div,strong,em){ color:#06251d; }
+body.theme-dark :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.usage-model-name { overflow-wrap:anywhere; }
+@media(max-width:600px) { .usage-model-stats { white-space:normal; } }
+/* Workspace file browser —— 2026-11-20 重做：图标/缩略图 + 名称 + 体积与时间，操作悬停才出现 */
+/* 2026-11-23：列表与预览上下分区，各自滚动。
+   之前 #ws-files 是唯一滚动容器、预览独占全高（列表被 hidden），主人要求改成
+   「列表在上、预览在下，滚动互不影响」：
+     · #ws-files 不再自己滚（overflow:hidden），只做纵向 flex 分栏
+     · .pf-list-region 装工具条+表头+列表+分页，只有它 overflow:auto；
+       高度由内容定（flex:0 1 auto），封顶 75%，文件少时自然收紧
+     · .pf-list 自己也要 min-height:0 + flex:0 1 auto，否则它是列 flex 容器、
+       内容多高就多高（实测 3656px），把 region 顶穿
+     · .pf-editor-pane 吃掉剩余高度（flex:1），内部 .pf-preview / textarea 各自滚 */
+/* display 交给 base.css 的 .ws-pane / .ws-pane.active 管。这里写 display:flex
+   会因 ID 特异性（1,0,0 > 0,1,0）压过 .ws-pane{display:none}，导致切到
+   终端/大纲时本面板仍占全高盖在上面——2026-11-23 主人报"终端点不开"即此。 */
+#ws-files{min-width:0;overflow:hidden;flex-direction:column;min-height:0}
+#ws-files .pf-list-region{display:flex;flex-direction:column;min-height:0;flex:0 1 auto;max-height:75%;overflow:auto;overscroll-behavior:contain}
+#ws-files .pf-list-region>.pf-list{flex:0 1 auto;min-height:0}
+#ws-files .pf-toolbar{position:sticky;top:0;z-index:3}
+#ws-files .pf-editor-pane{flex:1 1 0;min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;border-top:1px solid var(--border)}
+#ws-files .pf-editor-pane[hidden]{display:none!important}
+#ws-files .pf-editor-pane>.pf-preview{flex:1 1 auto;min-height:0;overflow:auto}
+#ws-files .pf-editor-pane>textarea{flex:1 1 auto;min-height:0}
+/* 没有预览时列表可以吃满整块（本来也没有下方区域要留） */
+#ws-files:not(.has-preview) .pf-list-region{max-height:100%}
+/* 有预览时列表封顶 3/4（主人给的上限），同时给预览区留出可用高度：
+   65% 上限 + 预览 min-height 200 撑住，避免 75% 时预览只剩 4~5 行（2026-11-23 实测 189px→86px 可视） */
+#ws-files.has-preview .pf-list-region{max-height:65%;flex:0 1 auto}
+#ws-files.has-preview .pf-editor-pane{min-height:200px}
+/* 工具条（2026-11-22 三次重做）
+   ① 状态文案只留表头一处：.pf-status 是给编辑器/弹窗复用的 class，面板本体不再渲染它，
+      否则「4 项」会在表头与工具条下各出现一次（主人判「重复了」）。
+   ② 下拉框：原生 select 靠左右 padding 假装留白，实际右边一大片空白、宽度随文字变。
+      改由外壳 .pf-select 提供边框与箭头，select 本身 appearance:none 透明铺满，
+      宽度锁死（1fr 那格），文字省略号，不再随选中项长度抖动。
+   2026-11-22 二次重做保留：字号对齐同面板 .ws-tab（13/11.5/11），第一行只放操作。 */
+.pf-toolbar{display:grid;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:2}
+.pf-locations{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:6px;align-items:center}
+.pf-locations input{min-width:0}
+.pf-manage{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 8px}
+.pf-manage[hidden]{display:none!important}
+.pf-toolbar input{width:100%;box-sizing:border-box;height:30px;min-height:30px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-md);padding:0 9px;font-size:var(--fs-sm);font-family:inherit;line-height:1.2}
+.pf-toolbar input:focus{outline:none;border-color:var(--accent);background:var(--bg2)}
+.pf-toolbar input::placeholder{color:var(--text3)}
+/* 下拉外壳：宽度按最长选项定（JS 写 --pf-sel-w），不随选中项变、也不跟着 1fr 撑开。
+   原生 select 的根号箭头去不掉、还会在右侧留一大块系统空白，所以改成
+   外壳画边框和箭头 + select appearance:none 透明铺满。 */
+.pf-select{position:relative;display:flex;align-items:center;flex:none;width:var(--pf-sel-w,92px);min-width:0;max-width:100%;height:30px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);transition:border-color .15s,background .15s}
+.pf-select:hover{background:var(--bg2)}
+.pf-select:focus-within{border-color:var(--accent);background:var(--bg2)}
+.pf-select select{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:100%;height:100%;min-width:0;padding:0 22px 0 9px;border:0;background:none;color:var(--text);font-size:var(--fs-sm);font-family:inherit;line-height:1.2;cursor:pointer;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.pf-select select:focus{outline:none}
+.pf-select select:disabled{color:var(--text3);cursor:default}
+.pf-select svg{position:absolute;right:7px;top:50%;width:12px;height:12px;margin-top:-6px;pointer-events:none;color:var(--text3)}
+/* 下拉展开的面板项（原生 option 能控的只有配色与缩进） */
+.pf-select option{padding:6px 8px;background:var(--bg1);color:var(--text)}
+.pf-select optgroup{color:var(--text3);font-size:var(--fs-xs)}
+.pf-ibtn{display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg1);color:var(--text2);cursor:pointer;transition:background .15s,color .15s}
+.pf-ibtn svg{width:15px;height:15px}
+.pf-ibtn:hover:not(:disabled){background:var(--bg3);color:var(--text)}
+.pf-ibtn:disabled{opacity:.4;cursor:default}
+.pf-chip{font-size:var(--fs-sm);line-height:1;padding:7px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg1);color:var(--text2);cursor:pointer}
+.pf-chip:hover{background:var(--bg3);color:var(--text)}
+/* 第二行：路径面包屑，独占一行，不跟按钮抢宽度 */
+.pf-searchrow{display:block;min-width:0}
+.pf-path{display:flex;align-items:center;gap:2px;padding:0;min-height:16px;min-width:0;font-size:var(--fs-sm);color:var(--text3);white-space:nowrap;overflow:hidden}
+.pf-path:empty::before{content:'路径加载中…';opacity:.6}
+.pf-path>*{flex:none}
+.pf-crumb-link{border:0;background:none;padding:1px 3px;border-radius:4px;color:var(--text3);font:inherit;cursor:pointer;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-crumb-link:hover{background:var(--bg3);color:var(--text)}
+.pf-crumb-here{color:var(--text2);padding:1px 3px;max-width:16em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-crumb-sep{color:var(--border2)}
+/* 排序改挂表头：与文件名同高、只有个小三角，不再单独占一个按钮位 */
+.pf-sort{display:flex;flex-wrap:wrap;gap:2px;padding:0;align-items:center;min-width:0}
+.pf-sortbtn{display:inline-flex;align-items:center;gap:3px;box-sizing:border-box;height:24px;padding:0 6px;border:1px solid transparent;border-radius:var(--radius-sm);background:none;color:var(--text3);font-size:var(--fs-sm);font-family:inherit;line-height:1;cursor:pointer;white-space:nowrap}
+.pf-sortbtn svg{width:12px;height:12px;flex:none;opacity:.5}
+.pf-sortbtn:hover{background:var(--bg3);color:var(--text2)}
+.pf-sortbtn:hover svg{opacity:.85}
+.pf-sortbtn.is-on{color:var(--accent);border-color:transparent;background:var(--accent-bg)}
+.pf-sortbtn.is-on svg{opacity:1}
+.pf-sortbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pf-status{padding:6px 12px 0;margin:0;color:var(--text3);font-size:var(--fs-xs);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* 面板本体的状态槽已撤（文案只在表头出现一次）；这个类是编辑器/弹窗共用的，别删 */
+#ws-files>.pf-status{display:none}
+/* 表头：与列表同一套字号，右边挂排序（不再是独立的大按钮） */
+.pf-head{display:flex;align-items:center;gap:6px;padding:6px 12px 2px;min-width:0}
+.pf-head .pf-count{margin-right:auto;min-width:0;max-width:min(62%,46ch);font-size:var(--fs-xs);color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+/* 2026-11-23：状态文案一长就把两个排序按钮挤成两行（实测 .pf-head 32px -> 58px，
+   按钮 y 相同即换行）。根因是 .pf-sort 自己带 flex-wrap:wrap 主动让位，
+   而 .pf-count 没有上限、被压缩后仍有 233px。这里双管：按钮条不换行不收缩，
+   状态行吃掉剩余宽度、超长一律省略号。 */
+.pf-head .pf-sort{flex:0 0 auto;flex-wrap:nowrap}
+.pf-list{padding:4px 6px 10px;display:flex;flex-direction:column;gap:1px}
+.pf-item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 6px;border-radius:var(--radius-md)}
+.pf-item:hover{background:var(--bg3)}
+.pf-ico{display:grid;place-items:center;width:28px;height:28px;border-radius:var(--radius-sm);background:var(--bg1);color:var(--text2);border:1px solid var(--border)}
+.pf-ico svg{width:16px;height:16px}
+.pf-ico-folder{color:var(--accent)}
+.pf-thumb{display:block;width:28px;height:28px;border-radius:var(--radius-sm);object-fit:cover;background:var(--bg1);border:1px solid var(--border)}
+.pf-main{min-width:0;display:flex;flex-direction:column;gap:1px}
+.pf-name{border:0;background:none;padding:0;text-align:left;font-size:var(--fs-md);font-family:inherit;line-height:1.35;color:var(--text);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-item.is-dir .pf-name{font-weight:600}
+.pf-name:hover{color:var(--accent)}
+.pf-meta{display:flex;gap:5px;align-items:baseline;font-size:var(--fs-xs);color:var(--text3);font-variant-numeric:tabular-nums;min-width:0}
+.pf-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-dot{color:var(--border2)}
+.pf-acts{display:flex;gap:4px;opacity:0;transition:opacity .12s}
+.pf-item:hover .pf-acts,.pf-item:focus-within .pf-acts{opacity:1}
+.pf-act{width:26px;height:26px;border:0;border-radius:7px;background:transparent;color:var(--text3);cursor:pointer;display:grid;place-items:center}
+.pf-act svg{width:14px;height:14px}
+.pf-act:hover{background:var(--bg2);color:var(--text)}
+@media(hover:none){.pf-acts{opacity:1}.pf-act{width:30px;height:30px}}
+.pf-empty{display:grid;justify-items:center;gap:8px;padding:28px 12px;color:var(--text3);font-size:var(--fs-sm);text-align:center}
+.pf-empty .pf-ico{width:36px;height:36px}
+.pf-empty p{margin:0;max-width:22em}
+.pf-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 12px}
+.pf-editor-pane{padding:12px;border-top:1px solid var(--border)}
+.pf-editor-pane h3{overflow-wrap:anywhere;margin:0 0 8px}
+.pf-editor-pane textarea,.pf-modal textarea{box-sizing:border-box;width:100%;min-height:220px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;resize:vertical;font:13px/1.7 ui-monospace,monospace}
+.pf-preview img,.pf-preview video{max-width:100%}
+.pf-preview iframe{width:100%;height:360px;border:0;background:var(--white)}
+.pf-preview audio{max-width:100%}
+/* Markdown 预览：直接沿用档案页 .arc-md 那套排版与配色（archive.css 全局加载），
+   这里只管容器边界——宽屏限宽、长串换行，样式本体一个字都不复制，
+   否则两处各写一套，主题一变就得改两份。 */
+.pf-md-view{max-width:880px;overflow-wrap:anywhere;padding:2px 0 6px}
+/* hidden 属性被下面的 display:flex/grid 压过去了，单靠 element.hidden=true 收不起来
+   （2026-11-22 实测：listHidden=true 但高度仍 833）。补回通用规则。 */
+.pf-toolbar[hidden],.pf-list[hidden],.pf-head[hidden],.pf-manage[hidden],.pf-status[hidden],.pf-actions[hidden],.pf-editor-pane[hidden]{display:none!important}
+.pf-modal{max-width:760px;overflow:auto;max-height:90dvh}
+.pf-modal input{width:100%;box-sizing:border-box;padding:12px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:8px}
+.pf-history{padding:14px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.pf-history button{margin:4px}
+.pf-editor-pane[hidden],.pf-editor-pane [hidden],.pf-modal [hidden]{display:none!important}
+/* 2026-11-14：原 .panel-runtime-bar（固定底条 + 让位 padding）已删除，
+   运行状态改走统一通知组件（js/panel-runtime-ui.js → window.toast，key='runtime'）。 */
+.pmcp-modal{max-width:720px;max-height:88dvh}.pmcp-modal .field{display:grid;gap:6px;margin:0}.pmcp-modal .mcp-io{display:flex;flex-direction:column;gap:12px}.pmcp-modal input,.pmcp-modal select,.pmcp-modal textarea{box-sizing:border-box;max-width:100%;min-width:0;width:100%;padding:10px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:8px;min-height:42px}.pmcp-modal textarea{min-height:100px}.pmcp-secret{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:6px;margin:10px 0}.pmcp-secret input[type=password]{grid-column:1/-1}.pmcp-compare{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg1);padding:12px}.pmcp-modal [hidden]{display:none!important}#ext-mcp .mcp-detail{overflow-wrap:anywhere}.pmcp-modal .mcp-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+.page>.page-body{padding-bottom:20px!important}.workspace-panel .ws-body{padding-bottom:0}
+.panel-typing{margin-top:24px}.panel-typing-row{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}.panel-typing-row select{min-width:88px;min-height:42px;padding:8px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:8px}
+
+/* 消息蒙版（2026-11-20）：队列的三种真告警画在那条消息自己的气泡上，
+   底部那条 #durableQueue 已删除。正常排队中/执行中不画蒙版。
+   尺寸要点：蒙版是绝对定位铺满气泡，气泡只有一行字时放不下「文案+按钮」，
+   所以带蒙版的气泡给一个最小高度（桌面 64 / 手机 76），行内允许换行。 */
+.msg-bubble.ma-host{position:relative;min-height:64px;min-width:min(260px,100%)}
+.msg-alarm{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 10px;padding:8px 10px;border-radius:inherit;background:rgba(12,14,18,.58);backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px);color:#fff;font-size:12px;line-height:1.3;text-align:center}
+.msg-alarm .ma-label{font-weight:600;letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+.msg-alarm .ma-btn{font:inherit;min-height:32px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;white-space:nowrap}
+.msg-alarm .ma-btn:hover{background:rgba(255,255,255,.26)}
+.msg-alarm .ma-btn:disabled{opacity:.6;cursor:default}
+.msg-alarm.ma-failed{background:rgba(158,26,40,.58)}
+.msg-alarm.ma-interrupted{background:rgba(150,102,10,.58)}
+.msg-alarm.ma-pending{background:rgba(26,52,96,.58)}
+
+/* ── 任务页三个页签按钮（周期/一次性/历史）──
+ * 2026-11-21 主人：紫色是浅色系的，深色是绿色系 —— 选中态跟各自主题的 accent 走，
+ * 不再写死一个色。浅色 = 紫 #5e64f3，深色 = 绿 #71dbc0，即 var(--accent) 本义。
+ * 深色另解「太黑」：未选中态提到 --bg3 + 亮边框；绿底上的字用 --on-dark-ok（深墨绿，保对比度）。 */
+#page-cron #cronTabs .btn{ border-radius:8px; }
+#page-cron #cronTabs .btn.primary{ background:var(--accent); border-color:var(--accent); color:var(--white); }
+#page-cron #cronTabs .btn.primary:hover{ background:var(--accent-h); border-color:var(--accent-h); color:var(--white); opacity:1; }
+body.theme-dark #page-cron #cronTabs .btn:not(.primary){ background:var(--bg3); border-color:var(--border2); color:var(--text2); }
+body.theme-dark #page-cron #cronTabs .btn:not(.primary):hover{ background:var(--accent-bg); border-color:var(--accent-h); color:var(--accent-h); }
+body.theme-dark #page-cron #cronTabs .btn.primary,
+body.theme-dark #page-cron #cronTabs .btn.primary:hover{ color:var(--on-dark-ok); }
+/* ── 工作区大纲筛选条（2026-11-24）──
+   外壳与输入框复用 base.css 的 .rail-filter（同 archive.css 的 .arc-rail-filter 先例），
+   这里只把外壳 padding 收到与 .ws-outline-list 的 12px 水平内边距对齐。 */
+.rail-filter.ws-outline-filter{padding:10px 12px 0}
+.ws-outline-nomatch{padding:14px 4px;font-size:12px;color:var(--text3);text-align:center}

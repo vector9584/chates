@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <base href="/app/hermes-agent/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes</title>
+  <!-- 站点图标：直接取应用图标（ui/images/icon-256.png）等比缩，不裁不补（2026-11-18）
+       应用图标本身是 256 正方形、圆角构图完整，之前裁头部/补白反而越做越偏。 -->
+  <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-app-16.png?v=10342b55">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-app-32.png?v=b769674b">
+  <link rel="icon" type="image/png" sizes="48x48" href="images/favicon-app-48.png?v=c30edb75">
+  <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-app-192.png?v=9a641ef7">
+  <link rel="apple-touch-icon" sizes="180x180" href="images/favicon-app-180.png?v=4e762346">
+  <link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#141518">
+  <!-- iOS 加到主屏：以独立 App 全屏打开，不再走 Safari 的磨砂地址栏（2026-11-18）
+       black-translucent + .app 的 safe-area padding 配合，刘海区显示页面自身背景色。 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="小肥鱼">
+  <link rel="stylesheet" href="css/base.css?v=c164bbc5">
+  <link rel="stylesheet" href="css/ui-components.css?v=48b5473b">
+<script src="scripts/marked.min.js?v=606c428a"></script>
+<script src="scripts/purify.min.js?v=fd4f07a2"></script>
+<script src="scripts/qrcode.min.js?v=b86b6879"></script>
+<link rel="stylesheet" href="css/panel-tree.css?v=7fe0d941">
+<script src="js/panel-tree.js?v=f2a6ae1c"></script>
+<link rel="stylesheet" href="css/panel-workspace.css?v=d4884665">
+    <link rel="stylesheet" href="css/panel-maintenance.css?v=1d5ae70c">
+    <link rel="stylesheet" href="css/archive.css?v=7b5caa7e">
+<link rel="stylesheet" href="css/panel-model-ref.css?v=f3e86366">
+<link rel="stylesheet" href="css/ui-kit.css?v=c43dfc89">
+</head>
+<body class="theme-dark">
+<div class="app" id="app">
+  <!-- 全局左侧导航 -->
+  <nav class="global-sidebar">
+    <button class="nav-btn" title="概览" onclick="switchPage('overview')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>概览</button>
+    <button class="nav-btn active" title="对话" onclick="switchPage('chat')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>对话</button>
+    <button class="nav-btn" title="群聊" onclick="switchPage('rooms')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h2"/><path d="M13 21v-2a4 4 0 0 1 4-4h2"/><path d="M12 17v4"/></svg>群聊</button>
+    <button class="nav-btn" title="专家" onclick="switchPage('experts')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/><path d="M18 3l.9 2.1L21 6l-2.1.9L18 9l-.9-2.1L15 6l2.1-.9L18 3z"/></svg>专家</button>
+    <button class="nav-btn" title="模型" onclick="switchPage('models')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>模型</button>
+    <button class="nav-btn" title="扩展" onclick="switchPage('extensions')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>扩展</button>
+    <button class="nav-btn" title="通讯" onclick="switchPage('comm')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.56 12.56 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.56 12.56 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>通讯</button>
+    <button class="nav-btn" title="隧道" onclick="switchPage('tunnel')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/><rect x="6" y="9" width="12" height="6" rx="1"/><path d="M12 9v6M9 12h6"/></svg>隧道</button>
+    <button class="nav-btn" title="知识库" onclick="switchPage('kb')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>知识库</button>
+    <button class="nav-btn" title="连接器" onclick="switchPage('connectors')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>连接器</button>
+    <button class="nav-btn" title="定时" onclick="switchPage('cron')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>定时</button>
+    <button class="nav-btn" title="记忆" onclick="switchPage('memory')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4C7 14.5 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg>记忆</button>
+        <button class="nav-btn" title="轨迹" onclick="switchPage('learning')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="7" x2="10" y2="10"/><line x1="17" y1="7" x2="14" y2="10"/><line x1="7" y1="17" x2="10" y2="14"/><line x1="17" y1="17" x2="14" y2="14"/></svg>轨迹</button>
+    <button class="nav-btn" title="用量" onclick="switchPage('usage')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>用量</button>
+    <button class="nav-btn" title="更新" onclick="switchPage('updates')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>更新</button>
+    <div class="spacer"></div>
+    <button class="nav-btn" title="设置" onclick="switchPage('settings')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>设置</button>
+  </nav>
+
+  <div class="main-wrap">
+    <!-- 全局顶栏 -->
+    <header class="global-topbar">
+      <div class="left">
+        <button class="glob-btn" id="sidebarToggle" title="折叠会话树" onclick="toggleRail()">
+          <svg xmlns="http://www.w3.org/2000/svg" id="sidebarIconClose" viewBox="0 0 24 24" style="display:block"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="9" y1="5" x2="9" y2="19"/><polyline points="16 9 12 12 16 15"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" id="sidebarIconOpen" viewBox="0 0 24 24" style="display:none"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="15" y1="5" x2="15" y2="19"/><polyline points="8 9 12 12 8 15"/></svg>
+        </button>
+        <div class="brand-logo" id="brandLogo" data-conn="idle"><span class="brand-dot" id="brandDot"></span><span class="brand-wordmark" id="brandWordmark" role="img" aria-label="CHATÈS"><img id="brandWordmarkImg" alt="" decoding="async"><span class="brand-wordmark-fallback" aria-hidden="true">CHATÈS</span></span><span class="brand-connection connecting" id="brandConnectionText" role="status" aria-live="polite" aria-atomic="true">连接中</span></div>
+        <span class="brand-ver" id="brandVer">--</span>
+      </div>
+      <div class="right">
+        <button class="glob-btn" title="在新标签打开" onclick="openNewWindow()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </button>
+        <button class="glob-btn" title="GitHub 项目" onclick="openGitHub()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        </button>
+        <button class="glob-btn" id="btnThemeToggle" title="切换主题" onclick="toggleTheme()">
+          <svg xmlns="http://www.w3.org/2000/svg" id="themeIconSun" viewBox="0 0 24 24" style="display:block"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" id="themeIconMoon" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- 左侧会话树 -->
+      <aside class="chat-rail hidden" id="chatRail">
+        <div class="rail-head">
+          <h2>会话</h2>
+          <span class="rail-count" id="railCount"></span>
+          <div class="right">
+            <button class="icon-btn" id="railArchivedBtn" title="已归档会话" aria-label="已归档会话" onclick="pwArchivedSessions()">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M3 5.5h18V8H3z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </button>
+            <button class="icon-btn" id="railNewFolderBtn" title="新建文件夹" aria-label="新建文件夹" onclick="pwFolder()">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h7A1.5 1.5 0 0 1 19 9.5v8A1.5 1.5 0 0 1 17.5 19h-13A1.5 1.5 0 0 1 3 17.5z"/><line x1="11" y1="11.5" x2="11" y2="16"/><line x1="8.75" y1="13.75" x2="13.25" y2="13.75"/></svg>
+            </button>
+            <button class="icon-btn" id="railNewSessionBtn" title="新建会话" aria-label="新建会话" onclick="newSession()">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="rail-filter">
+          <input id="railFilterInput" type="text" placeholder="筛选会话或文件夹…" autocomplete="off" aria-label="按文件夹名或会话名筛选" oninput="pwRailFilter(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();railGlobalSearchGo();}">
+          <button type="button" id="railFilterBtn" title="在所有会话中搜索" aria-label="在所有会话中搜索" onclick="railGlobalSearchGo()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.4" y1="16.4" x2="21" y2="21"/></svg>
+          </button>
+          <!-- 只看未读：放大镜右边的小筛子，只作用在会话树上（panel-unread-rail.js） -->
+          <button type="button" id="railUnreadBtn" title="只看未读" aria-label="只看未读会话" aria-pressed="false" onclick="pwRailUnreadToggle()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+          </button>
+        </div>
+        <div class="rail-scroll" id="railScroll"></div>
+        <div class="rail-channels" id="railChannels"></div>
+      </aside>
+
+      <!-- 页面容器 -->
+      <div class="page-container" id="pageContainer">
+        <!-- 聊天页 -->
+        <main class="page chat-main active" id="page-chat">
+          <header class="chat-header">
+            <div class="left">
+              <button class="rail-toggle mobile-only" title="打开会话树" onclick="openRailDrawer()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+              <div style="min-width:0">
+                <div class="title" id="chatTitle" title="点击编辑会话名称与归类" onclick="renameSession(currentSession,event)">项目规划讨论</div>
+                <div class="subtitle" id="chatSubtitle">默认主力助手 · 12 条消息</div>
+              </div>
+              <!-- 标题旁的状态徽标已下线（2026-11-13 用户第 36 条）：状态只写在会话气泡内的 .msg-statusbar -->
+              <button id="chReturnBtn" class="btn" style="display:none;margin-left:auto;flex-shrink:0" onclick="exitChannelView()" title="退出通道会话，返回正常会话">← 返回</button>
+            </div>
+            <div class="right">
+              <button class="tool-btn" id="wsPanelToggle" title="工作区" data-tip="工作区面板" onclick="toggleWorkspace()" style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+              <button class="tool-btn" id="multiTabsBtn" title="显示多会话标签" data-tip="多会话标签栏" aria-label="显示多会话标签" aria-expanded="false" aria-controls="sessionTabs" onclick="toggleSessionTabsBar()" style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
+            </div>
+          </header>
+
+          <!-- 多会话标签栏（浏览器式多开） -->
+          <div class="session-tabs" id="sessionTabs">
+            <div class="tabs-scroll" id="tabsScroll"></div>
+            <button class="tab-new" id="tabNewBtn" title="新建会话" onclick="openNewSessionModal()">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+
+          <div class="chat-body" id="chatBody" tabindex="0" role="log" aria-live="polite" aria-relevant="additions text" aria-label="会话消息">
+            <div class="system-tip">系统已注入「默认主力助手」角色设定，不会写入对话历史</div>
+          </div>
+
+          <button id="chatJumpBottom" class="chat-jump-bottom" type="button" title="回到最新消息" aria-label="回到最新消息" onclick="scrollChatToBottom()" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg></button>
+
+          <div class="quote-preview" id="quotePreview">
+            <span style="font-size:14px">💬</span>
+            <span class="qp-text" id="quotePreviewText"></span>
+            <button type="button" class="qp-close" aria-label="取消引用" title="取消引用" onclick="clearQuote()">×</button>
+          </div>
+
+          <div class="chat-composer" id="chatComposer">
+            <div class="gen-bar" id="genBar" hidden aria-hidden="true"></div>
+            <!-- 输入框上沿浮层（2026-11-18）：附件条 + 能力 chip + 技能 chip 三块共用一个
+                 flex 列，垂直排开。原先附件条插在 #chatComposer 第一个子元素（流内），
+                 chip 靠 position:absolute;bottom:100% 各自脱流，附件一上传三块就叠成一张
+                 图（实测重叠 758×28 / 758×26 px²）。改成一个容器管顺序，谁也不靠百分比定位。 -->
+            <div class="composer-overlays" id="composerOverlays">
+              <div class="attach-chips" id="attachChips" style="display:none"></div>
+              <div class="skill-chips" id="capabilityChips" style="display:none"></div>
+              <div class="skill-chips" id="skillChips" style="display:none"></div>
+            </div>
+            <div class="input-outer">
+              <div class="input-wrap">
+  <div class="input-tools">
+    <button type="button" class="toolbar-toggle tool-btn" id="toolbarToggle" onclick="toggleToolbar()" aria-label="展开输入工具" aria-expanded="false" aria-controls="toolbar" title="输入工具"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5v13"/><path d="M5.5 12h13"/></svg></button>
+  </div>
+  <textarea id="chatInput" rows="1" aria-label="输入消息" placeholder="输入消息…" oninput="autoResize(this);saveDraft(currentSession)" onkeydown="onKey(event)" onpaste="onChatPaste(event)"></textarea>
+  <!-- 录音态波谱：按住麦克风录语音时盖在输入框位置上，13 根柱子错开相位跳。
+       纯 CSS 动画驱动，不进 JS 主线程——录音时主线程本来就在跑 MediaRecorder 回调。 -->
+  <div class="voice-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="input-btns">
+    <button class="mic-btn tool-btn" data-tip="按住说话" aria-label="按住说话，松手发送语音，空输入框上长按转为文字" onpointerdown="micHoldStart(event)" onpointerup="micHoldEnd(event)" onpointercancel="micHoldEnd(event)" onkeyup="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleVoiceRecord();}" oncontextmenu="return false" id="btnMic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/><path d="M8.5 21h7"/></svg></button>
+    <button class="gen-send" id="sendBtn" onclick="onSendOrStop()" disabled title="发送"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5V5"/><path d="M5.5 11.5 12 5l6.5 6.5"/></svg></button>
+  </div>
+</div>
+<div class="toolbar" id="toolbar">
+  <div class="tb-group">
+    <button class="tool-btn" data-tip="选择模型" aria-label="选择模型" onclick="openMini(this,'model')" id="btnModel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 20.4 7.3v9.4L12 21.4 3.6 16.7V7.3z"/><path d="M3.6 7.3 12 12l8.4-4.7"/><path d="M12 12v9.4"/></svg><span class="tb-label">模型</span></button>
+    <button class="tool-btn" aria-label="思考强度" onclick="openMini(this,'reasoning')" id="btnReasoning"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.8a3 3 0 0 0-3 3 2.7 2.7 0 0 0-1.3 4.8A2.9 2.9 0 0 0 6.5 17a2.8 2.8 0 0 0 3.1 2.4 2 2 0 0 0 2-2V5.8a2 2 0 0 0-2-2Z"/><path d="M14.4 3.8a3 3 0 0 1 3 3 2.7 2.7 0 0 1 1.3 4.8A2.9 2.9 0 0 1 17.5 17a2.8 2.8 0 0 1-3.1 2.4"/><path d="M7.2 9.4h2.4M14.6 9.4h2.2M7.6 13.6h2M14.9 13.6h2"/></svg><span class="tb-label">思考</span></button>
+    <button class="tool-btn" data-tip="本轮能力：生图/视觉/语音/联网" aria-label="本轮能力" onclick="openMini(this,'capability')" id="btnCapability"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7.5" width="19" height="9" rx="4.5"/><circle cx="16.5" cy="12" r="2.8"/></svg><span class="tb-label">能力</span></button>
+    <button class="tool-btn" data-tip="选择技能" aria-label="选择技能" onclick="openMini(this,'skill')" id="btnSkill"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2c0 4.9 3.9 8.8 8.8 8.8-4.9 0-8.8 3.9-8.8 8.8 0-4.9-3.9-8.8-8.8-8.8 4.9 0 8.8-3.9 8.8-8.8z"/></svg><span class="tb-label">技能</span></button>
+    <button class="tool-btn" data-tip="选择专家" aria-label="选择专家" onclick="openMini(this,'expert')" id="btnExpert"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.9"/><path d="M4.8 20.6a7.2 7.2 0 0 1 14.4 0"/></svg><span class="tb-label">专家</span></button>
+  </div>
+  <span class="tb-sep" aria-hidden="true"></span>
+  <div class="tb-group">
+    <button class="tool-btn" data-tip="连接器" aria-label="连接器" onclick="openMini(this,'connector')" id="btnConnector"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 14.4a4.1 4.1 0 0 0 5.8 0l2.7-2.7a4.1 4.1 0 0 0-5.8-5.8l-1 1"/><path d="M14.4 9.6a4.1 4.1 0 0 0-5.8 0l-2.7 2.7a4.1 4.1 0 0 0 5.8 5.8l1-1"/></svg><span class="tb-label">连接器</span></button>
+    <button class="tool-btn" data-tip="快捷指令" aria-label="快捷指令" onclick="openMini(this,'quick')" id="btnQuick"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 2.6 4.8 13.4h6.2l-.9 8 8.4-10.8h-6.2l.9-8z"/></svg><span class="tb-label">快捷指令</span></button>
+    <button class="tool-btn" data-tip="上传附件" aria-label="上传附件" onclick="attachFile()" id="btnAttach"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 11.6 12.1 19.7a5.4 5.4 0 0 1-7.6-7.6l8.4-8.4a3.6 3.6 0 0 1 5.1 5.1l-8.4 8.4a1.8 1.8 0 0 1-2.5-2.5l7.7-7.7"/></svg><span class="tb-label">附件</span></button>
+  </div>
+</div>
+            </div>
+          </div>
+
+
+          <!-- 右侧工作区面板 -->
+          <aside class="workspace-panel" id="workspacePanel">
+            <div class="ws-tabs">
+              <button class="ws-tab" onclick="wsSwitchTab(this,'outline')">大纲</button>
+              <button class="ws-tab active" onclick="wsSwitchTab(this,'files')">文件</button>
+              <button class="ws-tab" onclick="wsSwitchTab(this,'terminal')">终端</button>
+              <button class="ws-close" onclick="toggleWorkspace()" title="关闭">×</button>
+            </div>
+            <div class="ws-body">
+              <div class="ws-pane" id="ws-outline">
+                <!-- 大纲筛选：纯前端隐藏，不改 data-msgidx，跳转顺序不受影响 -->
+                <div class="rail-filter ws-outline-filter">
+                  <input id="wsOutlineFilter" type="text" placeholder="筛选大纲要点…" autocomplete="off" aria-label="按关键词筛选大纲要点" oninput="applyOutlineFilter()" onkeydown="if(event.key==='Escape'){this.value='';applyOutlineFilter();}">
+                </div>
+                <div id="wsOutlineContent" class="ws-outline-list"><div class="empty-state">发送消息后自动生成大纲</div></div>
+              </div>
+              <div class="ws-pane active" id="ws-files"></div>
+              <div class="ws-pane" id="ws-terminal">
+                <div class="ws-term-toolbar">
+                  <button class="btn" onclick="termConnect()" id="termConnBtn">连接终端</button>
+                  <button class="btn" onclick="termDisconnect()">断开</button>
+                  <button class="btn" onclick="termClear()" title="清空屏幕">清屏</button>
+                  <span class="ws-term-status" id="termStatus">未连接</span>
+                </div>
+                <div class="ws-term-output" id="termOutput"></div>
+                <div class="ws-term-input-row">
+                  <span class="ws-term-prompt">$</span>
+                  <input type="text" class="ws-term-input" id="termInput" placeholder="输入命令…（Enter 执行 / ↑↓ 历史）" onkeydown="termKeydown(event)" autocomplete="off" spellcheck="false">
+                </div>
+              </div>
+            </div>
+          </aside>
+        </main>
+
+        <!-- 群聊页（多 Agent 协作房间，Socket.IO 风格实时群聊；全部走 Hermes 会话） -->
+        <section class="page" id="page-rooms">
+          <div class="page-header"><h1>群聊</h1><button class="btn mobile-only" id="roomListToggle" onclick="toggleRoomListMobile()" style="display:none">☰ 房间</button><div class="page-actions"><button class="btn" onclick="renderRoomsPage()">↻ 刷新</button><button class="btn" onclick="roomCreateDialog()">＋ 新建房间</button></div></div>
+          <div class="page-body">
+            <div class="rooms-layout">
+              <div class="rooms-side">
+                <div class="rooms-list" id="roomList"></div>
+              </div>
+              <div class="rooms-main">
+                <div class="rooms-chathead">
+                  <div class="rooms-title" id="roomTitle">选择或创建群聊房间</div>
+                  <div class="room-members" id="roomMembers"></div>
+                </div>
+                <div class="rooms-msgs" id="roomMsgs"><div class="rooms-empty">👥 多 Agent 协作房间<br><span style="font-size:12px;color:var(--muted)">创建房间并邀请多位专家（268 专家 + 16 MBTI 人格）。发消息时 @ 成员（可多选），每位被 @ 的专家用独立的 Hermes 会话并行回复，实时汇入房间。底子全部是 Hermes。</span></div></div>
+                <div class="rooms-input">
+                  <div class="rooms-atbar" id="roomAtBar"></div>
+                  <div class="input-outer" style="background:transparent;border:none;padding:0">
+                    <div class="input-wrap">
+                      <textarea id="roomCompose" rows="1" placeholder="和群聊成员说点什么吧~（可 Ctrl+V 粘贴图片，@ 成员并行回复）"></textarea>
+                      <div class="input-btns">
+                        <button class="gen-send" id="roomSendBtn" onclick="roomSend()" title="发送"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg></button>
+                      </div>
+                    </div>
+                    <div class="toolbar" id="roomToolbar" style="display:flex">
+                      <button class="tool-btn" data-tip="@ 成员（并行回复）" aria-label="@ 成员（并行回复）" onclick="roomAtDialog()" id="roomAtBtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+                      <button class="tool-btn" data-tip="上传附件" aria-label="上传附件" onclick="roomAttachClick()" id="roomAttachBtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                      <button class="tool-btn" data-tip="房间共享记忆" aria-label="房间共享记忆" onclick="roomMemoryDialog()" id="roomMemBtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4C7 14.5 5 12 5 9a7 7 0 0 1 7-7z"/></svg></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 任务方案（2026-11-13 改为静态容器：原先由 panel-plans-ui.js 运行时 createElement 造出来，
+             业务表里只能写“JS 注入”给不出行号。现在容器归属 index.html，JS 只填内容。） -->
+        <section class="page" id="page-plans">
+          <div class="page-header"><h1>任务方案</h1><div class="page-actions"><button class="btn" id="planNewTeam">新建专家分工</button><button class="btn" id="planNewTask">新建任务模板</button></div></div>
+          <div class="page-body"></div>
+        </section>
+
+        <!-- 专家页（v2 独立页：我的 / 内置 两页签，专家市场已并入内置） -->
+        <section class="page" id="page-experts">
+          <div class="page-header"><h1>专家</h1></div>
+          <div class="page-body">
+            <div class="exp-topbar">
+              <div class="ch-filterbar exp-tabs" id="expTabs">
+                <button class="ui-tab active" onclick="expSwitchTab(this,'mine')">我的专家</button>
+                <button class="ui-tab" onclick="expSwitchTab(this,'builtin')">内置专家</button>
+              </div>
+              <div class="exp-actions">
+                <button class="btn" onclick="refreshExperts()">↻ 刷新</button>
+              </div>
+            </div>
+            <div class="exp-panes">
+              <div class="exp-pane active" id="exp-mine">
+                <div class="exp-searchbar">
+                  <input type="text" id="expMineSearch" class="exp-input" placeholder="搜索我的专家（名称 / 描述）…" oninput="renderMineExperts()">
+                  <div class="exp-scenes" id="expMineScenes"></div>
+                </div>
+                <div class="exp-grid" id="expMineGrid"><div class="empty-state">加载中…</div></div>
+              </div>
+              <div class="exp-pane" id="exp-builtin">
+                <div class="exp-searchbar">
+                  <input type="text" id="expBuiltinSearch" class="exp-input" placeholder="搜索专家（内置精选 / 工作流专家，如 程序员 / 人类学家 / 前端开发者）" oninput="renderBuiltinExperts()">
+                  <div class="exp-srcs" id="expBuiltinSrcs"></div>
+                  <div class="exp-scenes" id="expBuiltinScenes"></div>
+                </div>
+                <div class="exp-grid" id="expBuiltinGrid"><div class="empty-state">加载中…</div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 概览页 -->
+        <section class="page" id="page-overview">
+          <div class="page-header"><h1>概览</h1></div>
+          <div class="page-body">
+<div class="overview-wrap">
+  <div class="ov-header">
+    <div class="ov-title">服务状态</div>
+    <div class="ov-status off" id="ovStatusBadge" role="status" aria-live="polite" aria-atomic="true"><span class="dot"></span><span id="ovStatusText">已停止</span></div>
+  </div>
+  <div id="overviewStatusFeedback" class="maintenance-feedback" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div class="ov-grid">
+    <div class="ov-card ov-card-main" id="cardSys">
+      <div class="ov-card-head">
+        <div class="ov-icon">🖥️</div>
+        <div class="ov-card-title">系统信息</div>
+        <button class="ov-refresh" onclick="refreshSysInfo()" title="刷新">↻</button>
+      </div>
+      <div class="ov-card-body sys-metrics">
+        <div class="ov-metric"><span>运行</span><strong id="sysUptime">--</strong></div>
+        <div class="ov-metric"><span>内存</span><strong id="sysMem">--</strong></div>
+        <div class="ov-metric"><span>Hermes 版本</span><strong id="sysHermesVer">--</strong></div>
+        <div class="ov-metric"><span>应用版本</span><strong id="sysAppVer">--</strong></div>
+      </div>
+      <button class="log-filter-toggle" id="ovLogFilterToggle" onclick="toggleLogFilters()" type="button" aria-expanded="false" aria-controls="ovLogBar">
+        <span>🔧</span><span id="ovLogFilterToggleLabel">显示日志过滤</span><span class="arrow">▾</span>
+      </button>
+      <div class="ov-logbar" id="ovLogBar">
+        <div class="log-filter-row">
+          <span class="log-filter-label">来源</span>
+          <button class="ov-logbtn active" data-log-source="monitor" onclick="setLogSource('monitor')">Monitor</button>
+          <button class="ov-logbtn" data-log-source="agent" onclick="setLogSource('agent')">AGENT</button>
+          <button class="ov-logbtn" data-log-source="gateway" onclick="setLogSource('gateway')">GATEWAY</button>
+          <button class="ov-logbtn" data-log-source="error" onclick="setLogSource('error')">ERRORS</button>
+          <button class="ov-logbtn" data-log-source="gui" onclick="setLogSource('gui')">GUI</button>
+          <button class="ov-logbtn" data-log-source="all" onclick="setLogSource('all')">全部</button>
+        </div>
+        <div class="log-filter-row">
+          <span class="log-filter-label">级别</span>
+          <button class="ov-logbtn active" data-log-level="all" onclick="setLogLevel('all')">ALL</button>
+          <button class="ov-logbtn" data-log-level="debug" onclick="setLogLevel('debug')">DEBUG</button>
+          <button class="ov-logbtn" data-log-level="info" onclick="setLogLevel('info')">INFO</button>
+          <button class="ov-logbtn" data-log-level="warning" onclick="setLogLevel('warning')">WARNING</button>
+          <button class="ov-logbtn" data-log-level="error" onclick="setLogLevel('error')">ERROR</button>
+        </div>
+        <div class="log-filter-row">
+          <span class="log-filter-label">组件</span>
+          <button class="ov-logbtn active" data-log-comp="all" onclick="setLogComponent('all')">ALL</button>
+          <button class="ov-logbtn" data-log-comp="gateway" onclick="setLogComponent('gateway')">GATEWAY</button>
+          <button class="ov-logbtn" data-log-comp="agent" onclick="setLogComponent('agent')">AGENT</button>
+          <button class="ov-logbtn" data-log-comp="tools" onclick="setLogComponent('tools')">TOOLS</button>
+          <button class="ov-logbtn" data-log-comp="cli" onclick="setLogComponent('cli')">CLI</button>
+          <button class="ov-logbtn" data-log-comp="cron" onclick="setLogComponent('cron')">CRON</button>
+        </div>
+      </div>
+    </div>
+    <div class="ov-card ov-card-services" id="cardServices">
+      <div class="ov-card-head">
+        <div class="ov-icon">⚙️</div>
+        <div class="ov-card-title">运行服务</div>
+        <div class="ov-head-actions">
+          <button class="ov-iconbtn" onclick="startServices()" title="启动">▶</button>
+          <button class="ov-iconbtn" onclick="stopServices()" title="停止">■</button>
+          <button class="ov-iconbtn" onclick="restartServices()" title="重启">↻</button>
+          <span id="overviewRestartStatus" class="ov-restart-status" role="status"></span>
+          <button class="ov-openbtn" onclick="openDashboard()">打开 Dashboard</button>
+        </div>
+      </div>
+      <div class="ov-card-body service-list">
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-title">Gateway</div>
+            <div class="service-meta">Port <span id="gwPort">8742</span> · <span id="gwStateText">未启动</span></div>
+          </div>
+          <div class="ov-toggle"><button type="button" class="toggle" id="gwToggle" role="switch" aria-checked="false" aria-label="Gateway 服务" onclick="toggleService('gateway')"></button></div>
+        </div>
+        <div class="service-row">
+          <div class="service-info">
+            <div class="service-title">Dashboard</div>
+            <div class="service-meta">Port <span id="dbPort">9219</span> · <span id="dbStateText">未启动</span></div>
+          </div>
+          <div class="ov-toggle"><button type="button" class="toggle" id="dbToggle" role="switch" aria-checked="false" aria-label="Dashboard 服务" onclick="toggleService('dashboard')"></button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ov-logbox">
+    <div class="ov-logbox-head">
+      <span id="logBoxTitle">Monitor 日志</span>
+      <div class="ov-logbox-ctrl">
+        <button class="ov-logbtn" id="logUndoBtn" onclick="restoreClearedLogs()" hidden>撤销清空</button>
+        <button class="ov-logbtn" onclick="clearLog()">清除</button>
+        <div class="ov-refresh-toggle"><span>开启刷新</span><button type="button" class="toggle" id="logRefreshToggle" role="switch" aria-checked="false" aria-label="开启实时日志刷新" onclick="toggleLogRefresh()"></button></div>
+      </div>
+    </div>
+    <pre class="ov-logpre" id="logPre">[ 加载日志中… ]</pre>
+  </div>
+</div>
+          </div>
+        </section>
+
+        <!-- 模型板块 · 六域一级路由（2026-11-15 二改）
+             六个域（概览 / 模型选择 / 服务商 / 能力后端 / 工具集 / 配置）不再是
+             页内按钮切换，而是各自一个真页面（#page-models-*），顶部页签条和
+             侧栏「模型」分组直接列出六项，深链 #/models-config 直达。
+             每个 .page-body 里的 .mv2-root 由 panel-model-v2.js 按 data-domain 渲染。 -->
+        <section class="page models-page" id="page-models-home">
+          <div class="page-header"><h1>概览</h1><div class="mv2-acts"></div></div>
+          <div class="page-body"><div class="mv2-root" data-domain="home"></div></div>
+        </section>
+        <section class="page models-page" id="page-models-select">
+          <div class="page-header"><h1>模型选择</h1><div class="mv2-acts"></div></div>
+          <div class="page-body"><div class="mv2-root" data-domain="select"></div></div>
+        </section>
+        <section class="page models-page" id="page-models-providers">
+          <div class="page-header"><h1>服务商</h1><div class="mv2-acts"></div></div>
+          <div class="page-body"><div class="mv2-root" data-domain="providers"></div></div>
+        </section>
+        <section class="page models-page" id="page-models-backends">
+          <div class="page-header"><h1>能力后端</h1><div class="mv2-acts"></div></div>
+          <div class="page-body"><div class="mv2-root" data-domain="backends"></div></div>
+        </section>
+        <section class="page models-page" id="page-models-config">
+          <div class="page-header"><h1>配置</h1><div class="mv2-acts"></div></div>
+          <div class="page-body"><div class="mv2-root" data-domain="config"></div></div>
+        </section>
+
+        <!-- 工具集页（能力开关，复用 model-v2 的 toolsets 域 = platform_toolsets 权威数据源） -->
+        <section class="page models-page" id="page-toolsets">
+          <div class="page-header"><h1>工具集</h1><div class="mv2-acts"></div></div>
+          <div class="page-body"><div class="mv2-root" data-domain="toolsets"></div></div>
+        </section>
+
+        <!-- 技能页（操作手册） -->
+        <section class="page" id="page-skills">
+          <div class="page-header"><h1>技能</h1></div>
+          <div class="page-body">
+            <div class="ch-filterbar skill-subtabs">
+              <button class="ui-tab active" onclick="extSkillSubtab(this,'local')">本地技能</button>
+              <button class="ui-tab" onclick="extSkillSubtab(this,'native')">内置技能</button>
+              <button class="ui-tab" onclick="extSkillSubtab(this,'market')">技能市场</button>
+            </div>
+            <div id="skillMarketBar" style="display:none;margin-bottom:10px">
+              <div style="display:flex;gap:8px">
+                <input type="text" id="skillMarketSearch" placeholder="搜索 SkillHub 海量技能（高德 / 知乎 / Notion / 股票...）" onkeydown="if(event.key==='Enter' && !event.isComposing && event.keyCode!==229)searchSkillMarket()" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit">
+                <button class="btn secondary" onclick="searchSkillMarket()">🔍 搜索</button>
+                <button class="btn secondary" onclick="renderSkillMarketCatalog()">📚 精选目录</button>
+              </div>
+              <div class="ch-filterbar" style="margin-top:8px">
+                <button class="ch-filter active" id="smFilterAll" onclick="setSkillMarketFilter(this,'all')">全部</button>
+                <button class="ch-filter" id="smFilterInstalled" onclick="setSkillMarketFilter(this,'installed')">已安装</button>
+                <button class="ch-filter" id="smFilterOfficial" onclick="setSkillMarketFilter(this,'official')">官方认证</button>
+              </div>
+            </div>
+            <div id="skillFeedback" class="maintenance-feedback" role="status" aria-live="polite"></div>
+            <div class="skill-grid" id="skillGrid"></div>
+          </div>
+        </section>
+
+        <!-- 通讯页 -->
+        <section class="page" id="page-comm">
+          <div class="page-header"><h1>消息渠道</h1></div>
+          <div class="page-body">
+            <div class="ch-filterbar">
+  <button class="ch-filter active" onclick="setChFilter(this,'all')">全部</button>
+  <button class="ch-filter" onclick="setChFilter(this,'configured')">已配置</button>
+  <button class="ch-filter" onclick="setChFilter(this,'unconfigured')">未配置</button>
+</div>
+<div class="channel-grid" id="channelGrid"></div>
+<div id="channelModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeChannelModal()">
+  <div class="modal-panel">
+    <div class="modal-head"><h3 id="chModalTitle">配置渠道</h3><button class="modal-close" aria-label="关闭" title="关闭" onclick="closeChannelModal()">×</button></div>
+    <div class="modal-body" id="chModalBody"></div>
+    <div class="modal-foot" id="chModalFoot">
+      <button class="btn" onclick="testChannel()">测试</button>
+      <button class="btn primary" onclick="saveChannel()">保存</button>
+    </div>
+  </div>
+</div>
+          </div>
+        </section>
+
+        <!-- 隧道页（Cloudflare Tunnel 外网访问） -->
+        <section class="page" id="page-tunnel">
+          <div class="page-header"><h1>隧道</h1><div class="page-actions"><button class="btn" onclick="renderTunnelPage()">↻ 刷新</button></div></div>
+          <div class="page-body">
+            <div class="wf-intro" style="margin-bottom:14px">通过 Cloudflare Tunnel 将本机 Hermes 服务发布到公网，手机 / 外部网络可直接访问。<b>Quick 临时链接</b>开箱即用（免费、无需账号）；<b>Named 固定域名</b>需要你的 Cloudflare 账号与已托管域名。</div>
+            <div class="mem-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">
+              <div class="mem-card">
+                <div class="mem-card-head"><span class="mem-icon">🌐</span><span class="mem-title">隧道状态</span></div>
+                <div style="padding:10px 0 4px;display:flex;align-items:center;gap:8px">
+                  <span class="ov-status" id="tunStatusBadge" style="min-width:14px;width:14px;height:14px;display:inline-block"></span>
+                  <b id="tunStatusText" style="font-size:15px">检测中…</b>
+                </div>
+                <div class="conn-hint" style="margin-top:6px" id="tunMeta">—</div>
+                <div style="margin-top:10px;display:none" id="tunUrlRow">
+                  <label style="font-size:12px;color:var(--text2)">公网访问地址（手机/外网请用此链接，非 127.0.0.1）</label>
+                  <div style="display:flex;gap:6px;margin-top:4px">
+                    <input id="tunUrl" readonly style="flex:1;padding:8px;border-radius:6px;background:var(--card);color:var(--accent);border:1px solid var(--border);font-size:12px;word-break:break-all" onclick="tunnelCopyUrl()">
+                    <button class="btn" onclick="tunnelCopyUrl()">复制</button>
+                    <button class="btn" onclick="tunnelShowQr()">二维码</button>
+                    <button class="btn primary" onclick="tunnelOpenUrl()">打开</button>
+                  </div>
+                  <div class="conn-hint" style="font-size:11px;margin-top:4px">Quick 链接每次重启都会变化，旧地址会失效（手机打不开请重新扫码/复制当前地址）；固定地址请用 Named 模式。</div>
+                </div>
+              </div>
+              <div class="mem-card">
+                <div class="mem-card-head"><span class="mem-icon">🚀</span><span class="mem-title">启动隧道</span></div>
+                <div class="field" style="margin-top:8px">
+                  <label>隧道模式</label>
+                  <select id="tunMode" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)" onchange="tunnelModeChanged()">
+                    <option value="quick">Quick 临时链接（无需账号）</option>
+                    <option value="named">Named 固定域名（需 Token）</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-top:8px">
+                  <label>转发目标（要暴露的本地服务）</label>
+                  <select id="tunTarget" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)" onchange="tunnelTargetChanged()">
+                    <option value="8650">Web UI（8650，聊天主界面）</option>
+                    <option value="9219">Dashboard（9219，官方面板）</option>
+                    <option value="8742">Gateway API（8742）</option>
+                    <option value="custom">自定义端口…</option>
+                  </select>
+                </div>
+                <div class="field" style="margin-top:8px;display:none" id="tunCustomWrap">
+                  <label>自定义端口</label>
+                  <input id="tunCustomPort" type="number" min="1" max="65535" placeholder="例如 8080" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)">
+                </div>
+                <div class="field" style="margin-top:8px;display:none" id="tunTokenWrap">
+                  <label>Cloudflare Tunnel Token（cloudflared tunnel login / create 获取）</label>
+                  <input id="tunToken" type="password" placeholder="eyJhIjoi…" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)">
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px">
+                  <button class="btn primary" id="tunStartBtn" onclick="tunnelStart()">启动隧道</button>
+                  <button class="btn" id="tunStopBtn" onclick="tunnelStop()">停止</button>
+                </div>
+                <div class="conn-hint" id="tunActHint" style="margin-top:8px">启动前请确认目标服务已在运行。Quick 链接重启后地址会变化。</div>
+              </div>
+            </div>
+            <div class="wf-intro" style="margin-bottom:8px;border-left:3px solid var(--orange,#f59e0b);padding-left:10px;font-size:12px">⚠️ 安全提醒：隧道会把本机服务暴露到公网。Hermes Web UI 本身无登录鉴权，公网访问时任何人拿到链接即可使用你的模型额度与文件权限，建议仅临时开启（如外出办公），用完立即停止。</div>
+            <div class="field">
+              <label style="display:flex;justify-content:space-between;align-items:center">cloudflared 运行日志<button class="btn" style="padding:2px 10px;font-size:12px" onclick="tunnelRefreshLog()">刷新日志</button></label>
+              <pre id="tunLog" style="width:100%;height:200px;overflow:auto;padding:10px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border);font-size:11px;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all;margin-top:6px">加载中…</pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- connectors -->
+        <section class="page" id="page-connectors">
+          <div class="page-header"><h1>外接工具</h1></div>
+          <div class="page-body">
+            <div class="wf-intro" style="margin-bottom:12px">两类外接工具：上方「预置连接器」由平台预置，配好凭证即可用；下方「MCP 服务器」是你自己接入的 Stdio 本地子进程或 HTTP 远程端点。同一台服务只会出现在其中一处 —— 由预置连接器交付的 MCP 服务跟随连接器配置，不在这里重复列出。修改后统一重启应用生效。</div>
+            <div class="section-head"><h2>预置连接器</h2></div>
+            <div class="ch-filterbar">
+              <button class="ch-filter active" onclick="setConnFilter(this,'all')">全部</button>
+              <button class="ch-filter" onclick="setConnFilter(this,'configured')">已配置</button>
+              <button class="ch-filter" onclick="setConnFilter(this,'unconfigured')">未配置</button>
+            </div>
+            <div class="channel-grid" id="connectorGrid"></div>
+            <div id="mcpServers" style="margin-top:20px"></div>
+            <dialog id="connectorModal" class="panel-connector-dialog" aria-labelledby="connModalTitle">
+              <div class="modal-head"><h3 id="connModalTitle">连接器配置</h3><button class="modal-close" aria-label="关闭">×</button></div>
+              <div class="modal-body" id="connModalBody"></div>
+              <div class="modal-foot" id="connModalFoot"></div>
+            </dialog>
+          </div>
+        </section>
+
+        <!-- 定时任务页 -->
+        <section class="page" id="page-cron">
+          <div class="page-header"><h1>定时任务</h1><div class="page-actions"><button class="btn" onclick="window._cronShowArchived=!window._cronShowArchived;this.textContent=window._cronShowArchived?'隐藏归档':'查看归档';renderCronJobs()">查看归档</button><button class="btn" onclick="openCronModal()">+ 创建任务</button></div></div>
+          <div class="page-body">
+            <div class="wf-intro" style="margin-bottom:12px">使用 Cron 表达式或自然语言调度自动化任务。任务由网关守护进程每 60 秒检查一次，到期后在全新 Agent 会话中执行。支持附加技能、指定投递目标、暂停/恢复/立即触发。</div>
+            <div id="cronTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+            <div class="mcp-server-list" id="cronJobList"><div class="empty-state" style="grid-column:1/-1">加载中…</div></div>
+          </div>
+        </section>
+
+        <!-- 提示词页（2026-11-14 改由 js/archive/ 接管）：外壳、目录树、文档/技能轨迹视图全在
+             archive-core.js 的 mount() 里生成，它会清空本节点所有非 header 子元素 ——
+             静态 DOM 写在这里也会被吃掉，所以这里只留一个空壳，别再加内容。 -->
+        <section class="page" id="page-assistant">
+          <div class="page-header"></div>
+        </section>
+
+        <!-- 留痕录页（2026-11-14 改由 js/archive/ 接管）：同上，只留空壳。
+             原先灵魂/记忆/笔记三个 textarea + saveAllMemory() 已废弃，
+             走的是 archive 的 文档 / 技能轨迹 两视图。 -->
+        <section class="page" id="page-memory">
+          <div class="page-header"></div>
+        </section>
+
+        <!-- 学习轨迹页 -->
+        <section class="page" id="page-learning">
+          <div class="page-header"><h1>学习轨迹</h1><div class="page-actions"><button class="btn" onclick="renderLearning()">↻ 刷新</button></div></div>
+          <div class="page-body">
+            <div class="wf-intro" style="margin-bottom:12px">技能知识图谱与使用统计。节点大小代表使用频率，颜色代表分类（点击顶部分类可筛选），连线代表技能关联关系；节点可拖拽。</div>
+            <div class="learn-stats" id="learnStats"></div>
+            <div class="learn-layout">
+              <div class="learn-graph-wrap" id="learnGraph"><div class="empty-state">加载中…</div></div>
+              <div class="learn-detail" id="learnDetail" style="display:none"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 用量页 -->
+        <section class="page" id="page-usage">
+          <div class="page-header"><h1>用量统计</h1><div class="page-actions"><button class="btn" onclick="renderUsagePage()">↻ 刷新</button></div></div>
+          <div class="page-body">
+            <div class="usage-summary" id="usageSummaryCards"></div>
+            <div class="usage-section" id="usageRecentSection" style="display:none">
+              <h3>最近调用 · 按小时 <small id="usageRecentNote" class="usage-recent-note"></small></h3>
+              <div class="usage-recent-wrap">
+                <table class="usage-table" id="usageRecentTable">
+                  <thead><tr><th>模型</th><th>服务商</th><th>推理</th><th>调用</th></tr></thead>
+                  <tbody id="usageRecentBody"></tbody>
+                </table>
+              </div>
+              <h3 class="usage-sub">按会话 · 模型 <small class="usage-recent-note">执行记录的首次→最近，回退链与压缩这类不进请求日志的调用在这里</small></h3>
+              <div class="usage-recent-wrap" id="usageRecentSessionsWrap" style="display:none">
+                <table class="usage-table">
+                  <thead><tr><th>首次 → 最近</th><th>模型</th><th>服务商</th><th>任务</th><th>调用</th><th>tokens</th></tr></thead>
+                  <tbody id="usageRecentSessions"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="usage-section" id="usageChannelSection" style="display:none">
+              <h3>渠道费用 <span class="usage-q" tabindex="0" role="button" data-tip="按每条调用自己的服务地址还原渠道与倍率；同一中转站挂多个倍率时按模型名归属。金额 = 各家官方价 × 渠道倍率，DeepSeek 另计高峰倍率×2，其他厂商不翻倍。" aria-label="按每条调用自己的服务地址还原渠道与倍率；同一中转站挂多个倍率时按模型名归属。金额 = 各家官方价 × 渠道倍率，DeepSeek 另计高峰倍率×2，其他厂商不翻倍。">?</span></h3>
+              <div id="usageChannelList"></div>
+            </div>
+            <div class="usage-section" id="usageByModelSection" style="display:none">
+              <h3>模型分布</h3>
+              <div id="usageByModelList"></div>
+            </div>
+            <div class="usage-section" id="usageDailySection" style="display:none">
+              <h3>每日消息活动（北京时间）</h3>
+              <table class="usage-table" id="usageDailyTable">
+                <thead><tr><th>日期</th><th>会话数</th><th>消息数</th></tr></thead>
+                <tbody id="usageDailyBody"></tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="usageEmpty" style="display:none">暂无用量数据</div>
+          </div>
+        </section>
+
+        <!-- 本地维护记录：不连接上游升级服务 -->
+        <section class="page" id="page-updates">
+          <div class="page-header"><h1>本地版本</h1><div class="page-actions"><button class="btn" id="maintenanceRefresh">刷新记录</button></div></div>
+          <div class="page-body">
+            <section id="configRecovery" class="config-recovery" aria-label="配置保存恢复"></section>
+            <div id="maintenanceRepositories" class="maintenance-repositories"></div>
+            <section id="maintenanceActivity" class="maint-activity" aria-label="提交活跃度" hidden>
+              <div class="maint-activity-head"><h2>提交活跃度</h2><div class="maint-chips" id="maintActivitySummary"></div></div>
+              <div class="maint-heat-wrap"><div class="maint-months" id="maintMonths"></div><div class="maint-heat" id="maintHeatmap"></div></div>
+              <div class="maint-heat-foot"><div class="maint-legend"><span>少</span><i data-lv="0"></i><i data-lv="1"></i><i data-lv="2"></i><i data-lv="3"></i><i data-lv="4"></i><span>多</span></div></div>
+              <div class="maint-types" id="maintTypeBars"></div>
+              <div class="maint-recent" id="maintRecent"></div>
+              <div class="maint-day" id="maintDayList" hidden></div>
+            </section>
+            <div id="maintenanceFeedback" class="maintenance-feedback" role="status" aria-live="polite"></div>
+            <div id="maintenanceHistory"></div>
+            <button class="btn" id="maintenanceMore" hidden>加载更早的提交</button>
+          </div>
+        </section>
+
+        <!-- 知识库页：来源(知识库/记忆/记录) + 多级笔记树 + 阅读/编辑 -->
+        <section class="page" id="page-kb">
+          <!-- 知识库页顶部 header 由 js/archive/archive-core.js 挂载时填充。 -->
+          <div class="page-header"></div>
+        </section>
+
+        <!-- 设置页 -->
+        <section class="page" id="page-settings">
+          <div class="page-header"><h1>设置</h1></div>
+          <div class="page-body">
+            <div class="settings-list">
+              <div class="setting-row"><div><div class="label">名称与头像</div><div class="desc">设置你的署名与默认助手身份，历史消息保留原署名。</div></div><button class="btn" onclick="pwIdentity()">编辑身份</button></div>
+              <div class="setting-row"><div><div class="label">朗读声音</div><div class="desc">选择 Windows 语音、系统回退与音色，并试听实际合成。</div></div><button class="btn" onclick="openVoiceSettings()">设置声音</button></div>
+              <div class="setting-row"><div><label class="label" for="settingsToolsMode">工具记录默认显示</label><div class="desc">折叠时可手动展开；隐藏只影响显示，执行记录仍会保存。</div></div><select id="settingsToolsMode" disabled><option value="collapsed">折叠摘要</option><option value="expanded">展开记录</option><option value="hidden">隐藏记录</option></select></div>
+              <div class="setting-row"><div><div class="label">启用长期记忆</div><div class="desc">跨会话保留关键上下文</div></div><button type="button" class="toggle" id="memToggle" role="switch" aria-checked="false" aria-label="启用长期记忆" onclick="toggleMemory()"></button></div>
+              <div class="setting-row"><div><div class="label">记忆字符上限</div><div class="desc">超过上限自动压缩旧记忆</div></div><input type="range" id="memLimit" min="500" max="8000" step="100" value="2200" oninput="updateMemLimit(this.value)" style="flex:1;max-width:220px"><span id="memLimitVal" style="min-width:44px;text-align:right">2200</span></div>
+            </div>
+            <div id="settingsFeedback" class="maintenance-feedback" role="status" aria-live="polite"></div>
+            <button class="btn" id="settingsRetry" hidden>重新读取设置</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移动端会话树遮罩 -->
+  <div class="chat-rail-overlay" id="chatRailOverlay" onclick="closeRailDrawer()"></div>
+
+  <!-- ===== 全局模态（必须在 page/section 之外，避免被隐藏页面遮挡） ===== -->
+  <!-- 技能配置 -->
+  <div id="skillConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeSkillConfigModal()">
+    <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3 id="skillCfgTitle">技能配置</h3><button class="modal-close" aria-label="关闭" title="关闭" onclick="closeSkillConfigModal()">×</button></div>
+      <div class="modal-body" id="skillCfgBody" style="overflow:auto"></div>
+      <div class="modal-foot" id="skillCfgFoot">
+        <button class="btn" onclick="runSkillSetup()" id="skillCfgSetupBtn" style="display:none">>_ Run setup</button>
+        <button class="btn primary" onclick="saveSkillConfig()">保存配置</button>
+      </div>
+    </div>
+  </div>
+  <!-- 技能市场配置 -->
+  <div id="marketCfgModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeMarketConfig()">
+    <div class="modal-panel" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3 id="marketCfgTitle">技能配置</h3><button class="modal-close" aria-label="关闭" title="关闭" onclick="closeMarketConfig()">×</button></div>
+      <div class="modal-body" id="marketCfgBody" style="overflow:auto"></div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeMarketConfig()">取消</button>
+        <button class="btn primary" onclick="saveMarketConfig()">保存配置</button>
+      </div>
+    </div>
+  </div>
+  <!-- 工具配置 -->
+  <div id="toolConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeToolConfigModal()">
+    <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3 id="toolCfgTitle">工具配置</h3><button class="modal-close" aria-label="关闭" title="关闭" onclick="closeToolConfigModal()">×</button></div>
+      <div class="modal-body" id="toolCfgBody" style="overflow:auto"></div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeToolConfigModal()">取消</button>
+        <button class="btn primary" onclick="saveToolConfig()">保存配置</button>
+      </div>
+    </div>
+  </div>
+  <!-- 统一小浮层 -->
+  <div class="mini-backdrop" id="miniBackdrop" onclick="closeMini(false)"></div>
+  <div class="mini-popup" id="miniPopup">
+    <div class="mini-popup-head"><span class="mini-popup-titlerow"><span class="mini-popup-title" id="popupTitle">标题</span><span class="mp-hint" id="popupHint" hidden>?</span></span><button type="button" class="mini-popup-close" aria-label="关闭选择面板" title="关闭" onclick="closeMini()">×</button></div>
+    <div class="mini-popup-search" id="popupSearchWrap"><input type="text" id="popupSearch" placeholder="搜索" oninput="filterMiniPopup()"></div>
+    <div class="mini-popup-tabs" id="popupTabs" style="display:none"></div>
+    <div class="mini-popup-body" id="popupBody"></div>
+    <div class="mini-popup-foot" id="popupFoot" style="display:none"></div>
+  </div>
+</div>
+
+
+<script src="js/core/dom.js?v=63c3f444"></script>
+<script src="js/core/data.js?v=e6f7ebc9"></script>
+<script src="js/core/state.js?v=7138f777"></script>
+<script src="js/core/utils.js?v=42f9ea77"></script>
+<script src="js/core/ui-kit.js?v=2756c6cf"></script>
+<script src="js/core/api.js?v=8e7dd4b5"></script>
+<script src="js/core/markdown.js?v=4905f81a"></script>
+<script src="js/chat/toolcard.js?v=4a17df4b"></script>
+<script src="js/chat/tabs.js?v=c0467239"></script>
+<script src="js/panels/workspace.js?v=c460ef2b"></script>
+<script src="js/panels/terminal.js?v=3d002036"></script>
+<script src="js/chat/message-ops.js?v=1f479e48"></script>
+<script src="js/chat/roundtable.js?v=71e58827"></script>
+<script src="js/chat/new-dialog.js?v=92d58b6c"></script>
+<script src="js/chat/compose.js?v=0973d78d"></script>
+<script src="js/chat/canvas.js?v=55d7c0b3"></script>
+<script src="js/core/think-intensity.js?v=f00c2b23"></script>
+<script src="js/core/mini-popup.js?v=fb337472"></script>
+<script src="js/core/router.js?v=b117c07c"></script>
+<script src="js/panels/tunnel.js?v=fc7cf5cf"></script>
+<script src="js/core/theme.js?v=b72699c4"></script>
+<script src="js/panels/overview.js?v=98b8e013"></script>
+<script src="js/panels/models.js?v=61a55fc1"></script>
+<script src="js/panels/extensions.js?v=3bf55b2d"></script>
+<script src="js/panels/cron.js?v=3bc23484"></script>
+<!-- 2026-11-14：js/panels/memory.js 已移除。它只服务 page-memory 里那三个 textarea
+     （memSoul/memMemory/memNotes）和 saveAllMemory()，这些 DOM 已随档案板块改版删掉，
+     留着的脚本只会在每次 page 事件上白跑一遍。档案页现在由 js/archive/ 接管。 -->
+
+<script src="js/panels/usage.js?v=6bf1bfd0"></script>
+<script src="js/panels/learning.js?v=c192f17c"></script>
+<script src="js/panels/channels.js?v=37454ed7"></script>
+<script src="js/core/init.js?v=d1bcb706"></script>
+
+<script src="js/fusion-v030.js?v=a023c737"></script>
+
+<!-- BUILT v17 single-file UI | sources: preview_v17/{index.html,styles.css,data.js,app.js,js/ao_workflow_presets.js} | libs external: scripts/{marked,purify,qrcode}.min.js, js/personas_library.js -->
+<script src="js/core/boot-mask.js?v=44e9aaf1"></script>
+<script src="js/panel-workspace-ui.js?v=578258a1"></script>
+<script src="js/panel-compress-ui.js?v=ed61d9c5"></script>
+<script src="js/panel-slash.js?v=c162e6e9"></script>
+<link rel="stylesheet" href="css/panel-durable.css?v=f64412db">
+<script src="js/panel-durable.js?v=bc1c9559"></script>
+<script src="js/panel-tooltip.js?v=21a598a9"></script>
+<script src="js/panel-cron-editor.js?v=742c2739"></script>
+<script src="js/panel-cron-hooks-ui.js?v=bed7905c"></script>
+<script src="js/panel-cron-history-ui.js?v=dfd38576"></script>
+<script src="js/panel-echo-ui.js?v=386584a9"></script>
+<link rel="stylesheet" href="css/panel-navigation.css?v=35af5d14">
+<link rel="stylesheet" href="css/panel-wordmark.css?v=d585d361">
+<link rel="stylesheet" href="css/panel-chat-avatar.css?v=01d645c0">
+<script src="js/panel-rooms-ui.js?v=591b9a85"></script>
+<script src="js/panel-experts-ui.js?v=0701b308"></script>
+<script src="js/panel-model-v2.js?v=d1d144c0"></script>
+<script src="js/panel-model-v2-pages.js?v=463ef5bb"></script>
+<script src="js/panel-model-v2-sheets.js?v=b4414bf0"></script>
+<script src="js/panel-connectors-ui.js?v=8d109f7c"></script>
+<script src="js/panel-capabilities-ui.js?v=2dca24af"></script>
+<script src="js/panel-auth-ui.js?v=a792fab9"></script>
+<script src="js/panel-files-ui.js?v=04cacb2b"></script>
+<script src="js/panel-runtime-ui.js?v=f7c7bf5f"></script>
+<script src="js/panel-mcp-ui.js?v=58aad124"></script>
+<link rel="stylesheet" href="css/panel-channels.css?v=874f95db">
+<link rel="stylesheet" href="css/panel-slash.css?v=212726b3">
+<link rel="stylesheet" href="css/panel-clarify.css?v=7a80bb23">
+<link rel="stylesheet" href="css/panel-compress.css?v=0b7b7d09">
+<link rel="stylesheet" href="css/components.css?v=a212b17a">
+<link rel="stylesheet" href="css/canvas.css?v=700104bf">
+<link rel="stylesheet" href="css/reasoning.css?v=103a9130">
+<script src="js/panel-channel-pairing-ui.js?v=41bbe1cb"></script>
+<script src="js/panel-channels-ui.js?v=79ed9a69"></script>
+<script src="js/panel-typing-ui.js?v=f308c763"></script>
+<script src="js/panel-settings.js?v=51441ddd"></script>
+<script src="js/panel-maintenance-ui.js?v=31cb14c9"></script>
+<script src="js/panel-config-recovery-ui.js?v=504efbad"></script>
+<script src="js/panel-plans-ui.js?v=d1ddc290"></script>
+<script src="js/panel-library-drafts.js?v=f1279a85"></script>
+<!-- 档案三页：提示词 / 知识库 / 留痕录（2026-11-14 替换 panel-library-ui 与 panels/assistant）
+     顺序要紧：core 定义命名空间 → 各视图模块注册 → boot 同步挂载 → reviews-ui 往新页头塞「整理草稿」。 -->
+<script src="js/archive/archive-core.js?v=5edacce9"></script>
+<script src="js/archive/archive-tree.js?v=c1e4ecec"></script>
+<script src="js/archive/archive-search.js?v=545167f6"></script>
+<script src="js/archive/archive-md.js?v=26fec538"></script>
+<script src="js/archive/archive-doc.js?v=04a51336"></script>
+<script src="js/archive/archive-info.js?v=d30b94b8"></script>
+<script src="js/archive/archive-arch.js?v=7b40be49"></script>
+<script src="js/archive/archive-graph.js?v=ff48920f"></script>
+<script src="js/archive/archive-trajectory.js?v=a2e82d9a"></script>
+<script src="js/archive/archive-vault.js?v=dc0c5600"></script>
+<script src="js/archive/archive-boot.js?v=43ffdda0"></script>
+<script src="js/panel-library-reviews-ui.js?v=a28c19e6"></script>
+<script src="js/panel-navigation.js?v=d15862ae"></script>
+<script src="js/panel-chat-avatar.js?v=953facc2"></script>
+<script src="js/panel-chat-tail.js?v=8ea31e46"></script>
+<script src="js/panel-clarify.js?v=add6c1e9"></script>
+<script src="js/panel-push.js?v=8f7d9e91"></script>
+<script src="js/panel-unread-rail.js?v=82b1f980"></script>
+<script src="js/panel-scroll-diag.js?v=1c75bc6a"></script>
+<div id="personaModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closePersonaModal()">
+  <div class="modal-panel">
+    <div class="modal-head"><h3 id="personaModalTitle">添加环境 Profile</h3><button class="modal-close" aria-label="关闭" title="关闭" onclick="closePersonaModal()">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="personaEditId">
+      <p style="font-size:12px;color:var(--muted);line-height:1.5">Profile 是独立运行环境，可配置模型、密钥、技能与 SOUL。它不切换当前会话角色；会话专家请到“专家”页选择。</p>
+      <div class="field"><label>环境图标 Emoji</label><input type="text" id="personaEmoji" placeholder="🤖" maxlength="4"></div>
+      <div class="field"><label>环境名称</label><input type="text" id="personaLabel" placeholder="如：独立测试环境"></div>
+      <div class="field"><label>环境 SOUL 提示词</label><textarea id="personaPrompt" rows="6" placeholder="配置该环境持久的系统身份"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="personaDeleteBtn" style="display:none" onclick="deletePersona()">删除</button>
+      <button class="btn primary" onclick="savePersona()">保存</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

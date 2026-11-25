@@ -1,0 +1,647 @@
+/* 模型页 · 六域工作台 — 骨架（2026-11-15 第二轮：严格对齐参考稿）
+ *
+ * 参考稿：/vol1/1000/飞牛文件/Code_20261115120611.html（CHATES · 模型）
+ * 本文件只管：外壳（两行页签 + content/wrap）、数据加载、域路由、弹层、toast、写操作。
+ * 六个域的渲染在 panel-model-v2-pages.js，弹层在 panel-model-v2-sheets.js。
+ * 三者通过 window.MV2 共享命名空间，加载顺序由 index.html 的 script 顺序保证。
+ *
+ * 与第一轮的差别：DOM 结构、类名、组件形态全部改用参考稿那一套
+ * （.tabbars/.tabrow/.content/.wrap/.ph/.hero/.qcard/.pcard/.slotbox/.tscard/.panel/.sheet），
+ * 样式表见 css/panel-model-ref.css（参考 CSS 原样搬入并限定作用域）。
+ */
+(function () {
+  'use strict';
+
+  /* 每个域的第二行子页签（严格对齐参考稿 DOMS） */
+  var DOMAINS = [
+    ['home', '概览', []],
+    ['select', '模型选择', [['main', '模型与插槽'], ['moa', '组合回答']]],
+    ['providers', '服务商', [['llm', 'LLM 服务'], ['keys', '密钥']]],
+    ['backends', '能力后端', [['all', '全部域'], ['ds', 'DeepSeek 落点']]],
+    ['toolsets', '工具集', []],
+    ['config', '配置', [['yaml', 'config.yaml'], ['apply', '生效与写入']]]
+  ];
+
+  /* 域 → 一级路由页 id 双向映射（2026-11-15 二改：页内按钮切换改成一页一域） */
+  var DOMAIN_PAGE = {
+    home: 'models-home', select: 'models-select', providers: 'models-providers',
+    backends: 'models-backends', toolsets: 'toolsets', config: 'models-config'
+  };
+  var PAGE_DOMAIN = {};
+  DOMAINS.forEach(function (row) { PAGE_DOMAIN[DOMAIN_PAGE[row[0]]] = row[0]; });
+  /* 六个域的根节点缓存，buildShell 里一次性建好，renderDomain 按域填内容 */
+  var rootsByDomain = null;
+  var loading = false;
+
+  var S = {
+    domain: 'home',
+    tab: {},
+    catalog: null,
+    keys: null,
+    backends: null,
+    toolsets: null,
+    preview: null,
+    audit: null,
+    moa: null,
+    aux: null,
+    caps: null,
+    voice: null,
+    loaded: false,
+    error: ''
+  };
+
+  function url(path) {
+    return typeof window.apiUrl === 'function' ? window.apiUrl(path) : path;
+  }
+
+  function headers() {
+    return { 'Content-Type': 'application/json', 'X-Monitor-Token': window.monitorToken || '' };
+  }
+
+  async function post(body) {
+    var response = await fetch(url('/api/panel-models'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body), cache: 'no-store'
+    });
+    var out = await response.json().catch(function () { return {}; });
+    if (!response.ok || !out.ok) {
+      var error = Error(out.error || '模型配置操作失败');
+      error.status = response.status;
+      throw error;
+    }
+    return out;
+  }
+
+  function makeGet(path, label) {
+    return async function () {
+      var response = await fetch(url(path), { method: 'GET', headers: headers(), cache: 'no-store' });
+      var out = await response.json().catch(function () { return {}; });
+      if (!response.ok || !out.ok) {
+        var error = Error(out.error || label + '读取失败');
+        error.status = response.status;
+        throw error;
+      }
+      return out;
+    };
+  }
+
+  function makePatch(path, label) {
+    return async function (body) {
+      var response = await fetch(url(path), {
+        method: 'PATCH', headers: headers(), body: JSON.stringify(body), cache: 'no-store'
+      });
+      var out = await response.json().catch(function () { return {}; });
+      if (!response.ok || !out.ok) {
+        var error = Error(out.error || label + '保存失败');
+        error.status = response.status;
+        throw error;
+      }
+      return out;
+    };
+  }
+
+  var auxGet = makeGet('/api/panel-models/auxiliary', '辅助模型');
+  var auxPatch = makePatch('/api/panel-models/auxiliary', '辅助模型');
+  var voiceGet = makeGet('/api/panel-models/voice', '语音配置');
+  var voicePatch = makePatch('/api/panel-models/voice', '语音配置');
+
+  /* 语音能力实测：真合成一句 / 真转写一遍，回耗时与结果。
+     和 voicePatch 的区别是失败语义 —— 「测出来不通」是本次测试的正常结论，
+     后端照样回 200 + ok:false，所以这里只有 5xx 才当异常抛，
+     否则前端会把「TTS 服务没起」这种有效信息变成一条红色报错。 */
+  var voiceTest = async function (body) {
+    var response = await fetch(url('/api/panel-models/voice-test'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body), cache: 'no-store'
+    });
+    var out = await response.json().catch(function () { return { ok: false, error: '实测没有返回结果' }; });
+    if (response.status >= 500) {
+      var error = Error(out.error || '实测请求失败');
+      error.status = response.status;
+      throw error;
+    }
+    return out;
+  };
+
+  /* ── DOM 小工具（类名沿用参考稿）───────────────────── */
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function btn(text, cls, run) {
+    var node = el('button', cls || 'btn', text);
+    node.type = 'button';
+    if (run) node.onclick = run;
+    return node;
+  }
+
+  function badge(text, tone) {
+    return el('span', 'badge' + (tone ? ' ' + tone : ''), text);
+  }
+
+  function chip(text, mono) {
+    return el('span', 'chip' + (mono ? ' mono' : ''), text);
+  }
+
+  function dot(tone) {
+    return el('span', 'dot' + (tone ? ' ' + tone : ''));
+  }
+
+  /* div.sec：h3 + 说明 + spacer */
+  function sec(title, note) {
+    var box = el('div', 'sec');
+    if (title) box.append(el('h3', null, title));
+    if (note) box.append(el('span', 'n', note));
+    box.append(el('span', 'spacer'));
+    return box;
+  }
+
+  /* div.ph：页面头 h1 + sub + acts */
+  function ph(title, sub, acts) {
+    var box = el('div', 'ph');
+    box.append(el('h1', null, title || ''));
+    if (sub) box.append(el('span', 'sub', sub));
+    if (acts) {
+      var wrap = el('div', 'acts');
+      [].concat(acts).forEach(function (a) { if (a) wrap.append(a); });
+      box.append(wrap);
+    }
+    return box;
+  }
+
+  function kv(label, value) {
+    var row = el('div', 'kv');
+    row.append(el('span', null, label));
+    var right = el('b');
+    if (typeof value === 'string') right.textContent = value;
+    else if (value) right.append(value);
+    row.append(right);
+    return row;
+  }
+
+  function panel(title, bodyNodes, headExtra) {
+    var box = el('div', 'panel');
+    if (title) {
+      var head = el('div', 'panel-h');
+      head.append(el('h3', null, title));
+      if (headExtra) head.append(headExtra);
+      box.append(head);
+    }
+    var body = el('div', 'panel-b');
+    [].concat(bodyNodes || []).forEach(function (n) { if (n) body.append(n); });
+    box.append(body);
+    return box;
+  }
+
+  function code(text) {
+    var box = el('div', 'code');
+    box.textContent = text || '';
+    return box;
+  }
+
+  function input(value, placeholder, type) {
+    var node = el('input', 'input');
+    node.type = type || 'text';
+    node.value = value == null ? '' : String(value);
+    if (placeholder) node.placeholder = placeholder;
+    return node;
+  }
+
+  /* 当前值不在选项里时补一条「当前值」。以前遇到这种情况一个都选不中，
+     浏览器就默认显示第一项 —— 用户打开编辑看到的是「我明明选了 X，怎么变成
+     别的了」。服务商被删、模型被禁用、来源选项改了都会踩这个；补这一条还有个
+     用处：不改原样存回去，不会因为打开一次编辑就把配置悄悄改成第一项。 */
+  function select(options, value) {
+    var node = el('select', 'select');
+    var list = (options || []).map(function (option) {
+      return Array.isArray(option) ? option.slice(0, 2) : [option, option];
+    });
+    var known = list.some(function (item) { return String(item[0]) === String(value); });
+    if (value != null && String(value) !== '' && !known) {
+      list = list.concat([[value, value + ' · 当前值']]);
+    }
+    list.forEach(function (item) {
+      var opt = el('option', null, item[1] === '' ? '（不指定，自动）' : item[1]);
+      opt.value = item[0];
+      if (String(item[0]) === String(value)) opt.selected = true;
+      node.append(opt);
+    });
+    return node;
+  }
+
+  /* 字段名右侧问号：提示文字走全站模板（.ui-hint + data-tip 单例气泡）。
+     旧版把 hint 铺成字段下方 .fh 内联小字，跟主页面「说明收进问号」不一致，
+     2026-11-21 统一收进问号。 */
+  function hintQ(text) {
+    var q = el('span', 'ui-hint mp-hint', '?');
+    if (text) { q.setAttribute('data-tip', text); q.setAttribute('aria-label', text); }
+    return q;
+  }
+
+  function field(label, control, hint, required) {
+    var box = el('div', 'field');
+    var tag = el('label', 'lb', label);
+    if (required) tag.append(el('span', 'req', '*'));
+    if (hint) tag.append(hintQ(hint));
+    box.append(tag, control);
+    return box;
+  }
+
+  /* 参考稿的步骤条 */
+  function steps(labels, current) {
+    var box = el('div', 'steps');
+    (labels || []).forEach(function (label, index) {
+      var sp = el('div', 'sp' + (index === current ? ' on' : '') + (index < current ? ' done' : ''));
+      sp.append(el('span', 'n', String(index + 1)));
+      sp.append(el('span', null, label));
+      box.append(sp);
+    });
+    return box;
+  }
+
+  /* ── 通知：复用站内统一通知条（core/utils.js 的 window.toast / hzToast）。
+     老调用全是 toast(title, body, tone) 三参，这里统一转成 hzToast 对象签名：
+     右下角 + 类型色板 + 「知道了」按钮，跟面板其它通知完全一致，不再自研 createElement。── */
+  function toast(title, body, tone) {
+    var T = window.toast || window.__hzToast;
+    if (!T) return null;
+    var bad = tone === 'bad';
+    return T({
+      type: bad ? 'error' : 'success',
+      title: title || '',
+      message: body || '',
+      duration: bad ? 6000 : 3000,
+      actions: [{ label: '知道了', primary: true, onClick: 'close' }]
+    });
+  }
+
+  /* ── 弹层：参考稿 overlay > sheet > (sheet-h + sheet-b + sheet-f) ── */
+  var sheetNode = null;
+
+  function sheet(options) {
+    closeSheet();
+    var overlay = el('div', 'overlay');
+    var box = el('div', 'sheet' + (options.wide ? ' wide' : ''));
+
+    var head = el('div', 'sheet-h');
+    var tt = el('div', 'tt');
+    tt.append(el('h3', null, options.title || ''));
+    if (options.sub) tt.append(el('div', 'st', options.sub));
+    head.append(tt);
+    var x = btn('×', 'sheet-x', closeSheet);
+    x.setAttribute('aria-label', '关闭');
+    head.append(x);
+
+    var body = el('div', 'sheet-b');
+    [].concat(options.body || []).forEach(function (n) { if (n) body.append(n); });
+
+    var foot = el('div', 'sheet-f');
+    (options.foot || []).forEach(function (item) {
+      if (!item) return;
+      if (item === 'spacer') { foot.append(el('span', 'spacer')); return; }
+      foot.append(item);
+    });
+
+    // foot 必须始终进 DOM：providerEdit 等调用方是在 sheet() 返回后
+    // 才用 sheet.foot.append() 动态加按钮，若按初始 options.foot 判空，
+    // 动态加的按钮永远渲染不出来（这正是「编辑面板没有保存按钮」的根因）。
+    box.append(head, body, foot);
+    overlay.append(box);
+    overlay.onclick = function (event) { if (event.target === overlay) closeSheet(); };
+    (document.querySelector('.models-page.active') || document.body).append(overlay);
+    sheetNode = overlay;
+
+    var first = body.querySelector('input,select,textarea,button');
+    if (first) setTimeout(function () { try { first.focus(); } catch (_) {} }, 60);
+    return { overlay: overlay, box: box, body: body, foot: foot, close: closeSheet };
+  }
+
+  function closeSheet() {
+    if (sheetNode && sheetNode.parentNode) sheetNode.parentNode.removeChild(sheetNode);
+    sheetNode = null;
+  }
+
+  function sheetOpen() { return !!sheetNode; }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && sheetNode) closeSheet();
+  });
+
+  /* ── 写操作 ─────────────────────────────────────────── */
+  function pending() {
+    try { window.panelRuntimeRefresh?.(); } catch (_) {}
+  }
+
+  /* 每种写动作对应哪一份 revision */
+  function revisionFor(action) {
+    if (action === 'moa_save') return (S.moa || {}).moa_revision || '';
+    if (action === 'save_backend') return (S.backends || {}).revision || '';
+    if (action === 'save_toolsets') return (S.toolsets || {}).revision || '';
+    return (S.catalog || {}).revision || '';
+  }
+
+  async function mutate(body, options) {
+    options = options || {};
+    var attempt = 0;
+    while (attempt < 2) {
+      try {
+        var out = await post(body);
+        if (out.changed === false) toast(options.unchanged || '没有变化', '配置与提交内容一致，未写入');
+        else {
+          /* 2026-11-16：保存同样可能顺手改会话。典型场景是「取消勾选一个模型」
+             —— 面板上的删除是就地归档成 enabled:False，服务商和地址都还在，
+             那些指着这个模型的群和对话会在后端被复位成默认模型。原来这条消息
+             只在 svcDelete 里有，保存路径一句不提，等于静默改了他的配置。
+             统一在 mutate 出口拼一次：两个面板共用这个函数，全路径都可见。 */
+          var swept = ((out && out.auto_cleaned) || []).concat((out && out.sessions_reset) || []);
+          var bodyText = options.body || '下一条消息起生效，不用重启';
+          if (swept.length) {
+            var shown = swept.slice(0, 4).join('、');
+            if (swept.length > 4) shown += ' 等 ' + swept.length + ' 处';
+            bodyText = '顺手清了 ' + shown + ' ｜ ' + bodyText;
+          }
+          toast(options.done || '已保存', bodyText);
+        }
+        if (out.changed !== false) pending();
+        await load(options.reload || null);
+        render();
+        return out;
+      } catch (error) {
+        // 409 有三种，只有「文件/版本变了」这类能靠重发解决 —— 重发会让后端重读
+        // 最新内容再算一遍，不会拿旧快照覆盖别人刚写的东西：
+        //   a) 面板 revision 过期      → 模型配置已被其他页面修改
+        //   b) 文件内容被别的进程改了  → 配置已被其他进程修改（gateway 重启时会回写
+        //      config.yaml，撞上就是这条）
+        //   c) 文件正在被原子替换      → 正在被替换 / 保存前配置发生变化
+        // 业务校验类 409（还被路线用着、不能撤销旧操作）不能重试，重发只会再错一次。
+        var retryableConflict = error.status === 409 &&
+          /已被其他页面修改|已被其他进程修改|正在被替换|保存前配置发生变化/.test(error.message || '');
+        if (retryableConflict && attempt === 0) {
+          attempt++;
+          await load();
+          body = Object.assign({}, body, { revision: revisionFor(body.action) });
+          toast('配置刚刚变过', '已按最新内容重试一次');
+          continue;
+        }
+        if (error.status === 409) {
+          // 走到这里说明重试也没过：要么后台正在反复回写（多半在重启），
+          // 要么是业务校验（那类文案本身就是人话，原样给）。
+          var why = retryableConflict ? '配置刚被后台改过两次，等几秒再点一次保存' : error.message;
+          /* 2026-11-16：不能再 return null —— 调用方 await 到 null 会当成「存上了」，
+             接着往下关弹层。用户取消主模型勾选、保存被校验拦下，面板就这么自己关了，
+             草稿全丢。现在返回带原因的失败对象，要留在面板里的调用方自己判断。
+             不抛异常是为了照顾另外十几个没有 catch 的调用点（它们只关心 toast）。 */
+          var failed = { ok: false, status: 409, error: why };
+          toast('未保存', why, 'bad');
+          await load();
+          render();
+          S.lastMutateError = failed;
+          return failed;
+        }
+        toast('保存失败', error.message, 'bad');
+        throw error;
+      }
+    }
+    return null;
+  }
+
+  async function auxMutate(body, options) {
+    options = options || {};
+    try {
+      var out = await auxPatch(body);
+      /* 后端 update 会回 revision_after（改完之后这个任务的 revision）。
+         同一屏连改两次时必须用它，否则第二次用的是过期 revision → 409。
+         顺带把刚回的值写回 S.aux.tasks，避免又靠一次 GET 才知道新值。 */
+      if (out && out.key && out.revision_after) {
+        (S.aux && S.aux.tasks || []).forEach(function (t) { if (t.key === out.key) t.revision = out.revision_after; });
+      }
+      toast(options.done || '已保存', options.body || '辅助模型配置已写入 config.yaml');
+      pending();
+      S.aux = await auxGet();
+      await load(['catalog']);
+      render();
+      return out;
+    } catch (error) {
+      if (error.status === 409) {
+        toast('辅助模型刚在别处改过', '已刷新，请重试', 'bad');
+        S.aux = await auxGet();
+        render();
+        return null;
+      }
+      toast('保存失败', error.message, 'bad');
+      throw error;
+    }
+  }
+
+  async function voiceMutate(body, options) {
+    options = options || {};
+    try {
+      var out = await voicePatch(body);
+      toast(options.done || '已保存', options.body || '语音配置已写入 config.yaml');
+      pending();
+      S.voice = await voiceGet();
+      await load(['catalog', 'backends']);
+      render();
+      return out;
+    } catch (error) {
+      if (error.status === 409) {
+        toast('语音配置刚在别处改过', '已刷新，请重试', 'bad');
+        S.voice = await voiceGet();
+        render();
+        return null;
+      }
+      toast('保存失败', error.message, 'bad');
+      throw error;
+    }
+  }
+
+  /* ── 数据加载 ───────────────────────────────────────── */
+  async function load(parts) {
+    var want = function (name) { return !parts || parts.indexOf(name) >= 0; };
+    var jobs = [];
+    if (want('catalog')) jobs.push(post({ action: 'read' }).then(function (out) { S.catalog = out; }));
+    if (want('aux')) jobs.push(auxGet().then(function (out) { S.aux = out; }).catch(function () { S.aux = S.aux || { tasks: [], services: [] }; }));
+    if (want('moa')) jobs.push(post({ action: 'moa_read' }).then(function (out) { S.moa = out; }).catch(function () { S.moa = S.moa || null; }));
+    if (want('keys')) jobs.push(post({ action: 'keys' }).then(function (out) { S.keys = out; }).catch(function () { S.keys = S.keys || { keys: [] }; }));
+    if (want('backends')) jobs.push(post({ action: 'backends' }).then(function (out) { S.backends = out; }).catch(function () { S.backends = S.backends || { domains: [] }; }));
+    if (want('toolsets')) jobs.push(post({ action: 'toolsets' }).then(function (out) { S.toolsets = out; }).catch(function () { S.toolsets = S.toolsets || { toolsets: [] }; }));
+    if (want('preview')) jobs.push(post({ action: 'config_preview' }).then(function (out) { S.preview = out; }).catch(function () { S.preview = S.preview || null; }));
+    if (want('audit')) jobs.push(post({ action: 'audit' }).then(function (out) { S.audit = out; }).catch(function () { S.audit = S.audit || { snapshots: [] }; }));
+    if (want('caps')) jobs.push(post({ action: 'cap_matrix' }).then(function (out) { S.caps = out; }).catch(function () { S.caps = S.caps || null; }));
+    /* 2026-11-23：能力实验室改成按模型批量测，清单要单独拉一次（cap_batch_matrix）。
+       和上面的 cap_matrix（单服务商 × 单模型那套，仍在别处用）不是一回事，别合并。 */
+    if (want('caps') || want('backends')) {
+      jobs.push(post({ action: 'cap_batch_matrix' })
+        .then(function (out) { S.caplab = out; })
+        .catch(function () { S.caplab = S.caplab || null; }));
+      /* 2026-11-23 主人定：DS 落点改回「上方一个供应商一个模型 + 下方全部功能」，
+         需要的是「供应商 → 它下面的模型」两级清单，不是 cap_batch_matrix 那种
+         「一行一个模型」的扁平表。两份都拉，各喂各的视图。 */
+      jobs.push(post({ action: 'ds_suite_view' })
+        .then(function (out) { S.dsView = out; })
+        .catch(function () { S.dsView = S.dsView || null; }));
+    }
+    if (want('voice')) jobs.push(voiceGet().then(function (out) { S.voice = out; }).catch(function () { S.voice = S.voice || null; }));
+    var results = await Promise.allSettled(jobs);
+    var failed = results.filter(function (row) { return row.status === 'rejected'; });
+    S.loaded = true;
+    S.error = failed.length ? '部分数据读取失败（' + failed.length + ' 项），可点右上角刷新重试' : '';
+    return S;
+  }
+
+  /* ── 路由与渲染 ─────────────────────────────────────── */
+  function go(domain, tab) {
+    if (domain) S.domain = domain;
+    if (tab) S.tab[domain] = tab;
+    closeSheet();
+    /* 域切换 = 一级路由切换，交给面板原生 switchPage，再重渲染目标域 */
+    try { window.switchPage(DOMAIN_PAGE[domain] || 'models-home'); } catch (_) {}
+    renderDomain(domain);
+  }
+
+  function subTabsOf(domain) {
+    var row = DOMAINS.filter(function (r) { return r[0] === domain; })[0];
+    return (row && row[2]) || [];
+  }
+
+  /* 2026-11-23：手动「刷新」按钮删了。它只做 boot(true) 一件事，而 boot 本来就
+     在切域/切页时按 60s 过期自动重拉 config.yaml —— 按钮等于给同一件事开了第二个
+     入口，还要用户记得点。现在只剩自动：进页面时若数据超过 60s 就后台重拉，
+     拉完就地重渲染，不打断当前操作。 */
+  var AUTO_REFRESH_MS = 60000;
+  function scheduleAutoRefresh() {
+    if (scheduleAutoRefresh.timer) clearTimeout(scheduleAutoRefresh.timer);
+    scheduleAutoRefresh.timer = setTimeout(function () {
+      /* 只看模型页是否可见，不可见就别费这次 IO；下次切回来会自己补。 */
+      var visible = ['models-home', 'models-select', 'models-providers',
+        'models-backends', 'toolsets', 'models-config'].some(function (id) {
+        var page = document.getElementById('page-' + id);
+        return page && !page.hidden && page.offsetParent !== null;
+      });
+      if (!visible) { scheduleAutoRefresh(); return; }
+      boot(true).catch(function (error) {
+        if (window.console) console.error('[MV2 autoload]', error);
+      }).then(scheduleAutoRefresh);
+    }, AUTO_REFRESH_MS);
+  }
+
+  /* 渲染单个域到它自己的 #page-models-* 的 .mv2-root；能力后端的子页签
+     （全部域 / DeepSeek 落点）作为该域根节点顶部的 second 页签行渲染。 */
+  function renderDomain(domain) {
+    var root = rootsByDomain && rootsByDomain[domain];
+    if (!root) return;
+    root.replaceChildren();
+    if (!S.loaded) {
+      root.append(el('div', 'empty', '正在读取 config.yaml…'));
+      return;
+    }
+    if (S.error) root.append(el('div', 'empty', S.error));
+    var subItems = subTabsOf(domain);
+    if (subItems.length) {
+      var bar = el('div', 'tabrow second');
+      var current = S.tab[domain] || subItems[0][0];
+      if (!subItems.some(function (i) { return i[0] === current; })) current = subItems[0][0];
+      S.tab[domain] = current;
+      subItems.forEach(function (item) {
+        var tab = btn(item[1], '', function () { go(domain, item[0]); });
+        tab.classList.toggle('on', item[0] === current);
+        bar.append(tab);
+      });
+      root.append(bar);
+    }
+    var page = (window.MV2 && MV2.pages && MV2.pages[domain]) || null;
+    if (!page) {
+      root.append(el('div', 'empty', '这个域还没有渲染器'));
+      return;
+    }
+    try {
+      root.append(page(S));
+    } catch (error) {
+      root.append(el('div', 'empty', '渲染失败：' + (error && error.message ? error.message : String(error))));
+      if (window.console) console.error(error);
+    }
+  }
+
+  function render() {
+    buildShell();
+    DOMAINS.forEach(function (row) { renderDomain(row[0]); });
+  }
+
+  /* ── 外壳 ───────────────────────────────────────────── */
+  function buildShell() {
+    var roots = {};
+    DOMAINS.forEach(function (row) {
+      var domain = row[0];
+      var host = document.getElementById('page-' + DOMAIN_PAGE[domain]);
+      if (!host) return;
+      var body = host.querySelector('.page-body') || host;
+      var root = body.querySelector('.mv2-root');
+      if (!root) { root = el('div', 'mv2-root'); root.dataset.domain = domain; body.replaceChildren(root); }
+      roots[domain] = root;
+      /* 不再注入任何手动按钮；数据新鲜度由 scheduleAutoRefresh 管。 */
+    });
+    if (DOMAINS.some(function (row) { return !roots[row[0]]; })) return false;
+    rootsByDomain = roots;
+    return true;
+  }
+
+  var booted = false;
+
+  async function boot(force) {
+    if (!buildShell()) return;
+    /* 已加载且未过期 → 只重渲染不重拉；首次或 >60s 或 force → 重拉 config.yaml */
+    var stale = !booted || (Date.now() - (window.__mv2LoadedAt || 0) > 60000);
+    if (booted && !force && !stale) { render(); return; }
+    if (loading) return;  /* 已经在拉，别叠第二个 */
+    loading = true;
+    window.__mv2LoadedAt = Date.now();
+    render();
+    try { await load(); } catch (error) { S.error = error.message; }
+    booted = true;
+    loading = false;
+    render();
+    scheduleAutoRefresh();
+  }
+
+  /* 自动启动：面板切到任意模型页（models-home ~ models-config）时才 boot。
+     直接包 switchPage 最稳——首次加载时六个 #page-models-* 可能还没被别处重建。 */
+  function autostart() {
+    /* 让出一次宏任务：pages.js / sheets.js 是后面的 <script>，本文件执行时
+       MV2.pages 还是空的，直接 boot 会渲染出「这个域还没有渲染器」。 */
+    setTimeout(function () {
+      boot().catch(function (error) { if (window.console) console.error('[MV2]', error); });
+    }, 0);
+    var orig = window.switchPage;
+    if (typeof orig === 'function' && !orig.__mv2Wrapped) {
+      var wrapped = function (name) {
+        var out = orig.apply(this, arguments);
+        if (name === 'models' || /^models-/.test(name) || name === 'toolsets') {
+          setTimeout(function () {
+            boot().catch(function (error) { if (window.console) console.error('[MV2]', error); });
+          }, 0);
+        }
+        return out;
+      };
+      wrapped.__mv2Wrapped = true;
+      window.switchPage = wrapped;
+    }
+  }
+
+  window.MV2 = {
+    S: S, DOMAINS: DOMAINS,
+    api: post, auxGet: auxGet, auxPatch: auxPatch, voiceGet: voiceGet, voicePatch: voicePatch, voiceTest: voiceTest,
+    el: el, btn: btn, badge: badge, chip: chip, dot: dot, sec: sec, ph: ph, kv: kv, panel: panel,
+    code: code, field: field, input: input, select: select, steps: steps,
+    toast: toast, sheet: sheet, closeSheet: closeSheet, sheetOpen: sheetOpen,
+    load: load, render: render, go: go, mutate: mutate, auxMutate: auxMutate, voiceMutate: voiceMutate,
+    pending: pending, boot: boot,
+    pages: {}, sheets: {}
+  };
+
+  window.renderProviders = function () { boot().catch(function () {}); };
+
+  /* 自动启动放在 MV2 挂载之后：boot 里 render() 要读 window.MV2.pages。 */
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', autostart);
+  else autostart();
+})();
