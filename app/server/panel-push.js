@@ -7,7 +7,9 @@
 // 3. 推送用空载荷（zero-length body）：iOS 只要求 SW 里弹一条可见通知，
 //    不需要 aes128gcm 加密，省掉一整套 payload 加密实现。
 // 4. 角标数字由 SW 收到 push 后回查 /api/push/unread 得到，再 setAppBadge。
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, chmodSync, watch } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, chmodSync, watch } from "node:fs";
+// 写字符串一律 utf8：Windows 省略 encoding 会按 GBK 写。
+import {writeFileSync} from "./panel-fs-utf8.js";
 import { generateKeyPairSync, createPrivateKey, createPublicKey, sign } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 

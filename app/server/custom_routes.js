@@ -8,8 +8,11 @@
 
 import { spawn, spawnSync } from "child_process";
 import {
-  writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, readdirSync, copyFileSync, appendFileSync,
+  readFileSync, unlinkSync, existsSync, mkdirSync, statSync, readdirSync, copyFileSync,
 } from "fs";
+// 写字符串一律 utf8：Windows 省略 encoding 会按 GBK 写，中文内容会静默损坏。
+// 本文件写知识库、每日记忆、SKILL.md 等中文文件，必须走这里。
+import {writeFileSync, appendFileSync} from "./panel-fs-utf8.js";
 import { randomBytes } from "crypto";
 import { resolve as resolvePath } from "path";
 import { Readable } from "stream";

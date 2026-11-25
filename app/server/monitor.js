@@ -9,7 +9,11 @@ import {inspectServicePortConflicts} from './panel-process-guard.js';
 import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync, renameSync } from "fs";
+import { writeFileSync as _writeFileSyncRaw, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync as _appendFileSyncRaw, renameSync } from "fs";
+// 强制 utf8 写：Windows 上省略 encoding 会用 CP936(GBK)，中文文件全写坏。
+// 说明见 panel-fs-utf8.js 顶部（auth.json 损坏 → 面板 503 → 启动超时的全过程）。
+import {writeFileSync, appendFileSync} from "./panel-fs-utf8.js";
+void _writeFileSyncRaw; void _appendFileSyncRaw;
 import { randomBytes, createHash } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
