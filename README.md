@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="app/ui/images/logo-cat-full-dark.png" alt="Hermes Agent 定制版" width="300">
+  <img src="app/ui/images/logo-cat-full-dark.png" alt="CHATÈS — 一只猫拉着小车" width="300">
 </p>
 
-<h1 align="center">Hermes Agent · 自用定制版</h1>
+<h1 align="center">CHATÈS</h1>
 
 <p align="center">
-  <b>一台 NAS 上养出来的 Agent，连同那台 NAS 上的改造一起搬到你自己的机器上</b><br/>
-  <sub>内核 + 控制面板 + 安装器 · Windows 双击装 · fnOS 打 fpk · 数据本地注入</sub>
+  <b>把一台 NAS 变成你自己能拆能改的 AI 工作台</b><br/>
+  <sub>Hermes Agent 内核 + 自建控制面板 + Windows 安装器 + fnOS fpk · 静态 HTML + 原生 JS · 无打包器 · 无 CDN</sub>
 </p>
 
 <p align="center">
@@ -40,11 +40,33 @@
 面板和内核**放在同一个仓库**，因为它们必须同版本一起升级：面板靠相对路径找内核文件
 （`app/home/data/venv`、`app/server`），拆成两个仓库就会装出一个半残的东西。
 
+### 一个仓库，三种产物
+
+以前面板是单独一个仓（`fnos-hermes-panel`），现在并进来了，因为面板靠相对路径找内核，拆开必装出半残。
+
+| 目录 | 是什么 |
+|---|---|
+| `agent/` `hermes_cli/` `gateway/` … | Hermes 内核（官方 0.20.0 + 本地改造） |
+| `app/ui` `app/server` | 控制面板（静态 HTML + 原生 JS，无打包器） |
+| `app/python` | 对上游 Python 层的补丁层 |
+| `win/` | Windows 安装器、更新器、使用说明 |
+| `fpk-bin` `fpk-cmd` `fpk-init` `fpk-wizard` `manifest` `build-slim.sh` | fnOS fpk 打包链 |
+| `JOURNEY.md` `UPDATE-LOG.md` `CHANGELOG.md` | 改造历程与版本记录 |
+
+**fpk 也在 Release 里**：`v0.21.149` 那个 tag 挂的是 `hermes-agent_0.21.149.fpk`，给 NAS 装。
+
+### 装哪儿
+
+- **Windows**：下 `HermesWin-Setup-*.zip`，解压双击 `安装(双击).bat`，桌面出一个图标
+- **fnOS**：下 `hermes-agent_*.fpk`，应用中心手动安装
+
+两边共用同一个内核和面板，只是打包方式不同。
+
 ## 装到 Windows
 
 不需要 WSL、不需要 Git、不需要管理员权限。下载
 
-**[HermesWin-Setup-0.20.0-win.2.zip](https://github.com/vector9584/hermes-agent-custom/releases/latest)**
+**[HermesWin-Setup-0.20.0-win.2.zip](https://github.com/vector9584/chates/releases/latest)**
 
 解压，双击 `install.bat`。装完桌面会有两个快捷方式：面板、终端。
 

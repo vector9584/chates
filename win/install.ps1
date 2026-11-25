@@ -13,9 +13,9 @@ $Hermes = Join-Path $Venv "Scripts\hermes.exe"
 $Here   = $PSScriptRoot
 
 $ZipUrls = @(
-  "https://gh-proxy.com/https://github.com/vector9584/hermes-agent-custom/archive/refs/heads/main.zip",
-  "https://ghfast.top/https://github.com/vector9584/hermes-agent-custom/archive/refs/heads/main.zip",
-  "https://codeload.github.com/vector9584/hermes-agent-custom/zip/refs/heads/main"
+  "https://gh-proxy.com/https://github.com/vector9584/chates/archive/refs/heads/main.zip",
+  "https://ghfast.top/https://github.com/vector9584/chates/archive/refs/heads/main.zip",
+  "https://codeload.github.com/vector9584/chates/zip/refs/heads/main"
 )
 function Say($m){ Write-Host ("[Hermes] " + $m) -ForegroundColor Cyan }
 function Warn($m){ Write-Host ("[warn] " + $m) -ForegroundColor Yellow }
