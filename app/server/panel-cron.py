@@ -1,8 +1,5 @@
 import contextlib
-try:
-    import fcntl
-except ImportError:  # Windows
-    import _win_fcntl as fcntl
+import fcntl
 import hashlib
 import json
 import os

@@ -94,7 +94,7 @@ Say "deploying panel ..."
 foreach($d in @("server","ui")){
   $dst = Join-Path $App $d
   if(Test-Path $dst){ Remove-Item $dst -Recurse -Force }
-  Copy-Item (Join-Path $Kernel ("win\panel\" + $d)) $dst -Recurse -Force
+  Copy-Item (Join-Path $Kernel ("app\" + $d)) $dst -Recurse -Force
 }
 Set-Content -Path (Join-Path $App "server\package.json") -Value '{"type":"module"}' -Encoding ascii
 

@@ -3,10 +3,7 @@ import base64
 import contextlib
 import ctypes
 import errno
-try:
-    import fcntl
-except ImportError:  # Windows
-    import _win_fcntl as fcntl
+import fcntl
 import hashlib
 import json
 import os

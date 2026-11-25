@@ -1,10 +1,7 @@
 """Shared, conflict-aware YAML transaction for panel-owned config operations."""
 import copy
 import importlib.util
-try:
- import fcntl
-except ImportError:  # Windows
- fcntl=None
+import fcntl
 import hashlib
 import io
 import json
@@ -87,19 +84,9 @@ def merge_changes(current,before,after):
   assign(updated,path,new)
  return updated
 
-def _lock_fd(fd):
- if fcntl is not None:
-  fcntl.flock(fd,fcntl.LOCK_EX);return
- import msvcrt
- while True:
-  try:
-   os.lseek(fd,0,os.SEEK_SET);msvcrt.locking(fd,msvcrt.LK_LOCK,1);return
-  except OSError:
-   time.sleep(0.05)
-
 @contextmanager
 def config_lock(root,*,recover=True):
- root=Path(root);root.mkdir(parents=True,exist_ok=True)
+ root=Path(root);root.mkdir(parents=True,exist_ok=True,mode=0o700)
  # Native credential operations nest YAML/env helpers under the auth-store
  # guard. Re-enter only in the same thread; retain flock across processes.
  key=(os.getpid(),str(root.resolve()))
@@ -111,9 +98,9 @@ def config_lock(root,*,recover=True):
    try:yield
    finally:holder.depth-=1
    return
-  fd=os.open(root/'config-transaction.lock',os.O_CREAT|os.O_RDWR|getattr(os,'O_NOFOLLOW',0),0o600)
+  fd=os.open(root/'config-transaction.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
   try:
-   _lock_fd(fd);holder.depth=1
+   fcntl.flock(fd,fcntl.LOCK_EX);holder.depth=1
    if recover:recover_bundle(root)
    yield
   finally:holder.depth=0;os.close(fd)
@@ -125,7 +112,7 @@ def read_file(path):
  for parent in [path,*path.parents]:
   if parent.is_symlink():raise ConfigError('配置路径包含链接，请先核对运行环境',403)
  for _ in range(4):
-  fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
+  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
   try:
    st=os.fstat(fd)
    if not __import__('stat').S_ISREG(st.st_mode) or st.st_nlink>1:raise ConfigError('配置不是独立普通文件',403)
@@ -150,7 +137,7 @@ def commit(path,root,raw,encoded,reason,details=None):
  if raw==encoded:return {'changed':False,'revision':checksum(raw)}
  current,stat=read_file(path)
  if current!=raw:raise ConfigError('配置已被其他进程修改，请重试',409)
- directory=Path(root)/'config-history';directory.mkdir(parents=True,exist_ok=True)
+ directory=Path(root)/'config-history';directory.mkdir(parents=True,exist_ok=True,mode=0o700)
  identifier=str(time.time_ns())+'-'+checksum(raw)[:12]
  backup=directory/(identifier+'.yaml')
  fd=os.open(backup,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)

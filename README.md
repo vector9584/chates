@@ -1,20 +1,115 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
+  <img src="app/ui/images/logo-cat-full-dark.png" alt="Hermes Agent 定制版" width="300">
 </p>
 
-# Hermes Agent ☤
+<h1 align="center">Hermes Agent · 自用定制版</h1>
+
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> | <a href="https://hermes-agent.nousresearch.com/">Hermes Desktop</a>
+  <b>一台 NAS 上养出来的 Agent，连同那台 NAS 上的改造一起搬到你自己的机器上</b><br/>
+  <sub>内核 + 控制面板 + 安装器 · Windows 双击装 · fnOS 打 fpk · 数据本地注入</sub>
 </p>
+
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Nous Research"></a>
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
-  <a href="README.ur-pk.md"><img src="https://img.shields.io/badge/Lang-اردو-green?style=for-the-badge" alt="اردو"></a>
-  <a href="README.es.md"><img src="https://img.shields.io/badge/Lang-Español-orange?style=for-the-badge" alt="Español"></a>
+  <img alt="kernel" src="https://img.shields.io/badge/kernel-0.20.0-71dbc0">
+  <img alt="panel" src="https://img.shields.io/badge/panel-0.21.149-5e64f3">
+  <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20fnOS-2f3a46">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT%20%2B%20GPL--3.0-green">
 </p>
+
+<p align="center">
+  <a href="win/使用说明.txt">Windows 安装说明</a> ·
+  <a href="docs/ARCHITECTURE.md">仓库结构</a> ·
+  <a href="https://github.com/NousResearch/hermes-agent">上游 Hermes</a>
+</p>
+
+---
+
+## 这是什么
+
+这是 [Nous Research 的 Hermes Agent](https://github.com/NousResearch/hermes-agent) 的**个人改造分支**，
+跑在我自己的一台 fnOS NAS 上，日活在用。这个仓库是它的完整可运行版本，不是一个「demo 版」或「精简版」。
+
+和上游的差别有三块：
+
+| 块 | 在哪 | 是什么 |
+|---|---|---|
+| **内核改造** | 仓库根 | 27 个 commit，44 个文件。Windows 兼容层、面板配置事务、会话状态拆分、cron 与 gateway 的若干修复 |
+| **控制面板** | `app/ui/`、`app/server/` | 从 53 个 `panel-*.js` 责任链重写出来的整套面板，静态 HTML + 原生 JS，无打包器、无 CDN。<br/>面板原委在 [fnos-hermes-panel](https://github.com/vector9584/fnos-hermes-panel) |
+| **安装器** | `win/` | Windows 一键安装 + 版本化更新，`install.ps1` / `update.ps1` |
+
+面板和内核**放在同一个仓库**，因为它们必须同版本一起升级：面板靠相对路径找内核文件
+（`app/home/data/venv`、`app/server`），拆成两个仓库就会装出一个半残的东西。
+
+## 装到 Windows
+
+不需要 WSL、不需要 Git、不需要管理员权限。下载
+
+**[HermesWin-Setup-0.20.0-win.2.zip](https://github.com/vector9584/hermes-agent-custom/releases/latest)**
+
+解压，双击 `install.bat`。装完桌面会有两个快捷方式：面板、终端。
+
+装在 `%LOCALAPPDATA%\HermesWin`，布局刻意照 NAS 的 APP_DIR 摆：
+
+```
+%LOCALAPPDATA%\HermesWin\
+  app\hermes-src\     内核源码（本仓库的 clone/解包）
+  app\server\ app\ui\  面板
+  app\home\data\     你的数据：config.yaml / .env / skills / knowledge / venv
+  app\var\            运行时 token 与日志
+```
+
+**更新**：双击 `检查更新.bat`，或者
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\HermesWin\update.ps1"
+```
+
+更新走 GitHub archive zip 下载 + 覆盖内核目录，比对 `win/version.json` 的版本号决定要不要动。
+用镜像源是因为实测这台机器直连 `github.com` 超时（12s 失败），而 `gh-proxy.com` / `ghfast.top` /
+`codeload` 都通。
+
+## 装到 fnOS
+
+面板那侧的 fpk 打包与工具链在 [fnos-hermes-panel](https://github.com/vector9584/fnos-hermes-panel)，
+内核在 fnOS 上就是本仓库的源码写进 `$TRIM_PKGHOME`。这一路没有做成双击安装，因为 fnOS 上装应用
+得走应用中心或 fpk 手动安装。
+
+## 敏感信息怎么处理
+
+**`.env`、API key、token、密码一律不入库**，`.gitignore` 卡死。仓库里只有代码和示例配置。
+
+你要的 key 装好之后自己在 `app\home\data\.env` 里填，或者用 `hermes setup` 走一遍向导。
+skills 和 knowledge 是个人数据，同样不入库——安装包里的 `data.zip` 是给同一个人换机器用的，
+不在这个 git 仓库里。
+
+## Windows 上踩过的坑（已经修好，写在这里省你一次）
+
+- 面板配置事务层用 `fcntl.flock` 加锁，Windows 没有这个模块 → 条件导入 + `msvcrt.locking` 垫片；
+  `os.O_NOFOLLOW` 同样要 `getattr` 兜底
+- `panel-echo/auxiliary/cron/files.py` 和 `panel_lifecycle.py` 的 `import fcntl`、`import pwd` 同理
+- 往 `@contextmanager` 修饰的函数上方插辅助函数时，别插在装饰器和 `def` 之间——装饰器会挂到辅助函数上，
+  被修饰的函数变成普通生成器，运行时报 `'generator' object does not support the context manager protocol`
+- 面板进程不能用 `Start-Process` 拉起（SSH 断开会被带走），改走计划任务 `schtasks /Run`
+- `.ps1` 必须 UTF-8 **带 BOM**，且只加一次；双 BOM 会让 `param()` 解析失败
+- `$ErrorActionPreference = "Stop"` 会被 uv 的 stderr 触发 `NativeCommandError`，用 `Continue` + 查 `$LASTEXITCODE`
+
+## 已知还瘸的地方
+
+- gateway 不会自动起（面板显示「模型配置尚未收到启动确认」），渠道要在面板里手动开一次
+- fnOS 专属的脚本（`fnos_trash.py`、`trim-cli`、`/vol1` 路径）在 Windows 上无效，删除类操作要另配
+- Windows 侧改的 skills 不会回流到 NAS，两边数据靠手工同步
+
+## 授权
+
+内核继承上游 [MIT](LICENSE)。`app/` 下面的面板代码来自
+[fnos-hermes-panel](https://github.com/vector9584/fnos-hermes-panel)，GPL-3.0。
+两者混在一个仓库里，各自的原授权不变：改内核按 MIT，改面板按 GPL-3.0。
+
+---
+
+下面这段是上游 README 的原文，内核本身的能力说明都在这里。
+
+---
 
 **The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
 
