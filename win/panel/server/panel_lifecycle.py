@@ -3,7 +3,15 @@
 Serialize lifecycle commands with flock; match exact executable/script and
 start ticks before every signal. All bookkeeping is confined to application VAR.
 """
-import fcntl,http.client,json,os,pwd,signal,socket,stat,struct,subprocess,sys,time
+import http.client,json,os,signal,socket,stat,struct,subprocess,sys,time
+try:
+    import fcntl
+except ImportError:  # Windows
+    import _win_fcntl as fcntl
+try:
+    import pwd
+except ImportError:  # Windows
+    import _win_pwd as pwd
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'python'))

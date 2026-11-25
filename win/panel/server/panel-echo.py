@@ -1,4 +1,7 @@
-import fcntl
+try:
+    import fcntl
+except ImportError:  # Windows
+    import _win_fcntl as fcntl
 import hashlib
 import json
 import math
