@@ -36,6 +36,23 @@ ok() { c '32' "  OK   $*"; }
 warn() { c '33' "$*"; }
 die() { c '31' "  FAIL $*"; exit 1; }
 
+# ── Python 调用统一出口 ────────────────────────────────────────────
+# Windows runner 上 python3 走 cp936 解码，读带中文的 json 直接 charmap 报错
+# （实测 2026-11-25 CI 第一次跑 exe 就死在这）。这里统一钉死 UTF-8 三个变量，
+# 并优先用 py（Windows 官方 launcher，Git Bash 下 python3 常是 App 别名空壳）。
+if command -v py >/dev/null 2>&1; then
+  PYEXE="py -3"
+elif command -v python3 >/dev/null 2>&1; then
+  PYEXE="python3"
+else
+  PYEXE="python"
+fi
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
+export PYTHONLEGACYWINDOWSSTDIO=0
+# py_file <heredoc 脚本> [args...]  —— 用 python 跑 heredoc
+py_run() { $PYEXE "$@"; }
+
 # 平台检查：这套流程只能在 Windows 上跑
 if [ "${OS:-}" != "Windows_NT" ] && [ "$(uname -s 2>/dev/null)" != "MINGW64_NT"* ] \
    && [ "$(uname -s 2>/dev/null)" != "MSYS_NT"* ]; then
@@ -52,7 +69,7 @@ c '1;36' "== exe 预检 =="
 [ -f electron/main.js ]      || die "缺 electron/main.js"
 [ -d data-skeleton ]         || die "缺 data-skeleton（先跑 release-tools/make-data-skeleton.py）"
 
-APP_VER=$(python3 -c "import json;print(json.load(open('electron/package.json'))['version'])")
+APP_VER=$($PYEXE -c "import json;print(json.load(open('electron/package.json',encoding='utf-8'))['version'])")
 ok "electron 版本 $APP_VER"
 
 # 凭据闸：反向搜索真 .env 的每个值（≥8 字符），命中即失败。
@@ -123,7 +140,7 @@ ok "app/       $(du -sh "$RES/app" 2>/dev/null | cut -f1)"
 # 2) data —— 脱敏骨架（绝不拷本机 data）
 cp -a data-skeleton/. "$RES/data/"
 # version.json 里的版本要对齐 tag
-python3 - "$TAG" <<'PY'
+$PYEXE - "$TAG" <<'PY'
 import json, sys, re
 tag = sys.argv[1]
 m = re.match(r'v(\d+\.\d+\.\d+)-win\.(\d+)', tag)

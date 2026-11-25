@@ -43,7 +43,7 @@ die() { c '31' "  FAIL $*"; exit 1; }
 # 两边是不同分发通道，各自版本线性递增，不需要相等。
 FPK_VER="${FPK_VERSION:-$(python3 -c "
 import json,re
-d=json.load(open('electron/package.json'))
+d=json.load(open('electron/package.json', encoding='utf-8'))
 v=d['version']                     # 0.20.8
 maj,minor,patch=v.split('.')
 print(f'{maj}.{int(minor)+1}.{patch}')
@@ -125,7 +125,7 @@ ok "cmd/     $(ls "$CMD_SRC" | wc -l) 个脚本"
 # config/resource 是 fpk 声明共享数据目录的 JSON 文件（不是目录）。
 # 内容必须和 config/privilege 的 username 一致，否则装完数据目录归错属主。
 mkdir -p "$STAGE/config/prompts" "$STAGE/config/bootstrap"
-PKG_USER=$(python3 -c "import json;print(json.load(open('fpk-assets/privilege'))['username'])")
+PKG_USER=$(python3 -c "import json;print(json.load(open('fpk-assets/privilege', encoding='utf-8'))['username'])")
 cat > "$STAGE/config/resource" <<EOF
 {
     "data-share": {
