@@ -36,6 +36,12 @@ const ELECTRON_DIR = path.join(REPO_ROOT, 'apps', 'desktop', 'electron')
 const MAIN_PLIST = path.join(ELECTRON_DIR, 'entitlements.mac.plist')
 const INHERIT_PLIST = path.join(ELECTRON_DIR, 'entitlements.mac.inherit.plist')
 
+// This fork ships a Windows-only Electron app rooted at ``electron/`` and has no
+// ``apps/desktop`` -- the mac bundle these plists belong to does not exist here.
+// Gate on the directory rather than dropping the assertions: if a mac bundle is
+// ever added back, every test below runs again unchanged.
+const testIfMacBundle = test.skipIf(!fs.existsSync(ELECTRON_DIR))
+
 const DEVICE_PREFIX = 'com.apple.security.device.'
 
 function loadEntitlements(plistPath: string): Record<string, unknown> {
@@ -49,7 +55,7 @@ function loadEntitlements(plistPath: string): Record<string, unknown> {
   return data as Record<string, unknown>
 }
 
-test('inherit plist grants microphone (regression #37718)', () => {
+testIfMacBundle('inherit plist grants microphone (regression #37718)', () => {
   const inherit = loadEntitlements(INHERIT_PLIST)
   assert.equal(
     inherit['com.apple.security.device.audio-input'],
@@ -61,7 +67,7 @@ test('inherit plist grants microphone (regression #37718)', () => {
   )
 })
 
-test('every device.* entitlement on the main app is also inherited', () => {
+testIfMacBundle('every device.* entitlement on the main app is also inherited', () => {
   const main = loadEntitlements(MAIN_PLIST)
   const inherit = loadEntitlements(INHERIT_PLIST)
 
@@ -81,7 +87,7 @@ test('every device.* entitlement on the main app is also inherited', () => {
 })
 
 for (const plist of [MAIN_PLIST, INHERIT_PLIST]) {
-  test(`${path.basename(plist)} is a well-formed non-empty entitlement dict`, () => {
+  testIfMacBundle(`${path.basename(plist)} is a well-formed non-empty entitlement dict`, () => {
     const data = loadEntitlements(plist)
     assert.ok(
       Object.keys(data).length > 0,
