@@ -21,6 +21,7 @@ import {envReaderWriter,channelConfigWriter} from "./panel-env-txn.js";
 import {parseEnv,envValue,setEnvValue} from "./panel-env-format.js";
 import { getExpert } from "./panel-experts.js";
 import { skillInstallName } from "./panel-skill-path.js";
+import { createIssueStore, ISSUE_TAXONOMY } from "./panel-issues.js";
 
 // ─── 路径常量（与上游 monitor.js 保持一致） ───────────────────────────────
 const APP_DIR        = process.env.APP_DIR       || "/var/apps/hermes-agent";
@@ -40,6 +41,11 @@ const WHATSAPP_SESSION_DIR    = `${DATA_DIR}/whatsapp/session`;
 const WHATSAPP_ONBOARDING_TTL = 600000; // 10 分钟（与官方一致）
 
 const log = (...args) => { try { console.log("[custom]", ...args); } catch {} };
+
+// ─── 站内反馈收件箱实例 ───────────────────────────────────────────────────
+// 落在 DATA_DIR/var/issues/issues.jsonl。用 DATA_DIR 而不是 VAR_DIR：DATA_DIR 在
+// @apphome 里随应用数据走升级保留，VAR_DIR 是运行时目录，升级时可能被清。
+const ISSUE_STORE = createIssueStore({ home: DATA_DIR });
 
 function jsonHeaders(extra = {}) {
   return {
@@ -1354,6 +1360,27 @@ async function handleCustomRouteScoped(req) {
   if(['/api/memory/distill','/api/memory/curator/run','/api/kb/import-memory','/api/memory/daily','/api/evolution'].includes(path))return new Response(JSON.stringify({ok:false,error:'请刷新面板后在资料中查看和整理原文'}),{status:410,headers:jsonHeaders()});
   if((path === '/api/flows' || path.startsWith('/api/flows/')) && req.method!=='GET')return new Response(JSON.stringify({ok:false,error:'请刷新面板后使用任务方案'}),{status:410,headers:jsonHeaders()});
   if(path === '/api/rooms' || path.startsWith('/api/rooms/'))return new Response(JSON.stringify({ok:false,error:'请刷新面板后使用专家讨论'}),{status:410,headers:jsonHeaders()});
+
+// ── 站内反馈（issue 收件箱，不需要 GitHub 账号）──
+  if (path === "/api/issue/taxonomy" && method === "GET") {
+    return new Response(JSON.stringify({ ok: true, taxonomy: ISSUE_TAXONOMY }), { headers: jsonHeaders() });
+  }
+  if (path === "/api/issue" && method === "POST") {
+    try {
+      const body = await req.json();
+      const r = ISSUE_STORE.submit(body);
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : (r.status || 400), headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "提交内容格式有误" }), { status: 400, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/issue/summary" && method === "GET") {
+    try {
+      return new Response(JSON.stringify({ ok: true, ...ISSUE_STORE.summary() }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "反馈收件箱读取失败" }), { status: 500, headers: jsonHeaders() });
+    }
+  }
 
   // ── 本地已安装技能枚举 ──
   if (path === "/api/extensions/skills/local" && method === "GET") {
