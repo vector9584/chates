@@ -1,6 +1,6 @@
 {
   "name": "chates-desktop",
-  "version": "0.20.8",
+  "version": "0.20.9",
   "productName": "CHATÈS",
   "description": "CHATÈS — 本地 AI 助手桌面应用",
   "author": "vector9584",
@@ -14,6 +14,9 @@
   "devDependencies": {
     "electron": "32.3.3",
     "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "build": {
     "appId": "wang.ruibing.chates",
@@ -71,6 +74,14 @@
     },
     "compression": "maximum",
     "asar": true,
-    "asarUnpack": []
+    "asarUnpack": [],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "vector9584",
+        "repo": "chates",
+        "releaseType": "release"
+      }
+    ]
   }
 }

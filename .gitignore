@@ -11,7 +11,12 @@ electron/node_modules/
 node_modules/
 tests-js/node_modules/
 dist/
-build/
+# 只忽略仓库根下的 build/ 产物目录。曾经写成 build/（任何层级），
+# 把 electron/build/installer.nsh 这个 NSIS 安装钩子一起吞了 ——
+# 结果钩子从没进过 git，CI 打出来的包是没有 taskkill 的版本。
+/build/
+# 从 kernel/hermes-src.tgz 解出来的内核副本，可重建，不进 git
+app/hermes-src/
 .skeleton-report
 kernel/*.fpk
 __pycache__/

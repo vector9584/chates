@@ -296,6 +296,89 @@ function createMainWindow() {
 }
 
 // ── 应用菜单 ───────────────────────────────────────────────
+// ── 更新 ───────────────────────────────────────────────────
+// 不自己写下载器。electron-updater 负责 latest.yml 比对、分块下载、静默安装、
+// 装完重启回新版本 —— 这条链在 NSIS 生态里被磨了很多年，自己造只会多一处出错的地方。
+//
+// 依赖只在打包态用得上；开发态（electron .）没装也不该炸，所以 require 放 try 里。
+// latest.yml 由 electron-builder 在 publish 配置存在时自动产出，和 Setup.exe 一起传上
+// Release —— 少了它 autoUpdater 会一直说"没有新版本"，这是最容易漏的一步。
+let updater = null;
+let manualCheck = false;   // 手动检查时把结果弹给用户，静默检查只写日志
+
+function loadUpdater() {
+  if (!app.isPackaged) return null;
+  if (updater !== null) return updater || null;
+  try {
+    updater = require('electron-updater').autoUpdater;
+  } catch (e) {
+    logLine('updater 载入失败: ' + (e && e.message));
+    updater = false;
+    return null;
+  }
+  const logger = { info: logLine, warn: logLine, error: logLine, debug: () => {} };
+  updater.logger = logger;
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+
+  updater.on('error', (e) => {
+    logLine('update error: ' + (e && e.message));
+    if (manualCheck) {
+      manualCheck = false;
+      dialog.showMessageBox({ type: 'warning', title: '检查更新失败',
+        message: '没能连上更新服务器。',
+        detail: String((e && e.message) || e) + '\n\n网络恢复后可在「帮助 → 检查更新」重试。' });
+    }
+  });
+  updater.on('update-available', (info) => {
+    logLine(`update available: ${info && info.version}`);
+    if (manualCheck) {
+      manualCheck = false;
+      dialog.showMessageBox({ type: 'info', title: '发现新版本',
+        message: `发现新版本 ${info && info.version}，正在后台下载。`,
+        detail: '下载完成后会提示你重启安装，不影响当前使用。' });
+    }
+  });
+  updater.on('update-not-available', () => {
+    logLine('update: 已是最新');
+    if (manualCheck) {
+      manualCheck = false;
+      dialog.showMessageBox({ type: 'info', title: '已是最新版本',
+        message: `当前版本 ${app.getVersion()} 是最新的。` });
+    }
+  });
+  updater.on('download-progress', (p) => {
+    if (p && p.percent) logLine(`update download ${p.percent.toFixed(1)}%`);
+  });
+  updater.on('update-downloaded', (info) => {
+    logLine('update downloaded: ' + (info && info.version));
+    const choice = dialog.showMessageBoxSync({
+      type: 'info', title: '更新已就绪',
+      message: `新版本 ${info && info.version} 已下载完成。`,
+      detail: '现在重启会关闭当前会话并安装新版本。选「稍后」则下次退出时自动安装。',
+      buttons: ['立即重启并安装', '稍后'], defaultId: 0, cancelId: 1,
+    });
+    if (choice === 0) {
+      quitting = true;
+      stopBackend();
+      // isSilent=false：让用户看见安装进度；isForceRunAfter=true：装完自己回来
+      setImmediate(() => updater.quitAndInstall(false, true));
+    }
+  });
+  return updater;
+}
+
+function checkUpdates(manual) {
+  const u = loadUpdater();
+  if (!u) {
+    if (manual) dialog.showMessageBox({ type: 'info', title: '当前为开发模式',
+      message: '开发态不检查更新，打包安装后才生效。' });
+    return;
+  }
+  manualCheck = !!manual;
+  u.checkForUpdates().catch((e) => logLine('checkForUpdates 抛出: ' + (e && e.message)));
+}
+
 function buildMenu() {
   // 只留必要项。默认菜单里 Electron 自带的 "Toggle Developer Tools"
   // 给普通用户点进 DevTools 是灾难，但排查问题又需要 —— 放「帮助」里加密码不合算，
@@ -327,6 +410,9 @@ function buildMenu() {
       label: '帮助',
       submenu: [
         { label: '打开日志目录', click: () => { const r = resolveRoots(); if (r) shell.openPath(r.varDir); } },
+        { type: 'separator' },
+        { label: '检查更新', click: () => checkUpdates(true) },
+        { label: `版本 ${app.getVersion()}`, enabled: false },
       ],
     },
   ];
@@ -400,6 +486,9 @@ if (!gotLock) {
   app.whenReady().then(() => {
     buildMenu();
     boot();
+    // 启动 20 秒后静默查一次：错开启动高峰。失败不弹窗——
+    // 首次安装当天没网很常见，等用户手动查再报。
+    setTimeout(() => checkUpdates(false), 20000);
   });
 
   app.on('window-all-closed', () => {
