@@ -1,0 +1,978 @@
+model:
+  provider: custom_1bfaf012c4a0a3994c6e
+  default: deepseek-v4.1-flash-1017
+providers:
+  custom_umv9igjvr7sj9:
+    base_url: https://api.apikey.fan
+    api_key: [REDACTED]
+    name: fan
+    models:
+    - deepseek-flash
+    - deepseek-v4-pro
+    enabled: true
+    note: ''
+  custom_umw0jmqronmd7:
+    base_url: https://newapi.yimingtalk.online/v1
+    api_key: [REDACTED]
+    name: newapi
+    models:
+    - deepseek-v4-flash-free
+    - deepseek-v4.1-flash-free
+    - glm-5.3-flash
+    - qwen3.8-flash
+  custom_umw1usswyv8zb:
+    base_url: https://x666.me/v1
+    api_key: [REDACTED]
+    name: x666
+    models:
+    - grok-4.7
+  custom_97ff4903864f235a4025:
+    base_url: https://api.deepseek.com/v1
+    name: DeepSeek 官方 · 主用
+    api_key: [REDACTED]
+    models:
+    - id: deepseek-flash
+      name: DeepSeek Flash
+      enabled: true
+    - id: deepseek-v4-pro
+      name: DeepSeek V4 Pro
+      enabled: true
+    extra_body: {}
+    enabled: true
+    key_label: 主用
+    api_mode: chat_completions
+  custom_e08d6358445e0c57eea0:
+    base_url: https://direct.saviour.cc.cd
+    name: ZeroAPI · Gemini-稳定通道 0.23x
+    key_label: Gemini-稳定通道 0.23x
+    models:
+    - id: gemini-3-pro-image-preview
+      name: gemini-3-pro-image-preview
+      enabled: false
+    - id: gemini-3.1-flash-image
+      name: gemini-3.1-flash-image
+      enabled: false
+    - id: gemini-4-argon
+      name: gemini-4-argon
+      enabled: false
+    - id: gemini-4-carbon
+      name: gemini-4-carbon
+      enabled: true
+    - id: gemini-4-hydrogen
+      name: gemini-4-hydrogen
+      enabled: false
+    - id: gemini-nano-banana-2.1
+      name: gemini-nano-banana-2.1
+      enabled: false
+    - id: nano-banana-2
+      name: nano-banana-2
+      enabled: false
+    - id: nano-banana-2.1
+      name: nano-banana-2.1
+      enabled: true
+    - id: nano-banana-pro
+      name: nano-banana-pro
+      enabled: true
+    - id: gemini-2.5-flash
+      name: gemini-2.5-flash
+      enabled: false
+    - id: gemini-2.5-flash-lite
+      name: gemini-2.5-flash-lite
+      enabled: false
+    - id: gemini-3.1-flash-lite
+      name: gemini-3.1-flash-lite
+      enabled: false
+    - id: gemini-3.1-flash-lite-preview
+      name: gemini-3.1-flash-lite-preview
+      enabled: false
+    - id: gemini-3.5-flash-lite
+      name: gemini-3.5-flash-lite
+      enabled: false
+    - id: gemini-3.8-flash
+      name: gemini-3.8-flash
+      enabled: false
+    enabled: true
+    group: custom_e08d6358445e0c57eea0
+    api_key: [REDACTED]
+    extra_body: {}
+  custom_63305ded5b7034f4dfcc:
+    base_url: https://direct.saviour.cc.cd
+    name: ZeroAPI · DeepSeek官转 0.4x
+    group: custom_e08d6358445e0c57eea0
+    key_label: DeepSeek官转 0.4x
+    api_key: [REDACTED]
+    models:
+    - id: deepseek-flash
+      name: deepseek-flash
+      enabled: true
+    - id: deepseek-v4-pro
+      name: deepseek-v4-pro
+      enabled: true
+    - id: deepseek-v4.1-flash
+      name: deepseek-v4.1-flash
+      enabled: true
+    - id: deepseek-v4.1-flash-1017
+      name: deepseek-v4.1-flash-1017
+      enabled: true
+    extra_body: {}
+  custom_060a76be0d280ff01495:
+    base_url: https://direct.saviour.cc.cd
+    name: ZeroAPI · Claude【CT满分】0.45x
+    group: custom_e08d6358445e0c57eea0
+    key_label: Claude【CT满分】0.45x
+    models:
+    - id: claude-fable-5
+      name: claude-fable-5
+      enabled: false
+    - id: claude-fable-5-1
+      name: claude-fable-5-1
+      enabled: true
+    - id: claude-haiku-4-5
+      name: claude-haiku-4-5
+      enabled: false
+    - id: claude-opus-4-5
+      name: claude-opus-4-5
+      enabled: false
+    - id: claude-opus-4-6
+      name: claude-opus-4-6
+      enabled: false
+    - id: claude-opus-4-7
+      name: claude-opus-4-7
+      enabled: false
+    - id: claude-opus-4-8
+      name: claude-opus-4-8
+      enabled: false
+    - id: claude-opus-5
+      name: claude-opus-5
+      enabled: false
+    - id: claude-opus-5-5
+      name: claude-opus-5-5
+      enabled: false
+    - id: claude-sonnet-4-5
+      name: claude-sonnet-4-5
+      enabled: false
+    - id: claude-sonnet-4-6
+      name: claude-sonnet-4-6
+      enabled: false
+    - id: claude-sonnet-5
+      name: claude-sonnet-5
+      enabled: false
+    - id: claude-sonnet-5-5
+      name: claude-sonnet-5-5
+      enabled: false
+    extra_body: {}
+    api_key: [REDACTED]
+  custom_3adabca234ee1711a244:
+    base_url: https://direct.saviour.cc.cd
+    name: ZeroAPI · Gpt-特惠组 0.058x
+    group: custom_e08d6358445e0c57eea0
+    key_label: Gpt-特惠组 0.058x
+    api_key: [REDACTED]
+    extra_body: {}
+    models:
+    - id: codex-auto-review
+      name: codex-auto-review
+      enabled: false
+    - id: gpt-5.6-luna
+      name: gpt-5.6-luna
+      enabled: false
+    - id: gpt-5.6-sol
+      name: gpt-5.6-sol
+      enabled: false
+    - id: gpt-5.6-terra
+      name: gpt-5.6-terra
+      enabled: false
+    - id: gpt-6-astra
+      name: gpt-6-astra
+      enabled: false
+    - id: gpt-6-sol
+      name: gpt-6-sol
+      enabled: false
+    - id: gpt-6.1-sol
+      name: gpt-6.1-sol
+      enabled: false
+    - id: gpt-6.1-terra
+      name: gpt-6.1-terra
+      enabled: false
+    - id: gpt-6.2-astra
+      name: gpt-6.2-astra
+      enabled: true
+    - id: gpt-6.2-sol
+      name: gpt-6.2-sol
+      enabled: true
+    enabled: true
+  custom_1bfaf012c4a0a3994c6e:
+    base_url: https://direct.saviour.cc.cd
+    name: ZeroAPI · DeepSeek 0.13x
+    group: custom_e08d6358445e0c57eea0
+    key_label: DeepSeek 0.13x
+    api_key: [REDACTED]
+    extra_body: {}
+    models:
+    - id: deepseek-v4-pro
+      name: deepseek-v4-pro
+      enabled: true
+    - id: deepseek-v4.1-flash
+      name: deepseek-v4.1-flash
+      enabled: false
+    - id: deepseek-v4.1-flash-1017
+      name: deepseek-v4.1-flash-1017
+      enabled: true
+    - id: deepseek-v4-flash
+      name: deepseek-v4-flash
+      enabled: false
+    - id: deepseek-v4-flash-0731
+      name: deepseek-v4-flash-0731
+      enabled: false
+    - id: deepseek-v4-pro-0813
+      name: deepseek-v4-pro-0813
+      enabled: false
+    enabled: true
+toolsets:
+- hermes-cli
+- delegation
+- x_search
+- video_gen
+- video
+- context_engine
+- discord
+- spotify
+- discord_admin
+- yuanbao
+agent:
+  gateway_timeout: 1800
+  restart_drain_timeout: 180
+  api_max_retries: 3
+  service_tier: ''
+  tool_use_enforcement: auto
+  task_completion_guidance: true
+  environment_probe: true
+  environment_hint: ''
+  gateway_timeout_warning: 900
+  clarify_timeout: 600
+  gateway_notify_interval: 180
+  gateway_auto_continue_freshness: 3600
+  image_input_mode: auto
+  disabled_toolsets: []
+  reasoning_effort: none
+terminal:
+  backend: local
+  modal_mode: auto
+  cwd: .
+  timeout: 180
+  env_passthrough: []
+  shell_init_files: []
+  auto_source_bashrc: true
+  docker_image: nikolaik/python-nodejs:python3.11-nodejs20
+  docker_forward_env: []
+  singularity_image: docker://nikolaik/python-nodejs:python3.11-nodejs20
+  modal_image: nikolaik/python-nodejs:python3.11-nodejs20
+  daytona_image: nikolaik/python-nodejs:python3.11-nodejs20
+  container_cpu: 1
+  container_memory: 5120
+  container_disk: 51200
+  container_persistent: true
+  docker_volumes: []
+  docker_mount_cwd_to_workspace: false
+  docker_extra_args: []
+  docker_run_as_host_user: false
+  persistent_shell: true
+web:
+  backend: ''
+  search_backend: deepseek
+  extract_backend: deepseek
+browser:
+  inactivity_timeout: 120
+  command_timeout: 30
+  record_sessions: false
+  allow_private_urls: false
+  engine: auto
+  auto_local_for_private_urls: true
+  cdp_url: ''
+  dialog_policy: must_respond
+  dialog_timeout_s: 300
+  camofox:
+    managed_persistence: false
+    user_id: ''
+    session_key: ''
+    adopt_existing_tab: false
+    rewrite_loopback_urls: false
+    loopback_host_alias: host.docker.internal
+checkpoints:
+  enabled: false
+  max_snapshots: 20
+  max_total_size_mb: 500
+  max_file_size_mb: 10
+  auto_prune: true
+  retention_days: 7
+  min_interval_hours: 24
+  delete_orphans: true
+file_read_max_chars: 20000
+tool_output:
+  max_bytes: 24000
+  max_lines: 600
+  max_line_length: 2000
+tool_loop_guardrails:
+  warnings_enabled: true
+  hard_stop_enabled: false
+  warn_after:
+    exact_failure: 2
+    same_tool_failure: 3
+    idempotent_no_progress: 2
+  hard_stop_after:
+    exact_failure: 5
+    same_tool_failure: 8
+    idempotent_no_progress: 5
+compression:
+  enabled: true
+  threshold: 0.12
+  target_ratio: 0.2
+  protect_last_n: 30
+  hygiene_hard_message_limit: 400
+  protect_first_n: 3
+  abort_on_summary_failure: false
+  max_messages: 0
+prompt_caching:
+  cache_ttl: 5m
+openrouter:
+  response_cache: true
+  response_cache_ttl: 300
+  min_coding_score: 0.65
+bedrock:
+  region: ''
+  discovery:
+    enabled: true
+    provider_filter: []
+    refresh_interval: 3600
+  guardrail:
+    guardrail_identifier: ''
+    guardrail_version: ''
+    stream_processing_mode: async
+    trace: disabled
+auxiliary:
+  vision:
+    provider: auto
+    api_key: ''
+    timeout: 120
+    download_timeout: 30
+    fallback_chain:
+    - provider: custom_63305ded5b7034f4dfcc
+      model: deepseek-v4.1-flash-1017
+      base_url: https://direct.saviour.cc.cd
+      key_env: CUSTOM_63305DED5B7034F4DFCC_API_KEY
+    - provider: custom_97ff4903864f235a4025
+      model: deepseek-flash
+      base_url: https://api.deepseek.com/v1
+      key_env: CUSTOM_UMU5G7PYGOZES_API_KEY
+    model: ''
+    base_url: ''
+    reasoning_effort: none
+  web_extract:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 360
+  compression:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 120
+  skills_hub:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 30
+  approval:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 30
+  mcp:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 30
+  title_generation:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 30
+  triage_specifier:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 120
+  kanban_decomposer:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 180
+  profile_describer:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 60
+  curator:
+    provider: auto
+    model: ''
+    base_url: ''
+    api_key: ''
+    timeout: 600
+display:
+  compact: false
+  personality: ''
+  resume_display: full
+  resume_exchanges: 10
+  resume_max_user_chars: 300
+  resume_max_assistant_chars: 200
+  resume_max_assistant_lines: 3
+  resume_skip_tool_only: true
+  busy_input_mode: queue
+  interface: cli
+  tui_auto_resume_recent: false
+  tui_agents_nudge: true
+  bell_on_complete: false
+  show_reasoning: false
+  streaming: false
+  timestamps: false
+  final_response_markdown: gfm
+  persistent_output: true
+  persistent_output_max_lines: 200
+  inline_diffs: true
+  file_mutation_verifier: true
+  turn_completion_explainer: true
+  show_cost: false
+  skin: default
+  language: en
+  tui_status_indicator: kaomoji
+  user_message_preview:
+    first_lines: 2
+    last_lines: 2
+  interim_assistant_messages: true
+  tool_progress_command: false
+  tool_preview_length: 0
+  ephemeral_system_ttl: 0
+  platforms:
+    telegram:
+      streaming: true
+    discord:
+      streaming: false
+  runtime_footer:
+    enabled: false
+    fields:
+    - model
+    - context_pct
+    - cwd
+  copy_shortcut: auto
+  tool_progress_overrides: {}
+dashboard:
+  theme: default
+  show_token_analytics: false
+  oauth:
+    client_id: ''
+    portal_url: ''
+  basic_auth:
+    username: ''
+    password_hash: ''
+    password: ''
+    secret: ''
+    session_ttl_seconds: 0
+  public_url: ''
+privacy:
+  redact_pii: false
+tts:
+  provider: windows-indextts
+  providers:
+    windows-indextts:
+      type: command
+      command: /vol1/@apphome/hermes-agent/data/venv/bin/python /vol1/@apphome/hermes-agent/data/scripts/tts_windows.py {input_path} {output_path}
+      output_format: mp3
+      timeout: 900
+      max_text_length: 900
+  edge:
+    voice: zh-CN-XiaoxiaoNeural
+stt:
+  enabled: true
+  provider: local
+  local:
+    model: base
+    language: zh
+    initial_prompt: 以下是普通话语音，请用简体中文输出，并加标点。
+  openai:
+    model: whisper-1
+  mistral:
+    model: voxtral-mini-latest
+  elevenlabs:
+    model_id: scribe_v2
+    language_code: ''
+    tag_audio_events: false
+    diarize: false
+  language: zh
+voice:
+  record_key: ctrl+b
+  max_recording_seconds: 120
+  auto_tts: false
+  beep_enabled: true
+  silence_threshold: 200
+  silence_duration: 3.0
+human_delay:
+  mode: off
+  min_ms: 800
+  max_ms: 2500
+context:
+  engine: compressor
+memory:
+  memory_enabled: true
+  memory_char_limit: 2200
+delegation:
+  model: ''
+  provider: ''
+  base_url: ''
+  api_key: ''
+  api_mode: ''
+  inherit_mcp_toolsets: true
+  max_iterations: 50
+  child_timeout_seconds: 600
+  reasoning_effort: ''
+  max_concurrent_children: 3
+  max_spawn_depth: 1
+  orchestrator_enabled: true
+  subagent_auto_approve: true
+prefill_messages_file: ''
+goals:
+  max_turns: 20
+skills:
+  template_vars: true
+  inline_shell: false
+  inline_shell_timeout: 10
+  guard_agent_created: false
+  external_dirs:
+    - /vol1/@appdata/hermes-agent/skills/baidu-map
+    - /vol1/@appdata/hermes-agent/skills/ctrip-wendao
+    - /vol1/@appdata/hermes-agent/skills/fliggy
+    - /vol1/@appdata/hermes-agent/skills/weread
+    - /vol1/@appdata/hermes-agent/skills/meituan-travel
+curator:
+  enabled: true
+  interval_hours: 168
+  min_idle_hours: 2
+  stale_after_days: 30
+  archive_after_days: 90
+  prune_builtins: true
+  backup:
+    enabled: true
+    keep: 5
+timezone: ''
+slack:
+  require_mention: true
+  free_response_channels: ''
+  allowed_channels: ''
+discord:
+  require_mention: true
+  free_response_channels: '*'
+  allowed_channels: ''
+  auto_thread: true
+  thread_require_mention: false
+  history_backfill: true
+  history_backfill_limit: 50
+  reactions: true
+  dm_role_auth_guild: ''
+  server_actions: ''
+  allow_any_attachment: false
+  max_attachment_bytes: 33554432
+  voice_fx:
+    enabled: false
+    ambient_enabled: true
+    ambient_path: ''
+    ambient_gain: 0.18
+    duck_gain: 0.06
+    speech_gain: 1.0
+    ack_enabled: true
+    ack_phrases:
+    - Let me look into that.
+    - One moment.
+    - Checking on that now.
+    - Give me a sec.
+    - On it.
+  title_from_channel: true
+telegram:
+  reactions: false
+  allowed_chats: ''
+mattermost:
+  require_mention: true
+  free_response_channels: ''
+  allowed_channels: ''
+matrix:
+  require_mention: true
+  free_response_rooms: ''
+  allowed_rooms: ''
+approvals:
+  mode: manual
+  timeout: 60
+  cron_mode: deny
+  mcp_reload_confirm: true
+  destructive_slash_confirm: false
+command_allowlist: []
+hooks_auto_accept: false
+security:
+  allow_private_urls: true
+  redact_secrets: true
+  tirith_enabled: true
+  tirith_path: tirith
+  tirith_timeout: 5
+  tirith_fail_open: true
+  website_blocklist:
+    enabled: false
+    domains: []
+    shared_files: []
+  acked_advisories: []
+  allow_lazy_installs: true
+cron:
+  wrap_response: true
+kanban:
+  dispatch_in_gateway: true
+  dispatch_interval_seconds: 60
+  failure_limit: 2
+  worker_log_rotate_bytes: 2097152
+  worker_log_backup_count: 1
+  orchestrator_profile: ''
+  default_assignee: ''
+  auto_decompose: true
+  auto_decompose_per_tick: 3
+  dispatch_stale_timeout_seconds: 14400
+code_execution:
+  mode: project
+tools:
+  tool_search:
+    enabled: auto
+    threshold_pct: 10
+    search_default_limit: 5
+    max_search_limit: 20
+logging:
+  level: INFO
+  max_size_mb: 5
+  backup_count: 3
+model_catalog:
+  enabled: true
+  url: https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
+  ttl_hours: 1
+  excluded_providers:
+  - deepseek
+network:
+  force_ipv4: false
+gateway:
+  strict: true
+  media_delivery_allow_dirs: '["/vol1/@apphome/hermes-agent/data/assets"]'
+  trust_recent_files: true
+  trust_recent_files_seconds: 600
+streaming:
+  enabled: false
+  transport: auto
+  edit_interval: 0.8
+  buffer_threshold: 24
+  cursor: ' ▉'
+  fresh_final_after_seconds: 60.0
+sessions:
+  auto_prune: false
+  retention_days: 90
+  vacuum_after_prune: true
+  min_interval_hours: 24
+  write_json_snapshots: false
+updates:
+  pre_update_backup: false
+  backup_keep: 5
+  non_interactive_local_changes: stash
+lsp:
+  enabled: true
+  wait_mode: document
+  wait_timeout: 5.0
+  install_strategy: auto
+x_search:
+  model: grok-4.20-reasoning
+  timeout_seconds: 180
+  retries: 2
+secrets:
+  bitwarden:
+    enabled: false
+    access_token_env: BWS_ACCESS_TOKEN
+    project_id: ''
+    cache_ttl_seconds: 300
+    override_existing: true
+    auto_install: true
+    server_url: ''
+paste_collapse_threshold: 5
+paste_collapse_threshold_fallback: 5
+paste_collapse_char_threshold: 2000
+_config_version: 33
+platform_toolsets:
+  cli:
+  - bfl
+  - browser
+  - clarify
+  - code_execution
+  - computer_use
+  - context_engine
+  - cronjob
+  - delegation
+  - file
+  - image_gen
+  - kanban
+  - memory
+  - session_search
+  - skills
+  - spotify
+  - terminal
+  - todo
+  - tts
+  - video
+  - video_gen
+  - vision
+  - web
+  - x_search
+  - yuanbao
+  discord:
+  - bfl
+  - browser
+  - clarify
+  - code_execution
+  - computer_use
+  - cronjob
+  - delegation
+  - discord
+  - discord_admin
+  - file
+  - image_gen
+  - kanban
+  - memory
+  - session_search
+  - skills
+  - terminal
+  - todo
+  - tts
+  - vision
+  - web
+  api_server:
+  - browser
+  - file
+  - image_gen
+  - skills
+  - tts
+  - vision
+  - web
+  - code_execution
+  - memory
+  - session_search
+  - terminal
+  - todo
+known_plugin_toolsets:
+  cli:
+  - spotify
+  discord:
+  - spotify
+known_builtin_toolsets:
+  cli:
+  - bfl
+  - browser
+  - clarify
+  - code_execution
+  - computer_use
+  - context_engine
+  - cronjob
+  - delegation
+  - discord
+  - discord_admin
+  - file
+  - homeassistant
+  - image_gen
+  - memory
+  - session_search
+  - skills
+  - spotify
+  - stt
+  - terminal
+  - todo
+  - tts
+  - video
+  - video_gen
+  - vision
+  - web
+  - x_search
+  - yuanbao
+  discord:
+  - bfl
+  - browser
+  - clarify
+  - code_execution
+  - computer_use
+  - context_engine
+  - cronjob
+  - delegation
+  - discord
+  - discord_admin
+  - file
+  - homeassistant
+  - image_gen
+  - memory
+  - session_search
+  - skills
+  - spotify
+  - stt
+  - terminal
+  - todo
+  - tts
+  - video
+  - video_gen
+  - vision
+  - web
+  - x_search
+  - yuanbao
+mcp_servers:
+  zotero:
+    command: /vol1/@apphome/hermes-agent/data/.local/bin/zotero-mcp
+    timeout: 60
+    env:
+      ZOTERO_LIBRARY_ID: ${ZOTERO_LIBRARY_ID}
+      ZOTERO_API_KEY: ${ZOTERO_API_KEY}
+      ZOTERO_LIBRARY_TYPE: ${ZOTERO_LIBRARY_TYPE}
+      ZOTERO_WEBDAV_URL: ${ZOTERO_WEBDAV_URL}
+      ZOTERO_WEBDAV_USER: ${ZOTERO_WEBDAV_USER}
+      ZOTERO_WEBDAV_PASSWORD: ${ZOTERO_WEBDAV_PASSWORD}
+  notify-hub:
+    command: /vol1/@appdata/notify-hub/notify_hub_mcp.py
+    timeout: 30
+    env:
+      NOTIFY_HUB_TOKEN: ${NOTIFY_HUB_TOKEN}
+  telegram:
+    command: /vol1/@apphome/hermes-agent/data/bin/tg-mcp-locked
+    timeout: 60
+    enabled: 'false'
+  windows:
+    command: ''
+    url: http://127.0.0.1:8006/mcp
+    timeout: 180
+    connect_timeout: 60
+    headers:
+      Authorization: Bearer ${WINDOWS_MCP_TOKEN}
+  nekowhale-stickers:
+    command: /vol1/@apphome/hermes-agent/data/.local/bin/node
+    args:
+    - /vol1/@apphome/hermes-agent/data/.local/share/nk-stickers/node_modules/dsh-nekowhale-stickers/lib/cli.js
+    - mcp
+    - --data
+    - /vol1/@apphome/hermes-agent/data/assets/nekowhale-stickers
+    env:
+      HOME: /vol1/@apphome/hermes-agent/data
+      PATH: /vol1/@apphome/hermes-agent/data/.local/bin:/usr/local/bin:/usr/bin:/bin
+    timeout: 60
+    connect_timeout: 10
+  conn-tencent-news:
+    command: /vol1/@apphome/hermes-agent/data/node/bin/node
+    args:
+    - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
+    - tencent-news
+    - '8650'
+  tencent-meeting:
+    url: https://meeting.tencent.com/mcp
+    headers:
+      Authorization: Bearer lc1LUvvLuX81b4OsVS3b4SC952XDvGtARnrR5k3p6mR7OoHR
+  conn-baidu-map:
+    command: /vol1/@apphome/hermes-agent/data/node/bin/node
+    args:
+    - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
+    - baidu-map
+    - '8650'
+  conn-yuandian:
+    command: /vol1/@apphome/hermes-agent/data/node/bin/node
+    args:
+    - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
+    - yuandian
+    - '8650'
+platforms:
+  qqbot:
+    extra:
+      app_id: 1905359086
+      client_secret: GFFFGHJLORVaflry5DLUeozAMYlyCQfv
+      group_policy: open
+      dm_policy: open
+    allow_all_users: true
+    qq_markdown: true
+    show_thinking: false
+    show_tool_hints: false
+    profile: default
+    model: ''
+    skills:
+    - ''
+    system_prompt: ''
+    updated_at: 1792308380084
+    enabled: true
+    home_channel:
+      platform: qqbot
+      chat_id: 8232B16CA5CBE30F3EAD47F358606507
+      name: QQ 绑定会话
+      user_id: 8232B16CA5CBE30F3EAD47F358606507
+  weixin:
+    token: [REDACTED]
+    extra:
+      account_id: 65db685c1817@im.bot
+      base_url: https://ilinkai.weixin.qq.com
+      rate_limit_circuit_threshold: 4
+      rate_limit_circuit_window_seconds: 60
+      rate_limit_circuit_open_seconds: 15
+    updated_at: 1787074918732
+  discord:
+    channel_overrides: {}
+onboarding:
+  seen:
+    busy_input_prompt: true
+plugins:
+  enabled:
+  - feishu-platform
+  - discord-platform
+fallback_providers:
+- provider: custom_97ff4903864f235a4025
+  model: deepseek-flash
+- provider: custom_63305ded5b7034f4dfcc
+  model: deepseek-v4-pro
+- provider: custom_97ff4903864f235a4025
+  model: deepseek-v4-pro
+moa:
+  presets:
+    panel-test:
+      reference_models:
+      - provider: custom_97ff4903864f235a4025
+        model: deepseek-v4-pro
+        enabled: true
+      aggregator:
+        provider: custom_97ff4903864f235a4025
+        model: deepseek-flash
+  default_preset: panel-test
+  active_preset: ''
+image_gen:
+  provider: custom
+  custom:
+    provider_id: custom_umv9igjvr7sj9
+    model: gpt-image-2
+  targets:
+  - provider_id: custom_umv9igjvr7sj9
+    model: gpt-image-2
+  - provider_id: custom_e08d6358445e0c57eea0
+    model: gemini-3-pro-image-preview
+  - provider_id: custom_e08d6358445e0c57eea0
+    model: gemini-3.1-flash-image
+  - provider_id: custom_e08d6358445e0c57eea0
+    model: gemini-nano-banana-2.1
+  - provider_id: custom_e08d6358445e0c57eea0
+    model: nano-banana-2
+  - provider_id: custom_e08d6358445e0c57eea0
+    model: nano-banana-2.1
+  - provider_id: custom_e08d6358445e0c57eea0
+    model: nano-banana-pro
