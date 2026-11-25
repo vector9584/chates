@@ -87,7 +87,6 @@ def merge_changes(current,before,after):
   assign(updated,path,new)
  return updated
 
-@contextmanager
 def _lock_fd(fd):
  if fcntl is not None:
   fcntl.flock(fd,fcntl.LOCK_EX);return
@@ -98,6 +97,7 @@ def _lock_fd(fd):
   except OSError:
    time.sleep(0.05)
 
+@contextmanager
 def config_lock(root,*,recover=True):
  root=Path(root);root.mkdir(parents=True,exist_ok=True)
  # Native credential operations nest YAML/env helpers under the auth-store
