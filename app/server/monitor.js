@@ -32,6 +32,7 @@ import { createCronHistoryHandler } from "./panel-cron-history.js";
 import { ModelChecks, createModelSource, createModelChecksHandler } from "./panel-model-checks.js";
 import {LibraryReviews,createLibraryReviewHandler} from './panel-library-reviews.js';
 import {LibraryStore,createLibraryHandler} from './panel-library.js';
+import {createUpdateHandler} from './panel-update.js';
 import {createLibrarySources} from './panel-library-sources.js';
 import {createArchiveVault} from './panel-archive.js';
 import {PlanStore,createPlanHandler,createPlanLaunch} from './panel-plans.js';
@@ -138,6 +139,13 @@ function readAppVersion() {
     "/var/apps/hermes-agent/manifest",
     `${process.cwd()}/manifest`,
   ];
+  // Windows 安装器把版本写在 app/version.json（install.ps1），没有 manifest，这里补上
+  for (const jf of [`${APP_DIR}/version.json`, `${APP_DIR}/../version.json`]) {
+    try {
+      const j = JSON.parse(readFileSync(jf, "utf8"));
+      if (j && j.version) return String(j.version).trim();
+    } catch {}
+  }
   // 尝试从 monitor.js 位置向上推导（兼容 ESM 与不同安装路径）
   try {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -2893,6 +2901,16 @@ const panelRoomRunner = new RoomRunner({store:panelRoomStore,reconcile:id=>{try{
 const handlePanelRooms=createRoomHandler({store:panelRoomStore,runner:panelRoomRunner,checkToken,modelCatalog:()=>panelModelChecks.source({action:"catalog"})});
 const panelFileRoots=createFileRoots({data:DATA_DIR,varDir:VAR_DIR,librarySources:createLibrarySources(DATA_DIR)});
 const handlePanelFiles=createFileHandler({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),roots:panelFileRoots,data:DATA_DIR,varDir:VAR_DIR,basePath:BASE_PATH,checkToken});
+const handlePanelUpdate=createUpdateHandler({
+  currentVersion:()=>{
+    // Windows 安装器把版本写进 app/version.json；manifest 只在 fpk 里才有
+    for(const f of [join(APP_DIR,'version.json'), join(APP_DIR,'..','version.json')]){
+      try{ const j=JSON.parse(readFileSync(f,'utf8')); if(j&&j.version) return String(j.version).trim(); }catch{}
+    }
+    return reloadAppVersion();
+  },
+  platform:process.platform,
+});
 const panelConfigRecovery=createConfigRecovery({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),home:DATA_DIR,state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
 const serviceHealth=new ServiceHealth({gateway:{url:`http://127.0.0.1:${GATEWAY_PORT}/health/detailed`,token:()=>MONITOR_TOKEN},dashboard:{url:`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/status`,token:()=>DASHBOARD_SESSION_TOKEN},identity:kind=>serviceProcesses.read(kind)||serviceProcesses.find(kind)});
 const panelDrain=new PanelDrain({python:join(VENV_BIN,PY_BIN),root:join(VAR_DIR,'panel-state'),identity:()=>serviceProcesses.read('gateway')||serviceProcesses.find('gateway'),health:serviceHealth});
@@ -4386,6 +4404,8 @@ async function handleFetch(req) {
     } catch (e) { return new Response("Not Found",{status:e.status || 404}); }
   }
 
+  const updateResponse = await handlePanelUpdate(req, path);
+  if (updateResponse) return updateResponse;
   const filesResponse = await handlePanelFiles(req, path);
   if (filesResponse) return filesResponse;
   const libraryResponse = await handlePanelLibrary(req, path);

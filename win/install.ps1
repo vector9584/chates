@@ -213,13 +213,16 @@ try {
     $sp = Join-Path $desk $stale
     if(Test-Path $sp){ Remove-Item $sp -Force -ErrorAction SilentlyContinue }
   }
-  foreach($pair in @(@($panelBat,"Hermes 面板"))){
-    $lnk = $ws.CreateShortcut((Join-Path $desk ($pair[1] + ".lnk")))
-    $lnk.TargetPath = $pair[0]
-    $lnk.WorkingDirectory = $Root
-    $lnk.IconLocation = "$env:SystemRoot\System32\shell32.dll,13"
-    $lnk.Save()
-  }
+  # 单元素用双层数组 @(@()) 会被 PowerShell 展平成字符串，$pair[1] 取到的是
+  # 字符串的第 2 个"字符"（"面"），拼出来是 ":.lnk" —— 2026-11-25 实测踩过。
+  # 这里直接一对标量，不做数组套数组。
+  $lnkPath = Join-Path $desk "Hermes 面板.lnk"
+  $lnk = $ws.CreateShortcut($lnkPath)
+  $lnk.TargetPath = $panelBat
+  $lnk.WorkingDirectory = $Root
+  $lnk.IconLocation = "$env:SystemRoot\System32\shell32.dll,13"
+  $lnk.Save()
+  if(Test-Path $lnkPath){ Say ("desktop shortcut: " + $lnkPath) } else { Warn "shortcut file not created" }
   Say "desktop shortcuts created"
 } catch { Warn ("shortcut failed: " + $_.Exception.Message) }
 
@@ -245,8 +248,9 @@ try {
 
 Say "---------------------------------------------"
 Say ("installed : " + $Root)
-Say ("panel     : " + $panelBat)
-Say ("hermes    : " + $hermesBat)
+Say ("desktop   : Hermes 面板.lnk (双击即开界面)")
+Say "background: scheduled task HermesCustomPanel (登录后静默常驻，无窗口)"
+Say ("cli manual: " + $hermesBat)
 Say "open http://127.0.0.1:8650/"
 Say "---------------------------------------------"
 if(-not $Silent){ Read-Host "Press Enter to exit" | Out-Null }
