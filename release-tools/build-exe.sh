@@ -159,13 +159,22 @@ PY
 ok "data/      $(du -sh "$RES/data" 2>/dev/null | cut -f1)（脱敏骨架）"
 
 # 3) python 运行时 —— CI 上用 uv 现场建
+# uv 探测：PATH 里没有就找 Windows 默认安装位置（Git Bash 的 PATH 偶尔漏）
+if ! command -v uv >/dev/null 2>&1; then
+  for u in "$USERPROFILE/.local/bin/uv.exe" "$HOME/.local/bin/uv.exe" "$LOCALAPPDATA/Microsoft/WinGet/Links/uv.exe"; do
+    [ -f "$u" ] && { UV="$u"; break; }
+  done
+  UV="${UV:-uv}"
+else
+  UV="uv"
+fi
 if [ -d electron/resources/chates/runtime/python ]; then
   cp -a electron/resources/chates/runtime/python "$RES/runtime/python"
   ok "python/    复用已有（$(du -sh "$RES/runtime/python" | cut -f1)）"
-elif command -v uv >/dev/null 2>&1; then
-  c '33' "  用 uv 下载 Windows python"
-  uv python install 3.11 2>/dev/null || true
-  PYBASE=$(uv python find 3.11 2>/dev/null || true)
+elif command -v "$UV" >/dev/null 2>&1 || [ -f "$UV" ]; then
+  c '33' "  用 uv 下载 Windows python（$UV）"
+  "$UV" python install 3.11 2>/dev/null || true
+  PYBASE=$("$UV" python find 3.11 2>/dev/null || true)
   [ -n "$PYBASE" ] || die "uv 没找到 python 3.11"
   mkdir -p "$RES/runtime/python"
   cp -a "$(dirname "$PYBASE")/." "$RES/runtime/python/"

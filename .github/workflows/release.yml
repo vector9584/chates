@@ -111,12 +111,16 @@ jobs:
           python-version: '3.12'
 
       - name: 装 uv（build-exe 用它拉 Windows 版 Python 运行时）
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          uv --version
+          Invoke-WebRequest -Uri https://astral.sh/uv/install.ps1 -OutFile $env:TEMP\uv.ps1
+          & $env:TEMP\uv.ps1
+          $uvdir = "$env:USERPROFILE\.local\bin"
+          Write-Host "uv dir: $uvdir"
+          Get-ChildItem $uvdir -ErrorAction SilentlyContinue | Select-Object Name
+          # Git Bash 的 $HOME 与 Windows 的 USERPROFILE 可能不同，两个都写进 PATH
+          Add-Content -Path $env:GITHUB_PATH -Value $uvdir
+          & "$uvdir\uv.exe" --version
 
       - name: 取内核
         shell: bash
