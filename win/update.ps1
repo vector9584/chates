@@ -1,48 +1,57 @@
 ﻿param([switch]$Silent)
-# Hermes updater: pull kernel + panel from GitHub, resync deps
 $ErrorActionPreference = "Continue"
-try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+$Root  = Join-Path $env:LOCALAPPDATA "HermesWin"
+$App   = Join-Path $Root "app"
+$Kernel= Join-Path $App "hermes-src"
+$Data  = Join-Path $App "home\data"
+$Venv  = Join-Path $Data "venv"
+$Py    = Join-Path $Venv "Scripts\python.exe"
 
-$Root   = Join-Path $env:LOCALAPPDATA "HermesWin"
-$App    = Join-Path $Root "app"
-$Kernel = Join-Path $App  "hermes-src"
-$Data   = Join-Path $App  "home\data"
-$Venv   = Join-Path $Data "venv"
-$PyExe  = Join-Path $Venv "Scripts\python.exe"
-$Hermes = Join-Path $Venv "Scripts\hermes.exe"
-$Here   = $PSScriptRoot
+function Say($m){ Write-Host ("[update] " + $m) -ForegroundColor Cyan }
 
-function Say($m){ Write-Host ("[Update] " + $m) -ForegroundColor Cyan }
-
-$uv = (Get-Command uv -ErrorAction SilentlyContinue).Source
-if(-not $uv){ $u = Join-Path $env:USERPROFILE ".local\bin\uv.exe"; if(Test-Path $u){ $uv = $u } }
 $git = (Get-Command git -ErrorAction SilentlyContinue).Source
 if(-not $git){ $g = Join-Path $env:LOCALAPPDATA "hermes\git\cmd\git.exe"; if(Test-Path $g){ $git = $g } }
+if(-not (Test-Path (Join-Path $Kernel ".git"))){ Write-Host "kernel is not a git checkout, run install first" -ForegroundColor Red; exit 1 }
 
-if(-not (Test-Path (Join-Path $Kernel ".git"))){ Write-Host "kernel not installed, run install first" -ForegroundColor Red; if(-not $Silent){ Read-Host }; exit 1 }
-
-Say "Fetching ..."
+$before = (& $git -C $Kernel rev-parse HEAD).Trim()
+Say ("current " + $before)
 & $git -C $Kernel fetch --all --prune 2>&1 | ForEach-Object { Write-Host $_ }
-$local  = (& $git -C $Kernel rev-parse HEAD).Trim()
-$remote = (& $git -C $Kernel rev-parse origin/main).Trim()
-Say ("local=" + $local.Substring(0,8) + "  remote=" + $remote.Substring(0,8))
-if($local -eq $remote){
-  Say "Already up to date."
-} else {
-  & $git -C $Kernel reset --hard origin/main 2>&1 | ForEach-Object { Write-Host $_ }
-  Say "Kernel updated. Resyncing dependencies ..."
-  & $uv pip install --python $PyExe -e $Kernel 2>&1 | ForEach-Object { Write-Host $_ }
-  $panelSrc = Join-Path $Kernel "win\panel"
-  if(Test-Path $panelSrc){
-    foreach($d in @("server","ui")){
-      $dst = Join-Path $App $d
-      if(Test-Path $dst){ Remove-Item $dst -Recurse -Force }
-      Copy-Item (Join-Path $panelSrc $d) $dst -Recurse -Force
-    }
-    Say "Panel updated."
-  }
+$after = (& $git -C $Kernel rev-parse origin/main).Trim()
+if($before -eq $after){
+  Say "already up to date"
+  if(-not $Silent){ Read-Host "Press Enter to exit" | Out-Null }
+  exit 0
 }
+Say ("updating " + $before + " -> " + $after)
 
-try { & $Hermes --version 2>&1 | ForEach-Object { Say $_ } } catch {}
-Say "Done. Restart the panel to apply."
-if(-not $Silent){ Read-Host "Press Enter to close" }
+# 停面板
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like "*HermesWin*monitor.js*" } |
+  ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
+Start-Sleep -Seconds 2
+
+& $git -C $Kernel reset --hard origin/main 2>&1 | ForEach-Object { Write-Host $_ }
+if($LASTEXITCODE -ne 0){ Write-Host "git reset failed" -ForegroundColor Red; exit 1 }
+
+$uv = (Get-Command uv -ErrorAction SilentlyContinue).Source
+if(-not $uv){ $uv = Join-Path $env:USERPROFILE ".local\bin\uv.exe" }
+Say "syncing deps ..."
+& $uv pip install --python $Py -e $Kernel 2>&1 | ForEach-Object { Write-Host $_ }
+
+foreach($d in @("server","ui")){
+  $dst = Join-Path $App $d
+  if(Test-Path $dst){ Remove-Item $dst -Recurse -Force }
+  Copy-Item (Join-Path $Kernel ("win\panel\" + $d)) $dst -Recurse -Force
+}
+Set-Content -Path (Join-Path $App "server\package.json") -Value '{"type":"module"}' -Encoding ascii
+$sitePkgs = Join-Path $Venv "Lib\site-packages"
+if(Test-Path $sitePkgs){ Set-Content -Path (Join-Path $sitePkgs "hermes_root.pth") -Value $Kernel -Encoding ascii -NoNewline }
+
+Start-Process -FilePath (Join-Path $Root "启动面板.bat") -WindowStyle Hidden
+Start-Sleep -Seconds 6
+try {
+  $r = Invoke-WebRequest -Uri "http://127.0.0.1:8650/" -UseBasicParsing -TimeoutSec 10
+  Say ("panel back up: HTTP " + $r.StatusCode)
+} catch { Say ("panel check failed: " + $_.Exception.Message) }
+Say ("done, now at " + $after)
+if(-not $Silent){ Read-Host "Press Enter to exit" | Out-Null }
