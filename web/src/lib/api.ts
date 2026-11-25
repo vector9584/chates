@@ -1,6 +1,12 @@
 import { reviewConfig } from "./panel-config-review.js";
 import { buildHermesWebSocketUrl } from "@hermes/shared";
 
+/** 从审阅抛出的冲突对象里取 panelRevision；非对象或无该字段返回 undefined。 */
+function revisionOf(value: unknown): string | undefined {
+  const r = (value as { panelRevision?: unknown } | null)?.panelRevision;
+  return typeof r === "string" ? r : undefined;
+}
+
 // The dashboard can be served either at the root of its host (e.g.
 // https://kanban.tilos.com/) or under a URL prefix when reverse-proxied
 // (e.g. https://mission-control.tilos.com/hermes/). The Python backend
@@ -577,7 +583,7 @@ export const api = {
       body: JSON.stringify({ config: fields, revision }),
     }); } catch (error) {
       try { await reviewConfig(error, {draft: config, latest: () => api.getConfig(profile)}); }
-      catch (conflict: any) { if (conflict.panelRevision) config._panel_revision = conflict.panelRevision; throw conflict; }
+      catch (conflict) { config._panel_revision = revisionOf(conflict); throw conflict; }
       throw error;
     }
     config._panel_revision = result.revision;
