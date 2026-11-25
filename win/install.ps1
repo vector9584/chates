@@ -1,11 +1,10 @@
-﻿﻿# =====================================================================
+﻿param([switch]$Force,[switch]$Silent)
+# =====================================================================
 #  Hermes Windows Installer  (customized kernel of vector9584)
 #  用法：双击 安装.bat  或  powershell -ExecutionPolicy Bypass -File install.ps1
 #  可选：-Force   覆盖已有数据目录
 # =====================================================================
-param([switch]$Force,[switch]$Silent)
-
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $ProgressPreference    = "SilentlyContinue"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 

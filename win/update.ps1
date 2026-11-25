@@ -1,4 +1,5 @@
-﻿﻿# Hermes updater: pull kernel + panel from GitHub, resync deps
+﻿param([switch]$Silent)
+# Hermes updater: pull kernel + panel from GitHub, resync deps
 $ErrorActionPreference = "Continue"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
