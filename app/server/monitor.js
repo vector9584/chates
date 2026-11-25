@@ -565,9 +565,22 @@ const STATIC_DIR     = `${APP_DIR}/ui`;
 // Windows 的 venv 布局是 Scripts/ 不是 bin/，可执行文件要带 .exe，解释器叫 python.exe。
 // 这三处写死过一次 POSIX 路径，结果 Windows 上面板起不来 —— 别再改回常量。
 const IS_WIN         = process.platform === "win32";
-const VENV_BIN       = IS_WIN ? `${DATA_DIR}/venv/Scripts` : `${DATA_DIR}/venv/bin`;
+// 运行时位置允许被 CHATES_PYTHON_DIR 覆盖。
+// 独立桌面版把 python 打包在 <root>/runtime/python（和 data 平级，不在 data 下），
+// 跟 fpk 版「venv 在 data/venv」完全不同。写死前者会让独立版一直报
+// `Hermes Agent 版本: unknown`，因为它找不到可以执行 --version 的入口。
+// 独立桌面版把 python 解压成「独立解释器」形态：python.exe 在 runtime/python/，
+// 启动器（hermes.exe 等 console script shim）在 runtime/python/Scripts/。
+// 这两个位置在 fpk 版里是同一个目录（venv/Scripts 同时放 python.exe 和 hermes.exe），
+// 所以必须拆成两个变量，否则总有一半功能找不到入口。
+const CHATES_PY_ROOT   = process.env.CHATES_PYTHON_ROOT || "";   // .../runtime/python
+const CHATES_PY_SCRIPT = process.env.CHATES_PYTHON_SCRIPT || ""; // .../runtime/python/Scripts
+const VENV_BIN       = CHATES_PY_ROOT
+  ? CHATES_PY_ROOT
+  : (IS_WIN ? `${DATA_DIR}/venv/Scripts` : `${DATA_DIR}/venv/bin`);
+const SCRIPT_BIN     = CHATES_PY_SCRIPT || VENV_BIN;
 const PY_BIN         = IS_WIN ? "python.exe" : "python3";
-const HERMES_BIN     = IS_WIN ? `${VENV_BIN}/hermes.exe` : `${VENV_BIN}/hermes`;
+const HERMES_BIN     = IS_WIN ? `${SCRIPT_BIN}/hermes.exe` : `${SCRIPT_BIN}/hermes`;
 const UV_BIN_PATH    = IS_WIN ? `${VENV_BIN}/uv.exe` : `${VENV_BIN}/uv`;
 const HERMES_CONFIG  = `${DATA_DIR}/config.yaml`;
 const HERMES_ENV     = `${DATA_DIR}/.env`;
