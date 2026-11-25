@@ -545,9 +545,13 @@ if (!UNIX_MODE) {
 const BASE_PATH      = (process.env.BASE_PATH || "").replace(/\/+$/, "");
 const DASHBOARD_PORT = Number(process.env.DASHBOARD_PORT || "9219");
 const STATIC_DIR     = `${APP_DIR}/ui`;
-const VENV_BIN       = `${DATA_DIR}/venv/bin`;
-const HERMES_BIN     = `${VENV_BIN}/hermes`;
-const UV_BIN_PATH    = `${VENV_BIN}/uv`;
+// Windows 的 venv 布局是 Scripts/ 不是 bin/，可执行文件要带 .exe，解释器叫 python.exe。
+// 这三处写死过一次 POSIX 路径，结果 Windows 上面板起不来 —— 别再改回常量。
+const IS_WIN         = process.platform === "win32";
+const VENV_BIN       = IS_WIN ? `${DATA_DIR}/venv/Scripts` : `${DATA_DIR}/venv/bin`;
+const PY_BIN         = IS_WIN ? "python.exe" : "python3";
+const HERMES_BIN     = IS_WIN ? `${VENV_BIN}/hermes.exe` : `${VENV_BIN}/hermes`;
+const UV_BIN_PATH    = IS_WIN ? `${VENV_BIN}/uv.exe` : `${VENV_BIN}/uv`;
 const HERMES_CONFIG  = `${DATA_DIR}/config.yaml`;
 const HERMES_ENV     = `${DATA_DIR}/.env`;
 
@@ -965,7 +969,7 @@ function _moduleLevelAutoRegisterMcp() {
       if(!(cat.fields||[]).every(field=>!!credentials[field.key]))continue;
       entries["conn-"+cat.kind]={command:resolvedNodeBin||"node",args:[MCP_BRIDGE_SCRIPT,cat.kind,String(UI_PORT)]};
     }
-    const result=configTransaction({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),
+    const result=configTransaction({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),
       state:join(VAR_DIR,'panel-state'),file:HERMES_CONFIG,body:{action:'managed_mcp',entries,reason:'连接器注册核对'}});
     if(result.changed)log(`[MCP-BRIDGE] 已核对 ${Object.keys(entries).length} 个面板连接器，其余MCP配置保留`);
   }catch(error){log('[MCP-BRIDGE] 注册未完成，原配置保留: '+error.message);}
@@ -998,7 +1002,7 @@ try {
     // ① 旧版 wheel 模式：hermes_cli/tui_dist/entry.js（0.19.0）
     // ② v0.20.0 源码模式：hermes-src/ui-tui/dist/entry.js（打包时预构建）
     const pyResult = spawnSync(
-      `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
+      `${VENV_BIN}/${PY_BIN}`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
       { stdout: "pipe", stderr: "pipe" }
     );
     const hermesCli = pyResult.stdout?.toString().trim();
@@ -2879,10 +2883,10 @@ const panelRoomRunner = new RoomRunner({store:panelRoomStore,reconcile:id=>{try{
     ensureSession:(id,job)=>{if(!getSession(id))saveSession({id,title:job.member.label+' · 专家讨论',group:'room_'+job.room_id,messages:[],created_at:Date.now(),updated_at:Date.now()});}})});
 const handlePanelRooms=createRoomHandler({store:panelRoomStore,runner:panelRoomRunner,checkToken,modelCatalog:()=>panelModelChecks.source({action:"catalog"})});
 const panelFileRoots=createFileRoots({data:DATA_DIR,varDir:VAR_DIR,librarySources:createLibrarySources(DATA_DIR)});
-const handlePanelFiles=createFileHandler({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),roots:panelFileRoots,data:DATA_DIR,varDir:VAR_DIR,basePath:BASE_PATH,checkToken});
-const panelConfigRecovery=createConfigRecovery({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),home:DATA_DIR,state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
+const handlePanelFiles=createFileHandler({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),roots:panelFileRoots,data:DATA_DIR,varDir:VAR_DIR,basePath:BASE_PATH,checkToken});
+const panelConfigRecovery=createConfigRecovery({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),home:DATA_DIR,state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
 const serviceHealth=new ServiceHealth({gateway:{url:`http://127.0.0.1:${GATEWAY_PORT}/health/detailed`,token:()=>MONITOR_TOKEN},dashboard:{url:`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/status`,token:()=>DASHBOARD_SESSION_TOKEN},identity:kind=>serviceProcesses.read(kind)||serviceProcesses.find(kind)});
-const panelDrain=new PanelDrain({python:join(VENV_BIN,'python3'),root:join(VAR_DIR,'panel-state'),identity:()=>serviceProcesses.read('gateway')||serviceProcesses.find('gateway'),health:serviceHealth});
+const panelDrain=new PanelDrain({python:join(VENV_BIN,PY_BIN),root:join(VAR_DIR,'panel-state'),identity:()=>serviceProcesses.read('gateway')||serviceProcesses.find('gateway'),health:serviceHealth});
 // 会话活动探针：不只看「最后写消息的时间」，还看 sessions.last_activity_description ——
 // 那是 gateway 自己写的实时状态（"receiving stream response" / "starting API call #1" / 空=一轮结束）。
 // 只按 busy 快照判会在别人刚说完最后一句的下一秒放行（2026-11-20 06:37:02 派发、06:37:03 还在写）；
@@ -2901,7 +2905,7 @@ function sessionActivity(){
    'rows=c.execute("select id,last_activity_at,coalesce(last_activity_description,\'\') from sessions'
     +' where coalesce(last_activity_at,0)>? order by last_activity_at desc limit 8",(time.time()-7200,)).fetchall()',
    'print(json.dumps(rows))'].join('\n');
-  const r=spawnSync(`${VENV_BIN}/python3`,['-c',probe,`${DATA_DIR}/state.db`],{encoding:'utf8',timeout:5000});
+  const r=spawnSync(`${VENV_BIN}/${PY_BIN}`,['-c',probe,`${DATA_DIR}/state.db`],{encoding:'utf8',timeout:5000});
   const rows=JSON.parse(String(r.stdout||'[]').trim()||'[]');
   const t=Math.floor(Date.now()/1000);
   let at=0, pick=null;
@@ -2915,22 +2919,22 @@ function sessionActivity(){
  actCache={at:now,value};
  return value;
 }
-const panelRuntime=new PanelRuntime({receipt:createRestartReceipt({python:join(VENV_BIN,'python3'),app:APP_DIR,home:DATA_DIR,varDir:VAR_DIR}),drain:panelDrain,prepare:()=>serviceHealth.refresh(),observation:()=>serviceHealth.snapshot(),activity:sessionActivity,quietSeconds:90,recovery:()=>panelConfigRecovery.status(),root:join(VAR_DIR,'panel-state'),source:join(DATA_DIR,'workspace/fnos-hermes-agent-src'),started:START_TIME,available:()=>{const s=serviceHealth.snapshot();return s.gateway.healthy&&s.dashboard.healthy;},busy:()=>serviceHealth.snapshot().gateway.busy===true||activeChatStreams.size>0||panelChatQueue.workers.size>0||panelLibraryReviews.workers.size>0||panelModelChecks.workers.size>0});
+const panelRuntime=new PanelRuntime({receipt:createRestartReceipt({python:join(VENV_BIN,PY_BIN),app:APP_DIR,home:DATA_DIR,varDir:VAR_DIR}),drain:panelDrain,prepare:()=>serviceHealth.refresh(),observation:()=>serviceHealth.snapshot(),activity:sessionActivity,quietSeconds:90,recovery:()=>panelConfigRecovery.status(),root:join(VAR_DIR,'panel-state'),source:join(DATA_DIR,'workspace/fnos-hermes-agent-src'),started:START_TIME,available:()=>{const s=serviceHealth.snapshot();return s.gateway.healthy&&s.dashboard.healthy;},busy:()=>serviceHealth.snapshot().gateway.busy===true||activeChatStreams.size>0||panelChatQueue.workers.size>0||panelLibraryReviews.workers.size>0||panelModelChecks.workers.size>0});
 const handlePanelRuntime=createRuntimeHandler({runtime:panelRuntime,checkToken});
 const handleRestartIngress=createRestartIngress({runtime:panelRuntime,checkToken});
 const observePanelChannels=createChannelRuntime({home:DATA_DIR,gatewayPid:()=>readPid(PID_GATEWAY),hermesBin:HERMES_BIN});
-const panelChannels=createChannelsService({observe:observePanelChannels,python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),getConfig:()=>HERMES_CONFIG,state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
+const panelChannels=createChannelsService({observe:observePanelChannels,python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),getConfig:()=>HERMES_CONFIG,state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
 const panelPairing=new ChannelPairing({root:join(VAR_DIR,'panel-state'),channels:panelChannels,allowedChannels:['weixin','qqbot','telegram','wecom']});
 const handlePanelChannelIngress=createChannelIngress({channels:panelChannels,pairing:createPairingHandler({pairing:panelPairing,checkToken}),checkToken});
-const panelModels=createModelsService({varRoot:VAR_DIR,python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),getConfig:()=>{const profile=_cronProfileName();return profile&&profile!=='default'?join(DATA_DIR,'profiles',safeId(profile),'config.yaml'):HERMES_CONFIG;},state:join(VAR_DIR,'panel-state'),changed:reason=>panelRuntime.changed(reason)});
-const handlePanelMcp=createMcpHandler({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),getConfig:()=>{const profile=_cronProfileName();return profile&&profile!=='default'?join(DATA_DIR,'profiles',safeId(profile),'config.yaml'):HERMES_CONFIG;},state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
-const handlePanelTyping=createTypingHandler({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),getConfig:()=>{const profile=_cronProfileName();return profile&&profile!=='default'?join(DATA_DIR,'profiles',safeId(profile),'config.yaml'):HERMES_CONFIG;},state:join(VAR_DIR,'panel-state'),platforms:()=>CHANNEL_DEFS,checkToken,changed:reason=>panelRuntime.changed(reason)});
+const panelModels=createModelsService({varRoot:VAR_DIR,python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),getConfig:()=>{const profile=_cronProfileName();return profile&&profile!=='default'?join(DATA_DIR,'profiles',safeId(profile),'config.yaml'):HERMES_CONFIG;},state:join(VAR_DIR,'panel-state'),changed:reason=>panelRuntime.changed(reason)});
+const handlePanelMcp=createMcpHandler({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),getConfig:()=>{const profile=_cronProfileName();return profile&&profile!=='default'?join(DATA_DIR,'profiles',safeId(profile),'config.yaml'):HERMES_CONFIG;},state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
+const handlePanelTyping=createTypingHandler({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),getConfig:()=>{const profile=_cronProfileName();return profile&&profile!=='default'?join(DATA_DIR,'profiles',safeId(profile),'config.yaml'):HERMES_CONFIG;},state:join(VAR_DIR,'panel-state'),platforms:()=>CHANNEL_DEFS,checkToken,changed:reason=>panelRuntime.changed(reason)});
 const panelLibraryStore=new LibraryStore({root:join(VAR_DIR,'panel-state'),sources:createLibrarySources(DATA_DIR)});
 const panelLibraryReviews=new LibraryReviews({root:join(VAR_DIR,'panel-state/library-reviews'),library:panelLibraryStore,source:body=>panelModelChecks.source(body)});
 try{panelLibraryReviews.load();}catch(error){panelLibraryReviews.fault=error;log('[library-reviews] '+error.message);}
 const handlePanelLibraryReviews=createLibraryReviewHandler({reviews:panelLibraryReviews,checkToken});
 const handlePanelLibrary=createLibraryHandler({store:panelLibraryStore,checkToken});
-const handleArchiveVault=createArchiveVault({dataDir:DATA_DIR,checkToken,python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state')});
+const handleArchiveVault=createArchiveVault({dataDir:DATA_DIR,checkToken,python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state')});
 const panelPlanStore=new PlanStore({root:join(VAR_DIR,'panel-state'),legacyConfig:CONFIG_FILE,legacyFlows:join(DATA_DIR,'flows'),expert:getExpert});
 const handlePanelPlans=createPlanHandler({store:panelPlanStore,checkToken,launch:createPlanLaunch({queue:panelChatQueue,
  ensureSession:(id,title)=>{if(!getSession(id))saveSession({id,title,messages:[],created_at:Date.now(),updated_at:Date.now()});},
@@ -3276,7 +3280,7 @@ function spawnHermes(name, pidPath, args) {
   // Resolve an interrupted multi-file config save before a child can observe
   // only one side of the pending change. Never start from a disputed journal.
   try {
-    configTransaction({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),file:HERMES_CONFIG,body:{action:'recover'}});
+    configTransaction({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),file:HERMES_CONFIG,body:{action:'recover'}});
   } catch (_) {
     log(`${name} 未启动：配置保存恢复未完成，请先核对待恢复记录`);
     return {ok:false,error:'配置保存恢复未完成，尚未启动服务；请在维护记录中核对'};
@@ -4296,7 +4300,7 @@ toolGuardLoad();
 
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
 const panelModelChecks = new ModelChecks({root: join(VAR_DIR, 'panel-state/model-checks'),
-  source: createModelSource({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), varRoot: VAR_DIR,
+  source: createModelSource({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'), varRoot: VAR_DIR,
     getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; }})});
 let panelModelChecksLoadError = null;
 try { panelModelChecks.load(); } catch (error) { panelModelChecksLoadError = error; log('[model-checks] state cannot load: '+error.message); }
@@ -4306,10 +4310,10 @@ async function handleModelChecks(req, path) {
     return new Response(JSON.stringify({ok:false,error:'验证记录无法读取，原文件已保留，请检查存储'}), {status:503,headers:{'Content-Type':'application/json'}});
   return modelChecksHandler(req,path);
 }
-const handleAuxiliary = createAuxiliaryHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
+const handleAuxiliary = createAuxiliaryHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'),
   getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; },
   backupRoot: join(VAR_DIR, 'panel-state/auxiliary-backups'), checkToken});
-const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
+const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'),
   getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; },
   lockRoot: join(VAR_DIR, 'panel-state'), checkToken});
 const handleConnectorTools = createConnectorToolsHandler({getConnector, readState: () => panelConnectorStore.all(), checkToken, call: callConnectorTool});
@@ -4318,8 +4322,8 @@ const handleMaintenance = createMaintenanceHandler({checkToken, repositories: [
   {id: 'panel', name: '面板源码仓库', path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src')},
   {id: 'python', name: 'Hermes Python 内核', path: join(APP_DIR, 'hermes-src')},
 ]});
-const handleUsage = createUsageHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
-const handleEcho = createEchoHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
+const handleUsage = createUsageHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
+const handleEcho = createEchoHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'),
   queueFile: '/vol1/1000/飞牛文件/html/.acl/tasks/tasks.json', backupRoot: join(VAR_DIR, 'panel-state/echo-backups'),
   draftFile: join(VAR_DIR, 'panel-state/echo-drafts.json'), checkToken});
 const handleCronHistory = createCronHistoryHandler({checkToken, getHome: () => {
@@ -4331,15 +4335,15 @@ const handleCronHooks = createCronHookHandler({hooks: panelCronHooks, checkToken
   return (Array.isArray(raw) ? raw : raw.jobs).some(job => job.id === id);
 }});
 const handleCronUpdate = createCronUpdateHandler({
-  python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), nativeRoot: join(APP_DIR, 'hermes-src'),
+  python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'), nativeRoot: join(APP_DIR, 'hermes-src'),
   backupRoot: join(VAR_DIR, 'panel-state/cron-backups'), checkToken,
   getHome: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile)) : DATA_DIR; },
 });
 
 async function handleFetch(req) {
-  const configRW=configReaderWriter({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getFile:()=>_runtimeConfigPath(),reason:'面板服务配置'});
-  const envRW=envReaderWriter({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getFile:()=>HERMES_ENV});
-  const channelRW=channelConfigWriter({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getConfig:()=>_runtimeConfigPath(),getEnv:()=>HERMES_ENV});
+  const configRW=configReaderWriter({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getFile:()=>_runtimeConfigPath(),reason:'面板服务配置'});
+  const envRW=envReaderWriter({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getFile:()=>HERMES_ENV});
+  const channelRW=channelConfigWriter({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getConfig:()=>_runtimeConfigPath(),getEnv:()=>HERMES_ENV});
   const url  = new URL(req.url);
   // fnOS gateway 反向代理不剥路径前缀（BASE_PATH），这里按实际 BASE_PATH 剥离
   let path = url.pathname;
@@ -6334,7 +6338,7 @@ async function handleFetch(req) {
   }
   // 合并写入 mcp_servers（保留用户其它条目，仅增/改/删本连接器对应项）
   function _upsertMcpServer(name, entry){
-    const result=configTransaction({python:join(VENV_BIN,'python3'),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),file:_runtimeConfigPath(),
+    const result=configTransaction({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),file:_runtimeConfigPath(),
       body:{action:'mcp_entry',name,entry,reason:'修改MCP服务 '+name}});
     return result;
   }
@@ -6529,7 +6533,7 @@ async function handleFetch(req) {
   function _findHermesRoot(){
     try {
       const pyResult = spawnSync(
-        `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
+        `${VENV_BIN}/${PY_BIN}`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
         { stdout: "pipe", stderr: "pipe" }
       );
       const root = (pyResult.stdout ? pyResult.stdout.toString() : "").trim();
@@ -9567,7 +9571,7 @@ function startServer() {
         // 真实 PTY：由 pty_bridge.py（pty.openpty + setsid + TIOCSCTTY）提供控制终端，
         // 修复 pipe spawn 下 bash -i 报 “cannot set terminal process group / no job control”，
         // Ctrl+C、前后台任务、vim 等全屏程序均可正常工作。
-        const pty = spawn(`${VENV_BIN}/python3`, [
+        const pty = spawn(`${VENV_BIN}/${PY_BIN}`, [
           `${APP_DIR}/server/pty_bridge.py`,
           "--shell", "/bin/bash",
           "--cwd", existsSync(cwd) ? cwd : WORKSPACE_DIR,

@@ -37,12 +37,32 @@ function Get-KernelZip {
   return $false
 }
 
+function Stop-HermesProcess {
+  # hermes.exe 正在跑时 kernel 目录和 venv 的 Scripts 都删不动（os error 32）
+  foreach($n in @("hermes","node","python","hermes-gateway")){
+    Get-Process -Name $n -ErrorAction SilentlyContinue |
+      Where-Object { $_.Path -and $_.Path.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase) } |
+      ForEach-Object { try { $_.Kill(); } catch {} }
+  }
+  & schtasks /End /TN "HermesCustomPanel" 2>&1 | Out-Null
+  Start-Sleep -Seconds 2
+}
+
+function Remove-PathForce {
+  param([string]$Path)
+  if(-not (Test-Path $Path)){ return }
+  for($i=1; $i -le 3; $i++){
+    try { Remove-Item $Path -Recurse -Force -ErrorAction Stop; return }
+    catch { if($i -eq 3){ Warn ("cannot remove " + $Path + " : " + $_.Exception.Message) } else { Start-Sleep -Seconds 2 } }
+  }
+}
+
 function Expand-Kernel {
   param([string]$ZipPath)
   $tmp = Join-Path $env:TEMP ("hk" + [Guid]::NewGuid().ToString("N"))
   Expand-Archive $ZipPath -DestinationPath $tmp -Force
   $inner = (Get-ChildItem $tmp -Directory | Select-Object -First 1).FullName
-  if(Test-Path $Kernel){ Remove-Item $Kernel -Recurse -Force }
+  Remove-PathForce $Kernel
   New-Item -ItemType Directory -Force -Path $Kernel | Out-Null
   Copy-Item (Join-Path $inner "*") $Kernel -Recurse -Force
   Remove-Item $tmp -Recurse -Force
@@ -50,6 +70,7 @@ function Expand-Kernel {
 
 New-Item -ItemType Directory -Force -Path $Root,$App,$Var | Out-Null
 Say ("root = " + $Root)
+Stop-HermesProcess
 
 $uv = $null
 $cand = @()

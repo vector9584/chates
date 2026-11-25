@@ -1,6 +1,7 @@
 """Edit exactly one auxiliary task with round-trip YAML and an optimistic revision."""
 import copy
-import fcntl
+try:import fcntl
+except ImportError:fcntl=None
 import hashlib
 import io
 import json

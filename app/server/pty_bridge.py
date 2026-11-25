@@ -21,7 +21,8 @@
 import argparse
 import ctypes
 import errno
-import fcntl
+try:import fcntl
+except ImportError:fcntl=None
 import os
 import pty
 import select
