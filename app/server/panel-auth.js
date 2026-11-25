@@ -1,5 +1,7 @@
 import {createHash,randomBytes,timingSafeEqual} from 'node:crypto';
-import {appendFileSync,statSync,renameSync} from 'node:fs';
+import {statSync,renameSync} from 'node:fs';
+// 调试日志里有 UA / origin / path，可能是中文；Windows 省略 encoding 会用 GBK 写坏
+import {appendFileSync} from './panel-fs-utf8.js';
 import {StateFile,stateError} from './panel-state.js';
 
 const COOKIE='hermes_panel_device';
