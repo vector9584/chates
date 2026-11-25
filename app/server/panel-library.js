@@ -143,7 +143,7 @@ export class LibraryStore{
   fs.mkdirSync(dirname(target),{recursive:true,mode:0o700});const previous=before.exists?fs.statSync(target):null,temp=target+'.panel-'+randomUUID()+'.tmp';let fd;
   try{fd=fs.openSync(temp,'wx',previous?previous.mode&0o777:0o600);fs.writeFileSync(fd,after);if(previous&&typeof process.getuid==='function'&&previous.uid!==process.getuid())fs.fchownSync(fd,previous.uid,previous.gid);fs.fsyncSync(fd);fs.closeSync(fd);fd=undefined;
    const current=this.read(body.source,body.path,{allowMissing:true});if(current.revision!==before.revision||current.exists!==before.exists)throw stateError('保存前原文发生变化，请重新读取后合并',409);
-   fs.renameSync(temp,target);fd=fs.openSync(dirname(target),'r');fs.fsyncSync(fd);fs.closeSync(fd);fd=undefined;file.write({...record,status:'committed',finished_at:Date.now()});
+   fs.renameSync(temp,target);if(process.platform!=='win32'){fd=fs.openSync(dirname(target),'r');fs.fsyncSync(fd);fs.closeSync(fd);fd=undefined;}file.write({...record,status:'committed',finished_at:Date.now()});
   }finally{if(fd!==undefined)fs.closeSync(fd);if(fs.existsSync(temp))fs.unlinkSync(temp);}
   return {...this.read(body.source,body.path),change_id:id};
  }

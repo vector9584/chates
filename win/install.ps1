@@ -179,6 +179,28 @@ Set-Content -Path $hermesBat -Value ($h -join "`r`n") -Encoding Default
 
 $u = @("@echo off","chcp 65001 >nul","cd /d `"$Here`"","powershell -NoProfile -ExecutionPolicy Bypass -File `"$Here\update.ps1`"","pause")
 Set-Content -Path $updateBat -Value ($u -join "`r`n") -Encoding Default
+# 后台静默启动器：WScript.Shell.Run 第二参数 0 = 隐藏窗口，第三参数 False = 不等待。
+# 注意不要在双引号里写 "$env:XXX=" 当字面量 —— PowerShell 会先把它展开成空字符串，
+# 生成的 vbs 就变成 `="C:\..."` 这种残句（实测直接跑不起）。用单引号拼。
+$vbsPath = Join-Path $Root "后台启动.vbs"
+$nodeDir = [System.IO.Path]::GetDirectoryName($node)
+$vbs = @(
+ ('Set sh = CreateObject("WScript.Shell")'),
+ ('sh.Environment("PROCESS")("APP_DIR") = "' + $App + '"'),
+ ('sh.Environment("PROCESS")("DATA_DIR") = "' + $Data + '"'),
+ ('sh.Environment("PROCESS")("VAR_DIR") = "' + $Var + '"'),
+ ('sh.Environment("PROCESS")("HERMES_HOME") = "' + $Data + '"'),
+ ('sh.Environment("PROCESS")("HERMES_VAR_DIR") = "' + $Var + '"'),
+ ('sh.Environment("PROCESS")("MONITOR_SOCKET_PATH") = ""'),
+ ('sh.Environment("PROCESS")("UI_PORT") = "8650"'),
+ ('sh.Environment("PROCESS")("UI_HOST") = "127.0.0.1"'),
+ ('sh.Environment("PROCESS")("GATEWAY_PORT") = "8742"'),
+ ('sh.Environment("PROCESS")("DASHBOARD_PORT") = "9219"'),
+ ('sh.Environment("PROCESS")("PATH") = "' + $Venv + '\Scripts;' + $nodeDir + ';" & sh.Environment("PROCESS")("PATH")'),
+ ('sh.CurrentDirectory = "' + $Kernel + '"'),
+ ('sh.Run """' + $node + '"" ""' + $App + '\server\monitor.js""", 0, False')
+)
+Set-Content -Path $vbsPath -Value ($vbs -join "`r`n") -Encoding Default
 Say "launchers written"
 
 try {
@@ -186,6 +208,11 @@ try {
   $desk = [Environment]::GetFolderPath("Desktop")
   # 只放一个桌面入口：用户要的是「点开就是操作界面」，后台进程由计划任务在登录时静默拉起，
   # 不该让他看见命令行窗口。命令行仍可通过 启动Hermes.bat 手动用，但不占桌面。
+  # 清掉历史版本留下的多余入口（"Hermes 终端"），现在只要一个面板图标。
+  foreach($stale in @("Hermes 终端.lnk","Hermes Terminal.lnk","启动Hermes.lnk")){
+    $sp = Join-Path $desk $stale
+    if(Test-Path $sp){ Remove-Item $sp -Force -ErrorAction SilentlyContinue }
+  }
   foreach($pair in @(@($panelBat,"Hermes 面板"))){
     $lnk = $ws.CreateShortcut((Join-Path $desk ($pair[1] + ".lnk")))
     $lnk.TargetPath = $pair[0]
@@ -198,9 +225,10 @@ try {
 
 try {
   # 直接跑 node，不经过 bat：cmd 窗口不会闪出来。node.exe 是无控制台窗口的子系统程序。
-  # 计划任务不继承 bat 里的 set，环境变量得在命令行里带全，否则 monitor 找不到 DATA_DIR。
-  $taskCmd = "cmd /c set `"APP_DIR=$App`" && set `"DATA_DIR=$Data`" && set `"VAR_DIR=$Var`" && set `"HERMES_HOME=$Data`" && set `"HERMES_VAR_DIR=$Var`" && set `"MONITOR_SOCKET_PATH=`" && set `"UI_PORT=8650`" && set `"PORT=8650`" && set `"GATEWAY_PORT=8742`" && set `"DASHBOARD_PORT=9219`" && set `"UI_HOST=127.0.0.1`" && set `"PATH=$Venv\Scripts;$([System.IO.Path]::GetDirectoryName($node));%PATH%`" && cd /d `"$Kernel`" && `"$node`" `"$App\server\monitor.js`""
-  schtasks /Create /TN "HermesCustomPanel" /SC ONLOGON /RL LIMITED /TR $taskCmd /F 2>&1 | Out-Null
+  # 计划任务直接跑 vbs：vbs 用 WScript.Shell.Run(...,0,False) 起 node，
+  # 0 表示隐藏窗口、False 表示不等 —— 用户看不到任何控制台闪一下。
+  # 不把一长串 set 塞进 schtasks /TR：引号嵌套会碎，实测起不来。
+  schtasks /Create /TN "HermesCustomPanel" /SC ONLOGON /RL LIMITED /TR "wscript.exe `"$Root\后台启动.vbs`"" /F 2>&1 | Out-Null
   Say "autostart registered"
 } catch { Warn ("autostart failed: " + $_.Exception.Message) }
 

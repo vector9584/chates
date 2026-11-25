@@ -39,9 +39,13 @@ export function atomicWrite(file, contents, io = fs) {
     io.closeSync(fd); fd = undefined;
     io.renameSync(temp, file);
     // Persist the directory entry on Linux. macOS also supports directory fsync.
-    fd = io.openSync(dir, 'r');
-    io.fsyncSync(fd);
-    io.closeSync(fd); fd = undefined;
+    // Windows: 目录不能用 openSync(dir,'r') 打开（EISDIR/EPERM），而且 NTFS 本身
+    // 不掉目录项，跳过即可。之前这里必抛，导致 bootstrap 一直 500「设备授权记录失败」。
+    if (process.platform !== 'win32') {
+      fd = io.openSync(dir, 'r');
+      io.fsyncSync(fd);
+      io.closeSync(fd); fd = undefined;
+    }
   } finally {
     if (fd !== undefined) io.closeSync(fd);
     if (io.existsSync(temp)) io.unlinkSync(temp);
