@@ -228,5 +228,6 @@ MV=$(tar xzOf "$OUT" manifest 2>/dev/null | grep -oP '^version\s*=\s*\K\S+')
 [ "$MV" = "$FPK_VER" ] || die "manifest 版本 $MV != $FPK_VER"
 ok "manifest 版本 = $MV"
 
+mkdir -p build
 echo "$OUT" > build/.fpk-out
 c '1;32' "fpk 完成: $OUT (${SIZE} 字节)"

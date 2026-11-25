@@ -216,5 +216,6 @@ OUT=$(find electron/dist -maxdepth 1 -name "*.exe" 2>/dev/null | head -1)
 [ -n "$OUT" ] || die "没找到 exe"
 SIZE=$(stat -c %s "$OUT" 2>/dev/null || stat -f %z "$OUT")
 ok "产物 $(basename "$OUT")  ${SIZE} 字节"
+mkdir -p build
 echo "$OUT" > build/.exe-out
 c '1;32' "exe 完成: $OUT (${SIZE} 字节)"
