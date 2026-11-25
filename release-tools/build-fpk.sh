@@ -228,6 +228,39 @@ MV=$(tar xzOf "$OUT" manifest 2>/dev/null | grep -oP '^version\s*=\s*\K\S+')
 [ "$MV" = "$FPK_VER" ] || die "manifest 版本 $MV != $FPK_VER"
 ok "manifest 版本 = $MV"
 
+# 版本递增校验（2026-11-25 教训）
+# 应用中心按数字比大小判断能不能升级，打出来的包必须比已装版本大，
+# 否则装上去显示「回退」甚至被拒。实测踩过：装 0.21.149，包是 0.21.10。
+if [ -d /vol1/@appcenter/hermes-agent ]; then
+  INSTALLED=$(fnos-cli --profile nas --allow-insecure-http app list 2>/dev/null \
+    | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    for a in d.get('list',[]):
+        if a.get('appName')=='hermes-agent':
+            print(a.get('version','')); break
+except Exception:
+    pass
+" 2>/dev/null)
+  if [ -n "$INSTALLED" ]; then
+    NEWER=$(python3 -c "
+import sys
+def k(v):
+    try: return tuple(int(x) for x in v.split('.'))
+    except: return (0,)
+print(1 if k('$MV') > k('$INSTALLED') else 0)
+")
+    ok "已装版本 = $INSTALLED"
+    if [ "$NEWER" != "1" ]; then
+      c '33' "  警告：$MV 不大于已装 $INSTALLED，应用中心可能拒绝升级"
+      c '33' "  用 FPK_VERSION=<更高的版本> 重打"
+    else
+      ok "版本递增 $INSTALLED -> $MV"
+    fi
+  fi
+fi
+
 mkdir -p build
 echo "$OUT" > build/.fpk-out
 c '1;32' "fpk 完成: $OUT (${SIZE} 字节)"
