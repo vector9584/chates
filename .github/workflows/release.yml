@@ -1,0 +1,151 @@
+name: release
+
+# 一条流水线同时出 fpk（fnOS）和 exe（Windows），都传同一个 Release。
+#
+# 为什么不在本机构建：本机是 fnOS 容器，出不了 Windows NSIS 安装包；
+# 而且本机产物不可复现。CI runner 上从源码现场重建，产物有 hash、可重跑。
+#
+# 触发方式：
+#   - push tag v*   -> 全自动发布
+#   - 手动 dispatch  -> 可只跑校验（dry=true）
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: '只跑校验，不发布'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  # 先跑门禁：版本一致性 + 凭据闸。任何一项红就停，不浪费 runner 时间
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.ver.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 读版本号并校验 tag
+        id: ver
+        run: |
+          set -euo pipefail
+          V=$(python3 -c "import json;print(json.load(open('win/version.json'))['version'])")
+          E=$(python3 -c "import json;print(json.load(open('electron/package.json'))['version'])")
+          echo "win/version.json      = $V"
+          echo "electron/package.json = $E"
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            [ "$TAG" = "v$V" ] || { echo "::error::tag=$TAG 与版本 $V 不一致"; exit 1; }
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 凭据闸
+        run: |
+          set -euo pipefail
+          for bad in .env auth.json credentials.json; do
+            [ -e "data-skeleton/$bad" ] && { echo "::error::data-skeleton 里有 $bad"; exit 1; }
+          done
+          BAD=$( { grep -rEn '^(QQ_CLIENT_SECRET|NAS_SSH_PASS|SUDO_PASSWORD|GITHUB_PAT|GITHUB_TOKEN[A-Z_]*|GITEA_TOKEN|ZOTERO_API_KEY|DISCORD_BOT_TOKEN|TELEGRAM_SESSION_STRINGS)=[^[]' data-skeleton/ 2>/dev/null || true; } | wc -l)
+          [ "$BAD" -eq 0 ] || { echo "::error::骨架里有 $BAD 行明文凭据"; exit 1; }
+          echo "凭据闸通过"
+
+  # fpk：在 Linux 上打 fnOS 包
+  fpk:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 构建 fpk
+        run: |
+          set -euo pipefail
+          bash release-tools/build-fpk.sh --tag "${{ needs.gate.outputs.tag }}"
+          ls -l dist/*.fpk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fpk
+          path: dist/*.fpk
+          if-no-files-found: error
+
+  # exe：在 Windows 上跑 electron-builder 出 NSIS 安装包
+  exe:
+    needs: gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 构建 NSIS 安装包
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash release-tools/build-exe.sh --tag "${{ needs.gate.outputs.tag }}"
+          ls -l electron/dist/*.exe 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: |
+            electron/dist/*.exe
+            electron/dist/*.yml
+            electron/dist/*.blockmap
+          if-no-files-found: error
+
+  # 发布：两个产物 + latest.yml + SHA256SUMS 传同一个 Release
+  publish:
+    needs: [gate, fpk, exe]
+    if: ${{ !inputs.dry }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 取回产物
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+
+      - name: 摊平目录并生成校验
+        run: |
+          set -euo pipefail
+          find release -type f -exec mv {} release/ \; 2>/dev/null || true
+          find release -mindepth 1 -type d -empty -delete 2>/dev/null || true
+          ls -lR release
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.gate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NOTES="$GITHUB_WORKSPACE/release-notes.md"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，补传资产"
+          else
+            gh release create "$TAG" --title "CHATES $TAG" --notes-file "$NOTES"
+          fi
+          gh release upload "$TAG" release/* --clobber
+          echo "已发布 https://github.com/${{ github.repository }}/releases/tag/$TAG"
