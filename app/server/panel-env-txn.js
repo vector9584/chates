@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import {stateError} from './panel-state.js';
 import {configRequestContext,configTransaction} from './panel-config-txn.js';
 export function envTransaction({python,serverRoot,state,file,body,run=spawnSync}){
- const result=run(python,['-B',join(serverRoot,'panel_env_txn.py'),file,state],{input:JSON.stringify(body),encoding:'utf8',timeout:15000,maxBuffer:1024*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const result=run(python,['-B',join(serverRoot,'panel_env_txn.py'),file,state],{input:JSON.stringify(body),encoding:'utf8',timeout:15000,maxBuffer:1024*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});
  let output;try{output=JSON.parse(result.stdout);}catch{throw stateError('凭证操作未收到确认，请重新读取核对',503);}
  if(!output.ok)throw stateError(output.error,output.status||500);return output;
 }

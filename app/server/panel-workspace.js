@@ -125,7 +125,7 @@ async function validFileSession(sid){
  if(existsSync(join(VAR,'chat/archived-sessions',sid+'.json')))return false;
  let pending=fileSessionLookups.get(sid);
  if(!pending){
-  pending=run(PYTHON,['-B','-c',DB_SESSION_QUERY,join(DATA,'state.db'),sid],{timeout:2000,maxBuffer:4096})
+  pending=run(PYTHON,['-B','-c',DB_SESSION_QUERY,join(DATA,'state.db'),sid],{timeout:2000,maxBuffer:4096,env:{...process.env,PYTHONIOENCODING:'utf-8'}})
    .then(({stdout})=>stdout.trim()==='1',()=>{throw stateError('无法核实会话，暂不能访问会话文件',503);})
    .finally(()=>fileSessionLookups.delete(sid));
   fileSessionLookups.set(sid,pending);

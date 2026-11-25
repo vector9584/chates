@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import * as fs from 'node:fs';
 import {stateError} from './panel-state.js';
 export function configTransaction({python,serverRoot,state,file,body,run=spawnSync}){
- const result=run(python,['-B',join(serverRoot,'panel_config_txn.py'),file,state],{input:JSON.stringify(body),encoding:'utf8',timeout:15000,maxBuffer:1024*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const result=run(python,['-B',join(serverRoot,'panel_config_txn.py'),file,state],{input:JSON.stringify(body),encoding:'utf8',timeout:15000,maxBuffer:1024*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});
  let output;try{output=JSON.parse(result.stdout);}catch{throw stateError('配置操作未收到确认，请重新读取核对',503);}
  if(!output.ok)throw stateError(output.error,output.status||500);
  return output;

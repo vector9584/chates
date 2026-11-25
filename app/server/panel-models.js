@@ -271,7 +271,7 @@ export function createModelsService({python,serverRoot,getConfig,state,varRoot,c
  }
  async function execute(body){
   const result=await new Promise(resolve=>{
-   const child=start(python,['-B',join(serverRoot,'panel-models.py'),getConfig(),state,...(varRoot?[varRoot]:[])],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',done=false;
+   const child=start(python,['-B',join(serverRoot,'panel-models.py'),getConfig(),state,...(varRoot?[varRoot]:[])],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});let output='',done=false;
    const finish=data=>{if(done)return;done=true;clearTimeout(timer);resolve(data);};
    /* 2026-11-23：能力批量探测要真发请求（思考强度那一项 single 就要 40~100 秒），
       15 秒的固定窗口会把它砍成 504「模型配置处理超时」，用户看到的是超时而不是结果。

@@ -89,7 +89,7 @@ export function hasRasterHeader(fd,ext){
 const types={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',svg:'image/svg+xml',bmp:'image/bmp',ico:'image/x-icon',pdf:'application/pdf',html:'text/html; charset=utf-8',htm:'text/html; charset=utf-8',mp3:'audio/mpeg',wav:'audio/wav',mp4:'video/mp4',webm:'video/webm'};
 export function createFileHandler({python,serverRoot,state,roots,data,varDir,basePath='',checkToken,start=spawn}){
  const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
- function childFor(body){const child=start(python,['-B',join(serverRoot,'panel-files.py')],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});child.stderr.resume();child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({roots:roots(),state,body}));return child;}
+ function childFor(body){const child=start(python,['-B',join(serverRoot,'panel-files.py')],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});child.stderr.resume();child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({roots:roots(),state,body}));return child;}
  async function call(body){return new Promise((resolve,reject)=>{let output='',settled=false;const child=childFor(body),timer=setTimeout(()=>{child.kill('SIGTERM');finish(null,stateError('文件操作超时，记录已保留，请刷新核对',504));},30000);
   function finish(value,error){if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value);}
   child.stdout.on('data',chunk=>{output+=chunk;if(Buffer.byteLength(output)>52*1024*1024){child.kill('SIGTERM');finish(null,stateError('返回内容过大，请缩小读取范围',413));}});

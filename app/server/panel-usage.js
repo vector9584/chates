@@ -9,7 +9,8 @@ export function createUsageHandler({python, serverRoot, dataRoot, panelRoot=null
     if (!pending) {
       pending = new Promise((resolve) => {
         run(python, ['-B', join(serverRoot, 'panel-usage.py'), join(dataRoot, 'state.db')],
-          {timeout: 15000, maxBuffer: 4 * 1024 * 1024}, async (error, stdout) => {
+          {timeout: 15000, maxBuffer: 4 * 1024 * 1024,
+           env: {...process.env, PYTHONIOENCODING: 'utf-8'}}, async (error, stdout) => {
             try {
               const result = JSON.parse(stdout);
               if (!result.ok || error) throw new Error(result.error || '用量读取进程未完成');

@@ -3,7 +3,11 @@ import {join} from 'node:path';
 export function createChannelsService({python,serverRoot,getConfig,state,checkToken,changed=()=>{},observe=()=>({verified:false,reason:"record_unavailable",platforms:{}}),start=spawn}){
  async function execute(body){
   const result=await new Promise(resolve=>{
-   const child=start(python,['-B',join(serverRoot,'panel-channels.py'),getConfig(),state],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',done=false;
+   // PYTHONIOENCODING 必须显式设成 utf-8：panel-channels.py 用 ensure_ascii=False
+   // 输出原始中文，而 Windows 上 Python 的 stdout 默认跟随系统代码页（cp936/GBK），
+   // 中文按 GBK 写出后，这边 `output += part`（Buffer 隐式转 utf8）就解成 `δ���`。
+   // 现象：面板「通讯」和通道消息列表里的中文标题全部乱码。POSIX 上无影响（本就 utf-8）。
+   const child=start(python,['-B',join(serverRoot,'panel-channels.py'),getConfig(),state],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});let output='',done=false;
    const finish=data=>{if(done)return;done=true;clearTimeout(timer);resolve(data);};const timer=setTimeout(()=>{child.kill();finish({ok:false,error:'通讯配置处理超时，请刷新核对',status:504});},15000);
    child.stdout.on('data',part=>{output+=part;if(Buffer.byteLength(output)>2*1024*1024){child.kill();finish({ok:false,error:'通讯配置内容过大',status:413});}});child.stderr.resume();child.stdin.on('error',()=>{});child.on('error',()=>finish({ok:false,error:'通讯配置服务无法启动',status:503}));child.on('close',()=>{try{finish(JSON.parse(output));}catch{finish({ok:false,error:'通讯配置未返回处理结果，请刷新核对',status:502});}});child.stdin.end(JSON.stringify(body));
   });

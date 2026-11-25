@@ -34,7 +34,7 @@ export class PanelDrain {
   return true;
  }
  mutate(body){
-  const result=spawnSync(this.python,['-B',fileURLToPath(new URL('./panel_drain_store.py',import.meta.url)),this.path],{input:JSON.stringify(body),encoding:'utf8',timeout:5000,maxBuffer:16384,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+  const result=spawnSync(this.python,['-B',fileURLToPath(new URL('./panel_drain_store.py',import.meta.url)),this.path],{input:JSON.stringify(body),encoding:'utf8',timeout:5000,maxBuffer:16384,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});
   let data;try{data=JSON.parse(result.stdout);}catch{throw stateError('排空状态服务未返回确认，请核对后重试',503);}
   if(result.status!==0||!data.ok)throw stateError(data.error||'排空状态未能更新',409);
  }
