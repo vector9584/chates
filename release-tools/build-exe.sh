@@ -33,6 +33,7 @@ done
 
 c() { printf '\033[%sm%s\033[0m\n' "$1" "$2"; }
 ok() { c '32' "  OK   $*"; }
+warn() { c '33' "$*"; }
 die() { c '31' "  FAIL $*"; exit 1; }
 
 # 平台检查：这套流程只能在 Windows 上跑
@@ -54,10 +55,38 @@ c '1;36' "== exe 预检 =="
 APP_VER=$(python3 -c "import json;print(json.load(open('electron/package.json'))['version'])")
 ok "electron 版本 $APP_VER"
 
-# 凭据闸：data-skeleton 必须干净
-LEAK=$( { grep -rEc "^(QQ_CLIENT_SECRET|NAS_SSH_PASS|SUDO_PASSWORD|GITHUB_PAT)=[^[]" data-skeleton/ 2>/dev/null || true; } | awk -F: '{s+=$2} END{print s+0}')
-[ "${LEAK:-0}" -eq 0 ] || die "data-skeleton 有明文凭据"
-ok "凭据闸通过"
+# 凭据闸：反向搜索真 .env 的每个值（≥8 字符），命中即失败。
+# 不能只按 key 名单列 —— 曾漏过 ROUTER_PWD / STUDENT_NAME / *_USER，
+# 因为这些 key 名看着不像凭据，值却是真的。
+REAL_ENV="${REAL_ENV:-/vol1/@apphome/hermes-agent/data/.env}"
+if [ -f "$REAL_ENV" ]; then
+  LEAK=0
+  while IFS= read -r line; do
+    case "$line" in \#*|"") continue ;; esac
+    v="${line#*=}"
+    [ ${#v} -lt 8 ] && continue
+    case "${v,,}" in
+      127.0.0.1|localhost|0.0.0.0|::1|true|false|none|null|auto|default|utf-8|utf8) continue ;;
+    esac
+    if grep -rqF -- "$v" data-skeleton/ 2>/dev/null; then
+      warn "  data-skeleton 泄漏: ${line%%=*}"
+      LEAK=$((LEAK+1))
+    fi
+  done < "$REAL_ENV"
+  [ "$LEAK" -eq 0 ] || die "data-skeleton 有 $LEAK 条真凭据"
+  ok "凭据闸通过（反向搜索 0 泄漏）"
+else
+  warn "  无 $REAL_ENV，跳过反向搜索"
+fi
+
+# 分发包只许 .env.example，不许 .env 本体
+[ -f data-skeleton/.env ] && die "data-skeleton 里有 .env（只许 .env.example）"
+
+# 环境指纹
+for pat in "王瑞兵" "ruibing.wang" "192.168.3.110" "vector9584"; do
+  grep -rqF -- "$pat" data-skeleton/ 2>/dev/null && die "data-skeleton 命中指纹: $pat"
+done
+ok "指纹闸通过"
 
 # 内核必须找得到
 [ -d app/hermes-src ] || [ -d electron/resources/chates/app/hermes-src ] || die "找不到 hermes-src 内核"

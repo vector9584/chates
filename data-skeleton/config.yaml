@@ -899,8 +899,8 @@ mcp_servers:
 platforms:
   qqbot:
     extra:
-      app_id: 1905359086
-      client_secret: GFFFGHJLORVaflry5DLUeozAMYlyCQfv
+      app_id: [REDACTED]
+      client_secret: [REDACTED]
       group_policy: open
       dm_policy: open
     allow_all_users: true
@@ -922,8 +922,8 @@ platforms:
   weixin:
     token: [REDACTED]
     extra:
-      account_id: 65db685c1817@im.bot
-      base_url: https://ilinkai.weixin.qq.com
+      account_id: [REDACTED]
+      base_url: [REDACTED]
       rate_limit_circuit_threshold: 4
       rate_limit_circuit_window_seconds: 60
       rate_limit_circuit_open_seconds: 15

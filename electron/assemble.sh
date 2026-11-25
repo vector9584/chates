@@ -45,15 +45,69 @@ for d in ui server; do
 done
 echo '{"type":"module"}' > "$OUT/app/server/package.json"
 
-# ── 3. 用户数据 ────────────────────────────────────────────
-say "unpacking user data ..."
-DATA_ZIP="$WS/hermes-win-data/data.zip"
-[ -f "$DATA_ZIP" ] || die "data.zip not found: $DATA_ZIP"
+# ── 3. 出厂数据（默认脱敏骨架）──────────────────────────────
+# 铁律：装进 exe 的 data 必须是干净的。真实 .env / 技能库 / 个人知识库
+# 只允许落在使用者自己的 %APPDATA%\CHATÈS\data 里，不进分发包。
+#
+# 以前这里无条件解 hermes-win-data/data.zip（52MB，含 142 条真凭据），
+# win.8 就是这么带出去的。现在默认 data-skeleton，真数据要显式 opt-in。
+DATA_MODE="${CHATES_DATA_MODE:-skeleton}"
+say "data mode = $DATA_MODE"
 TMPD="$(mktemp -d)"
-unzip -q "$DATA_ZIP" -d "$TMPD" 2>/dev/null || unzip -q "$DATA_ZIP" -d "$TMPD"
-if [ -d "$TMPD/data" ]; then SRC="$TMPD/data"; else SRC="$TMPD"; fi
-cp -a "$SRC"/. "$OUT/data"/
+case "$DATA_MODE" in
+  skeleton)
+    [ -d "$BUILD/data-skeleton" ] || die "缺 data-skeleton（跑 release-tools/make-data-skeleton.py）"
+    cp -a "$BUILD/data-skeleton"/. "$OUT/data/"
+    ;;
+  private)
+    # 只给自用构建。产物不能对外分发。
+    DATA_ZIP="${CHATES_PRIVATE_DATA:-$WS/hermes-win-data/data.zip}"
+    [ -f "$DATA_ZIP" ] || die "private 模式缺 $DATA_ZIP"
+    say "  !! private 模式：产物含真实凭据，禁止发布 !!"
+    unzip -q -o "$DATA_ZIP" -d "$TMPD" 2>/dev/null || unzip -q -o "$DATA_ZIP" -d "$TMPD"
+    if [ -d "$TMPD/data" ]; then SRC="$TMPD/data"; else SRC="$TMPD"; fi
+    cp -a "$SRC"/. "$OUT/data/"
+    ;;
+  *) die "CHATES_DATA_MODE 只能是 skeleton 或 private（收到 $DATA_MODE）" ;;
+esac
 rm -rf "$TMPD"
+
+# 凭据闸：不管哪种模式，暂存区的 data 都要过一遍。
+# 反向搜索真 .env 的每个值（≥8 字符），命中即失败——按 key 名单列不可靠，
+# 曾漏过 ROUTER_PWD / STUDENT_NAME / *_USER。
+REAL_ENV="${REAL_ENV:-/vol1/@apphome/hermes-agent/data/.env}"
+if [ -f "$REAL_ENV" ]; then
+  LEAK=0
+  while IFS= read -r line; do
+    case "$line" in \#*|"") continue ;; esac
+    v="${line#*=}"
+    [ ${#v} -lt 8 ] && continue
+    case "${v,,}" in
+      127.0.0.1|localhost|0.0.0.0|::1|true|false|none|null|auto|default|utf-8|utf8) continue ;;
+    esac
+    if grep -rqF -- "$v" "$OUT/data" 2>/dev/null; then
+      say "  泄漏: ${line%%=*}"
+      LEAK=$((LEAK+1))
+    fi
+  done < "$REAL_ENV"
+  [ "$LEAK" -eq 0 ] || die "暂存 data 有 $LEAK 条真凭据（模式 $DATA_MODE）"
+  say "  凭据闸通过（0 泄漏）"
+else
+  say "  --  $REAL_ENV 不存在，跳过反向搜索，只查 .env 存在性"
+fi
+
+# 分发包里不允许出现 .env 本体，只允许 .env.example
+if [ -f "$OUT/data/.env" ] && [ "$DATA_MODE" != "private" ]; then
+  die "分发包里出现了 .env（只许 .env.example）"
+fi
+
+# 环境指纹：姓名、域名、内网 IP、GitHub 账号
+for pat in "王瑞兵" "ruibing.wang" "192.168.3.110" "vector9584"; do
+  if grep -rqF -- "$pat" "$OUT/data" 2>/dev/null; then
+    die "暂存 data 命中环境指纹: $pat"
+  fi
+done
+say "  指纹闸通过"
 
 # ── 4. node 运行时 ─────────────────────────────────────────
 say "node runtime ..."

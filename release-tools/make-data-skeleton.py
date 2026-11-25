@@ -105,6 +105,24 @@ def looks_secret(key: str, val: str) -> bool:
     return False
 
 
+def looks_entropy(v: str) -> bool:
+    """这个值够不够「像凭据」，值得全文替换。
+
+    纯小写字母的短值是配置词不是密钥：FEISHU_DOMAIN=feishu 会把
+    `- feishu-platform` 洗成 `- [REDACTED]-platform`，把公开版的默认
+    配置弄坏。所以只有高熵形态才进替换名单，剩下的交给收尾复核去判。
+    """
+    if v.startswith(("http://", "https://")):
+        return True
+    if len(v) >= 12:
+        return True
+    if len(v) >= 8 and re.search(r"\d", v):
+        return True
+    if re.search(r"[\d!@#$%^&*_+=~]", v) and re.search(r"[A-Za-z]", v):
+        return True
+    return False
+
+
 def sanitize_env(src: Path, dst: Path, report: list[dict]) -> None:
     out_lines: list[str] = []
     for raw in src.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -226,6 +244,48 @@ def main() -> int:
         (dst / d).mkdir(exist_ok=True)
         (dst / d / ".gitkeep").write_text("")
 
+    # ---- 按值反搜：config.yaml / *.md 里也可能嵌着 .env 的真值 ----
+    # 2026-11-25 教训：按 key 名猜必漏。client_secret / app_id / account_id
+    # 都不在 SENSITIVE_KEY 或 sanitize_config 的正则里，QQ 的 client_secret
+    # 就这样明文进了骨架。改成拿真 .env 的每个值反搜产物，命中即替换——
+    # 这是唯一不依赖猜测的判据。
+    BENIGN = {
+        "localhost", "127.0.0.1", "0.0.0.0", "::1", "true", "false",
+        "none", "null", "auto", "default", "utf-8", "utf8",
+    }
+    secrets: list[str] = []
+    # 真值来源取并集：产物里的 .env 可能过期，线上运行的那份才是当前真相。
+    env_sources = [env_src, Path(os.environ.get("REAL_ENV", "/vol1/@apphome/hermes-agent/data/.env"))]
+    for es in env_sources:
+        if not es.is_file():
+            continue
+        for raw in es.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            v = line.split("=", 1)[1].strip().strip("\"'")
+            if len(v) >= 6 and v.lower() not in BENIGN and looks_entropy(v):
+                secrets.append(v)
+    # 长的先换：短值若是长值的子串，先换长的才不会留下半截
+    secrets = sorted(set(secrets), key=len, reverse=True)
+
+    scrubbed = 0
+    for f in dst.rglob("*"):
+        if not f.is_file() or f.suffix not in (".md", ".yaml", ".yml", ".example", ".json", ".txt", ""):
+            continue
+        try:
+            t = f.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        orig = t
+        for s in secrets:
+            if s in t:
+                scrubbed += t.count(s)
+                t = t.replace(s, REDACTED)
+        if t != orig:
+            f.write_text(t, encoding="utf-8")
+    print(f"  按值反搜: 替换 {scrubbed} 处（来自真 .env 的 {len(secrets)} 个值）")
+
     # ---- 环境指纹闸 ----
     # SSOT 文件（.env / AGENTS.md / SOUL.md）是用户的正本，不能改源。
     # 但它们里面天然带着个人域名、内网 IP、任务表入口——这些不该随公开包外发。
@@ -253,6 +313,38 @@ def main() -> int:
             f.write_text(t, encoding="utf-8")
     if hits:
         print(f"  环境指纹: 替换 {hits} 处（域名/内网IP/账号名）")
+
+    # ---- 收尾复核：全量反搜，剩余命中必须能解释 ----
+    # 只承认「纯小写字母的配置词」为良性（feishu / websocket / discord 这类）。
+    # 其余任何残留都算泄漏，直接退出 1 —— 宁可构建失败，也不带凭据出厂。
+    WORDLIKE = re.compile(r"^[a-z][a-z0-9_-]{0,15}$")
+    residual: list[tuple[str, str]] = []
+    for es in env_sources:
+        if not es.is_file():
+            continue
+        for raw in es.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            v = v.strip().strip("\"'")
+            if len(v) < 6 or v.lower() in BENIGN or WORDLIKE.match(v):
+                continue
+            for f in dst.rglob("*"):
+                if not f.is_file() or f.suffix not in (".md", ".yaml", ".yml", ".example", ".json", ".txt", ""):
+                    continue
+                try:
+                    if v in f.read_text(encoding="utf-8", errors="replace"):
+                        residual.append((k, f.name))
+                        break
+                except Exception:
+                    continue
+    if residual:
+        print(f"\n  !! 收尾复核发现 {len(residual)} 条残留：", file=sys.stderr)
+        for k, f in residual[:20]:
+            print(f"     {k} 仍在 {f}", file=sys.stderr)
+        return 1
+    print("  收尾复核: 0 残留")
 
     # 复核报告（不进仓库）
     rep = root / ".skeleton-report"
