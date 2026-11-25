@@ -2,12 +2,10 @@ name: release
 
 # 一条流水线同时出 fpk（fnOS）和 exe（Windows），都传同一个 Release。
 #
-# 为什么不在本机构建：本机是 fnOS 容器，出不了 Windows NSIS 安装包；
-# 而且本机产物不可复现。CI runner 上从源码现场重建，产物有 hash、可重跑。
-#
-# 触发方式：
-#   - push tag v*   -> 全自动发布
-#   - 手动 dispatch  -> 可只跑校验（dry=true）
+# 内核 hermes-src 不在 git 里（85MB / 3231 文件，被 .gitignore 排除）。
+# 它作为资产挂在 tag=kernel 的 prerelease 上，这里下载解压。
+# 为什么这么做：内核是上游代码快照，塞进 git 会让每次 clone 多搬 29MB，
+# 而且它跟本仓的改动节奏不同步。用 Release 资产 = 有版本、有 hash、可按需换。
 
 on:
   push:
@@ -69,6 +67,22 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: 取内核
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download kernel -p 'hermes-src.tgz' -D /tmp/k
+          mkdir -p app
+          tar xzf /tmp/k/hermes-src.tgz -C app
+          # tgz 内层可能是 hermes-src/ 也可能是散开的，两种都认
+          if [ ! -d app/hermes-src ]; then
+            cand=$(find app -maxdepth 2 -name pyproject.toml -printf '%h\n' | head -1)
+            [ -n "$cand" ] && mv "$cand" app/hermes-src
+          fi
+          [ -d app/hermes-src ] || { echo "::error::内核解压后找不到 app/hermes-src"; ls -R app | head -30; exit 1; }
+          echo "内核文件数: $(find app/hermes-src -type f | wc -l)"
+
       - name: 构建 fpk
         run: |
           set -euo pipefail
@@ -96,8 +110,26 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: 取内核
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download kernel -p 'hermes-src.tgz' -D /tmp/k
+          mkdir -p app
+          tar xzf /tmp/k/hermes-src.tgz -C app
+          if [ ! -d app/hermes-src ]; then
+            cand=$(find app -maxdepth 2 -name pyproject.toml -printf '%h\n' | head -1)
+            [ -n "$cand" ] && mv "$cand" app/hermes-src
+          fi
+          [ -d app/hermes-src ] || { echo "::error::内核解压后找不到 app/hermes-src"; exit 1; }
+          echo "内核文件数: $(find app/hermes-src -type f | wc -l)"
+
       - name: 构建 NSIS 安装包
         shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           set -euo pipefail
           bash release-tools/build-exe.sh --tag "${{ needs.gate.outputs.tag }}"
