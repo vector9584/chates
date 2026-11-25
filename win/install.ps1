@@ -172,7 +172,7 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyCon
   Where-Object { $_.CommandLine -like "*HermesWin*monitor.js*" } |
   ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
 Start-Sleep -Seconds 1
-Start-Process -FilePath $panelBat -WindowStyle Hidden
+& schtasks /Run /TN "HermesCustomPanel" 2>&1 | Out-Null
 Start-Sleep -Seconds 8
 try {
   $r = Invoke-WebRequest -Uri "http://127.0.0.1:8650/" -UseBasicParsing -TimeoutSec 10

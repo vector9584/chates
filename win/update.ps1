@@ -97,7 +97,7 @@ Set-Content -Path (Join-Path $App "server\package.json") -Value '{"type":"module
 $sitePkgs = Join-Path $Venv "Lib\site-packages"
 if(Test-Path $sitePkgs){ Set-Content -Path (Join-Path $sitePkgs "hermes_root.pth") -Value $Kernel -Encoding ascii -NoNewline }
 
-Start-Process -FilePath (Join-Path $Root "启动面板.bat") -WindowStyle Hidden
+& schtasks /Run /TN "HermesCustomPanel" 2>&1 | Out-Null
 Start-Sleep -Seconds 8
 try { $r = Invoke-WebRequest -Uri "http://127.0.0.1:8650/" -UseBasicParsing -TimeoutSec 10; Say ("panel back: HTTP " + $r.StatusCode) }
 catch { Warn ("panel check: " + $_.Exception.Message) }
