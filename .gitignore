@@ -8,6 +8,8 @@ win/data.zip
 electron/resources/
 electron/dist/
 electron/node_modules/
+node_modules/
+tests-js/node_modules/
 dist/
 build/
 .skeleton-report
