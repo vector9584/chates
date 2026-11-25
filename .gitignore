@@ -1,3 +1,17 @@
 win/data-stage/
 win/data.zip
 *.zip
+
+# ---- 构建产物（2026-11-25 发布链）----
+# electron/resources 是本机组装的 516MB 资源树（内核/python/node），
+# CI 每次现场重建，绝不进 git。误 git add -A 会把仓库撑爆。
+electron/resources/
+electron/dist/
+electron/node_modules/
+dist/
+build/
+.skeleton-report
+kernel/*.fpk
+__pycache__/
+*.pyc
+.pytest_cache/

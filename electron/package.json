@@ -1,0 +1,76 @@
+{
+  "name": "chates-desktop",
+  "version": "0.20.8",
+  "productName": "CHATÈS",
+  "description": "CHATÈS — 本地 AI 助手桌面应用",
+  "author": "vector9584",
+  "license": "MIT",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "32.3.3",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "wang.ruibing.chates",
+    "productName": "CHATÈS",
+    "copyright": "Copyright © 2026 vector9584",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html",
+      "package.json",
+      "!resources/**",
+      "!dist/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/chates",
+        "to": "chates",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!**/node_modules/.cache/**"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "CHATES-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CHATÈS",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "include": "build/installer.nsh"
+    },
+    "compression": "maximum",
+    "asar": true,
+    "asarUnpack": []
+  }
+}

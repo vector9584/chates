@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CHATÈS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(120% 100% at 50% 0%, #12203a 0%, #0b1220 55%, #070c15 100%);
+    color: #dbe7f5;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px;
+    -webkit-user-select: none; user-select: none;
+    overflow: hidden;
+  }
+  .whale { font-size: 44px; line-height: 1; animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+  .brand { font-size: 22px; letter-spacing: .34em; font-weight: 300; color: #8fd0ff; text-indent: .34em; }
+  .msg { font-size: 13px; color: #6f8399; letter-spacing: .06em; min-height: 18px; }
+  .bar { width: 220px; height: 3px; border-radius: 2px; background: #1b2a3f; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 38%; border-radius: 2px;
+    background: linear-gradient(90deg, #2f7fd8, #66c2ff);
+    animation: slide 1.5s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(320%); } }
+</style>
+</head>
+<body>
+  <div class="whale">🐋</div>
+  <div class="brand">CHATES</div>
+  <div class="bar"><i></i></div>
+  <div class="msg" id="msg">正在启动面板…</div>
+  <script>
+    // 只做一句人话的轮换，不假装知道真实进度（假进度条比没有更让人着急）
+    const steps = ["正在启动面板…", "正在读取配置…", "正在加载知识库…", "马上就好…"];
+    let i = 0;
+    setInterval(() => {
+      i = (i + 1) % steps.length;
+      const el = document.getElementById("msg");
+      if (el) el.textContent = steps[i];
+    }, 2600);
+  </script>
+</body>
+</html>
