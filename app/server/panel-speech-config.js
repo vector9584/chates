@@ -18,7 +18,7 @@ export function createSpeechConfigHandler({python,serverRoot,getConfig,lockRoot,
    const body=isTest?{...await req.json(),action:'test'}:(req.method==='GET'?{action:'read'}:{...await req.json(),action:'update'});
    const serialized=JSON.stringify(body);if(serialized.length>128000)return reply({ok:false,error:'语音配置内容过大'},413);
    return await new Promise(resolve=>{
-    const child=start(python,['-B',join(serverRoot,'panel-speech-config.py'),getConfig(),lockRoot],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});let output='',settled=false;
+    const child=start(python,['-B',join(serverRoot,'panel-speech-config.py'),getConfig(),lockRoot],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',settled=false;
     const finish=(data,status)=>{if(settled)return;settled=true;clearTimeout(timer);resolve(reply(data,status));};
     const timer=setTimeout(()=>{child.kill('SIGTERM');finish({ok:false,error:'实测超时，提供方可能挂住；配置读写本身正常'},504);},budget);
     child.stdout.on('data',chunk=>{output+=chunk;if(output.length>1024*1024){child.kill('SIGTERM');finish({ok:false,error:'配置返回内容过大'},502);}});child.stderr.resume();child.stdin.on('error',()=>{});

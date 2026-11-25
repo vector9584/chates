@@ -13,8 +13,6 @@
  *    data/.vault-trash.jsonl（0600，保留最近 200 条），删错了能捞回来。删除要二级授权。
  */
 import * as fs from 'node:fs';
-// 写字符串一律 utf8（Windows 省略 encoding 会按 GBK 写）。见 panel-fs-utf8.js。
-import {writeFileSync as _writeUtf8, appendFileSync as _appendUtf8} from './panel-fs-utf8.js';
 import {join} from 'node:path';
 import {randomBytes,scryptSync,timingSafeEqual} from 'node:crypto';
 import {stateError} from './panel-state.js';
@@ -103,7 +101,7 @@ function removeEnvKey(text, key) {
 
 function audit(file, row) {
   try {
-    _appendUtf8(file, JSON.stringify(row) + '\n', { mode: 0o600 });
+    fs.appendFileSync(file, JSON.stringify(row) + '\n', { mode: 0o600 });
   } catch (_) { /* 审计失败不阻断写操作，但要能看出来 */ }
 }
 
@@ -149,7 +147,7 @@ export function createArchiveVault({ dataDir, checkToken, python, serverRoot, st
   }
   const writeAuth = data => {
     const temp = authFile + '.tmp';
-    _writeUtf8(temp, JSON.stringify(data), { mode: 0o600 });
+    fs.writeFileSync(temp, JSON.stringify(data), { mode: 0o600 });
     fs.renameSync(temp, authFile);
   };
 
@@ -188,7 +186,7 @@ export function createArchiveVault({ dataDir, checkToken, python, serverRoot, st
   }
   function writeCats(map) {
     const temp = catsFile + '.tmp';
-    _writeUtf8(temp, JSON.stringify(map, null, 0), { mode: 0o600 });
+    fs.writeFileSync(temp, JSON.stringify(map, null, 0), { mode: 0o600 });
     fs.renameSync(temp, catsFile);
   }
   /* 分类名：允许中文/字母/数字/短横，去掉控制字符，最长 12 个字。
@@ -386,7 +384,7 @@ export function createArchiveVault({ dataDir, checkToken, python, serverRoot, st
           const old = fs.existsSync(trashFile)
             ? fs.readFileSync(trashFile, 'utf8').trim().split('\n').filter(Boolean) : [];
           const keep = old.concat([JSON.stringify({ at: Date.now(), key, raw: cut.removed, value: cut.value })]).slice(-200);
-          _writeUtf8(trashFile, keep.join('\n') + '\n', { mode: 0o600 });
+          fs.writeFileSync(trashFile, keep.join('\n') + '\n', { mode: 0o600 });
         } catch (_) { /* 回收失败不阻断删除；审计里仍有这一条 */ }
         rw.write(cut.text);
         /* 键没了，人工分类也跟着删；留着会在同名键重建时冒出旧标签 */

@@ -8,11 +8,8 @@
 
 import { spawn, spawnSync } from "child_process";
 import {
-  readFileSync, unlinkSync, existsSync, mkdirSync, statSync, readdirSync, copyFileSync,
+  writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, readdirSync, copyFileSync, appendFileSync,
 } from "fs";
-// 写字符串一律 utf8：Windows 省略 encoding 会按 GBK 写，中文内容会静默损坏。
-// 本文件写知识库、每日记忆、SKILL.md 等中文文件，必须走这里。
-import {writeFileSync, appendFileSync} from "./panel-fs-utf8.js";
 import { randomBytes } from "crypto";
 import { resolve as resolvePath } from "path";
 import { Readable } from "stream";
@@ -33,6 +30,10 @@ const HERMES_CONFIG  = `${DATA_DIR}/config.yaml`;
 const HERMES_ENV     = `${DATA_DIR}/.env`;
 const CONFIG_VERSION = "1.0";
 
+// 站内问题反馈收件箱。落 DATA_DIR 而不是 VAR_DIR——VAR_DIR 在运行目录下，
+// fpk 升级会整目录覆盖，用户提交的问题会跟着消失。
+const ISSUE_STORE = createIssueStore({ home: DATA_DIR });
+
 const GITHUB_REPO     = process.env.GITHUB_REPO  || "veenyi/fnos-hermes-agent";
 const GITHUB_PAT_FILE = `${VAR_DIR}/github_pat`;
 
@@ -41,11 +42,6 @@ const WHATSAPP_SESSION_DIR    = `${DATA_DIR}/whatsapp/session`;
 const WHATSAPP_ONBOARDING_TTL = 600000; // 10 分钟（与官方一致）
 
 const log = (...args) => { try { console.log("[custom]", ...args); } catch {} };
-
-// ─── 站内反馈收件箱实例 ───────────────────────────────────────────────────
-// 落在 DATA_DIR/var/issues/issues.jsonl。用 DATA_DIR 而不是 VAR_DIR：DATA_DIR 在
-// @apphome 里随应用数据走升级保留，VAR_DIR 是运行时目录，升级时可能被清。
-const ISSUE_STORE = createIssueStore({ home: DATA_DIR });
 
 function jsonHeaders(extra = {}) {
   return {
@@ -1361,7 +1357,7 @@ async function handleCustomRouteScoped(req) {
   if((path === '/api/flows' || path.startsWith('/api/flows/')) && req.method!=='GET')return new Response(JSON.stringify({ok:false,error:'请刷新面板后使用任务方案'}),{status:410,headers:jsonHeaders()});
   if(path === '/api/rooms' || path.startsWith('/api/rooms/'))return new Response(JSON.stringify({ok:false,error:'请刷新面板后使用专家讨论'}),{status:410,headers:jsonHeaders()});
 
-// ── 站内反馈（issue 收件箱，不需要 GitHub 账号）──
+  // ── 站内问题反馈（免 GitHub 登录，落本地 JSONL 收件箱） ──
   if (path === "/api/issue/taxonomy" && method === "GET") {
     return new Response(JSON.stringify({ ok: true, taxonomy: ISSUE_TAXONOMY }), { headers: jsonHeaders() });
   }
@@ -1369,17 +1365,19 @@ async function handleCustomRouteScoped(req) {
     try {
       const body = await req.json();
       const r = ISSUE_STORE.submit(body);
-      return new Response(JSON.stringify(r), { status: r.ok ? 200 : (r.status || 400), headers: jsonHeaders() });
+      if (!r.ok) return new Response(JSON.stringify(r), { status: 400, headers: jsonHeaders() });
+      return new Response(JSON.stringify(r), { headers: jsonHeaders() });
     } catch (e) {
-      return new Response(JSON.stringify({ ok: false, error: "提交内容格式有误" }), { status: 400, headers: jsonHeaders() });
+      return new Response(JSON.stringify({ ok: false, error: e?.message || "bad request" }), { status: 400, headers: jsonHeaders() });
     }
   }
   if (path === "/api/issue/summary" && method === "GET") {
-    try {
-      return new Response(JSON.stringify({ ok: true, ...ISSUE_STORE.summary() }), { headers: jsonHeaders() });
-    } catch (e) {
-      return new Response(JSON.stringify({ ok: false, error: "反馈收件箱读取失败" }), { status: 500, headers: jsonHeaders() });
-    }
+    return new Response(JSON.stringify({ ok: true, ...ISSUE_STORE.summary() }), { headers: jsonHeaders() });
+  }
+  if (path === "/api/issue/list" && method === "GET") {
+    const { items, skipped } = ISSUE_STORE.list();
+    const n = Number(url.searchParams.get("limit") || 100);
+    return new Response(JSON.stringify({ ok: true, skipped, items: items.slice(0, n) }), { headers: jsonHeaders() });
   }
 
   // ── 本地已安装技能枚举 ──

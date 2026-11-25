@@ -1,6 +1,4 @@
-import {mkdtempSync,readFileSync,rmSync,statSync} from 'node:fs';
-// 写字符串一律 utf8：Windows 省略 encoding 会按 GBK 写。
-import {writeFileSync} from './panel-fs-utf8.js';
+import {mkdtempSync,writeFileSync,readFileSync,rmSync,statSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {runSpeechProcess} from './panel-speech-process.js';

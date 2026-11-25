@@ -39,7 +39,7 @@ export function createCronUpdateHandler({python, serverRoot, nativeRoot, backupR
       if (Buffer.byteLength(serialized) > 256 * 1024) return reply({ok: false, error: '任务设定超过 256 KB'}, 413);
       return await new Promise(resolve => {
         const child = start(python, ['-B', join(serverRoot, 'panel-cron.py'), getHome(), nativeRoot, backupRoot],
-          {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8'}});
+          {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, PYTHONDONTWRITEBYTECODE: '1'}});
         let output = '', settled = false;
         const finish = (body, status) => { if (settled) return; settled = true; clearTimeout(timer); resolve(reply(body, status)); };
         const timer = setTimeout(() => {

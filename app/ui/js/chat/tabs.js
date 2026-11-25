@@ -145,7 +145,11 @@ function openTabCore(sid) {
 /* 切换激活标签：流式后台继续（并行多会话）。切换前保存当前 chatBody → _chatHTML[currentSession]，切回时仍优先用缓存（流式最新） */
 function switchTabCore(sid) {
   if (!sid) return;
-  if (sid === currentSession) {
+  /* 通道会话返回修复（2026-11-25）：从「通道会话只读预览」点回面板自己的会话时，
+     打开通道会话并没有改 currentSession，于是这里 sid===currentSession 成立、
+     直接 return，updateHeader() 不执行 —— 顶部标题就卡在「xxx 通道会话」不动。
+     判据是 _channelViewActive：通道视图下不算「已在当前会话」，必须走完整流程刷标题。 */
+  if (sid === currentSession && !_channelViewActive) {
     /* 点左树上的当前会话（2026-11-16 修）：原本这里直接 return，
        画板会话在对话视图下点它毫无反应，看着像功能没生效。
        是画板就把呈现切回画布，别的什么都不动。 */
@@ -188,6 +192,14 @@ function switchTabCore(sid) {
   }
   saveDraft(currentSession, true);   // 切换只抓取实际内容，不把尚未加载的默认选项当编辑
   currentSession = sid;
+  /* 通道会话返回修复（2026-11-25）：从只读预览点回面板会话时，把通道视图的痕迹一起收掉，
+     否则顶部「返回」按钮和隐藏的输入框会跟着残留，看着像还在通道里。 */
+  if (_channelViewActive) {
+    _channelViewActive = false;
+    var _rb2 = document.getElementById('chReturnBtn'); if(_rb2) _rb2.style.display = 'none';
+    var _cmp = document.getElementById('chatComposer'); if(_cmp) _cmp.hidden = false;
+    window.dispatchEvent(new Event('panel-session-changed'));
+  }
   /* 2026-11-20 修闪动：以前这里对「旧会话」调用 scrollChatToBottom()，紧接着内容被换掉，
      浏览器来不及画就被覆盖；真正让画面上下跳的是下一步的清空。这里只打开跟随，不动 DOM。 */
   _follow = true;
@@ -475,8 +487,9 @@ function renderRailChannels(){
   chIds.forEach(function(chId){
     var sessions = chGroups[chId];
     var def = (_chState.defs && _chState.defs[chId]) || {};
-    var chName = def.name || chId;
-    var chIcon = def.icon || '📨';
+    var lbl = (_chGroupLabels && _chGroupLabels[chId]) || {};
+    var chName = def.name || lbl.name || chId;
+    var chIcon = def.icon || lbl.icon || '📨';
     // 树目录统一模板：与文件夹组共用同一套箭头/动画/热区/缩进/记忆
     var kids = sessions.length ? sessions.slice(0,20).map(function(s){
       var title = (s.title && s.title!=='未命名会话') ? s.title : '新会话';
@@ -493,6 +506,7 @@ function renderRailChannels(){
   box.classList.add('has');
 }
 var _channelSessions = null;
+var _chGroupLabels = {};
 /* 侧栏内联筛选：只动 display，不重建 DOM，所以输入框不丢焦点。
    文件夹名命中时，其下所有会话一并放行。 */
 window.pwRailFilter = function(q){
@@ -587,7 +601,7 @@ function exitChannelView(){
 function fetchChannelSessions(){
   if(_authWallShown) return;   // 授权失效后停掉 30 秒轮询，别对着 401 空转
   apiGet('/api/channel-sessions').then(function(res){
-    if(res && res.ok && res.groups){ _channelSessions = res.groups; renderRail(); }
+    if(res && res.ok && res.groups){ _channelSessions = res.groups; _chGroupLabels = res.labels || {}; renderRail(); }
   }).catch(function(){});
 }
 function toggleChannelGroup(chId){

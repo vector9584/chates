@@ -4,9 +4,7 @@ import {lookup} from 'node:dns/promises';
 import {request as httpRequest} from 'node:http';
 import {request as httpsRequest} from 'node:https';
 import {isIP} from 'node:net';
-import {readFileSync,mkdirSync,renameSync} from 'node:fs';
-// 模型名/别名可能是中文；统一走 utf8 包装，别靠调用点显式传 encoding
-import {writeFileSync} from './panel-fs-utf8.js';
+import {readFileSync,writeFileSync,mkdirSync,renameSync} from 'node:fs';
 import {createModelSource} from './panel-model-checks.js';
 function privateIPv4(address){
  if(isIP(address)!==4)return false;
@@ -271,7 +269,7 @@ export function createModelsService({python,serverRoot,getConfig,state,varRoot,c
  }
  async function execute(body){
   const result=await new Promise(resolve=>{
-   const child=start(python,['-B',join(serverRoot,'panel-models.py'),getConfig(),state,...(varRoot?[varRoot]:[])],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});let output='',done=false;
+   const child=start(python,['-B',join(serverRoot,'panel-models.py'),getConfig(),state,...(varRoot?[varRoot]:[])],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',done=false;
    const finish=data=>{if(done)return;done=true;clearTimeout(timer);resolve(data);};
    /* 2026-11-23：能力批量探测要真发请求（思考强度那一项 single 就要 40~100 秒），
       15 秒的固定窗口会把它砍成 504「模型配置处理超时」，用户看到的是超时而不是结果。

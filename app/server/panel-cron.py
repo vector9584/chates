@@ -1,28 +1,5 @@
 import contextlib
-try:import fcntl
-except ImportError:fcntl=None
-
-def _winflock(fd, mode):
-    """Windows 上 fcntl 不存在，用 msvcrt.locking 做等价的独占/共享锁。
-    mode 为 None 表示解锁；带 LOCK_NB 语义：拿不到就抛 BlockingIOError 让调用方重试。"""
-    import msvcrt, time as _t, os as _os
-    if mode is None:
-        try:
-            _os.lseek(fd, 0, _os.SEEK_SET); msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-        except OSError:
-            pass
-        return
-    nonblock = bool(mode & 4)   # LOCK_NB
-    deadline = _t.monotonic() + (0 if nonblock else 30)
-    while True:
-        try:
-            _os.lseek(fd, 0, _os.SEEK_SET)
-            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-            return
-        except OSError:
-            if _t.monotonic() >= deadline:
-                raise BlockingIOError('lock busy')
-            _t.sleep(0.05)
+import fcntl
 import hashlib
 import json
 import os
@@ -67,7 +44,7 @@ def execute(request, home, native_root, backup_root):
             deadline = time.monotonic() + 8
             while True:
                 try:
-                    (_winflock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB) if fcntl is None else fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB))
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
                 except BlockingIOError:
                     if time.monotonic() >= deadline:
@@ -78,7 +55,7 @@ def execute(request, home, native_root, backup_root):
                 yield
             finally:
                 depth = 0
-                (None if fcntl is None else fcntl.flock(handle, fcntl.LOCK_UN))
+                fcntl.flock(handle, fcntl.LOCK_UN)
 
     native._jobs_lock = strict_lock
     action = request.get('action')

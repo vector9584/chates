@@ -34,6 +34,38 @@ function setBrandConnection(state,label){
    有未提交改动时药丸带一个 * ；标题里给全 sha / 时间 / 提交说明；点一下复制全号。
    为什么不用匿名 GitHub API：NAS 出口 IP 是共享的，60 次/小时早被别的活吃光——今天实测就撞了 403，
    药丸一直挂在「--」上，比不显示还糟。 */
+function applyPanelVerGh(d){
+  var el=document.getElementById('brandVerGh'); if(!el) return;
+  if(!d||!d.tag){ el.style.display='none'; return; }
+  el.textContent=d.tag;
+  var full='GitHub 发布版 '+d.tag;
+  if(d.date) full+='\n'+String(d.date).replace('T',' ').slice(0,16);
+  if(d.name) full+='\n'+d.name;
+  el.title=full;
+  el.style.display='';
+  el.onclick=function(){
+    var t=d.tag||'';
+    if(!t) return;
+    try{ navigator.clipboard.writeText(t); if(window.ui&&ui.toast) ui.toast('已复制 '+t); }
+    catch(e){}
+  };
+}
+/* GitHub 版标记：只有真的从 GitHub 发布版跑起来时才显示。
+   NAS 开发机上两个标都有（Gitea 提交号 + GitHub 版本），别人装 exe 只看到 GitHub 那个。
+   为什么不硬编码：同一个 index.html 要同时服务两边，写死了 NAS 上会显示假版本。 */
+function loadGitHubVersion(){
+  var el=document.getElementById('brandVerGh'); if(!el) return;
+  fetch('api/update/current',{cache:'no-store'}).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(j){
+    if(!j||!j.ok||!j.tag) throw new Error('no tag');
+    applyPanelVerGh(j);
+  }).catch(function(){ el.style.display='none'; });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(loadGitHubVersion,1100); });
+else setTimeout(loadGitHubVersion,1100);
+
 function applyPanelVer(d){
   var el=document.getElementById('brandVer'); if(!el) return;
   el.textContent=(d.sha||'--')+(d.changes?'*':'');

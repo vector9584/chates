@@ -4,6 +4,10 @@
 //   - 不缓存到磁盘，每次现查；Release API 匿名 60 次/小时足够面板按钮用
 //   - 网络不通就返回 ok:false + 原因，不抛异常、不阻塞面板其他功能
 
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from 'node:fs';
+
 const REPO = 'vector9584/chates';
 const API = [
   `https://api.github.com/repos/${REPO}/releases/latest`,
@@ -25,6 +29,32 @@ function verParts(v) {
     .split(/[^0-9]+/)
     .filter(Boolean)
     .map(Number);
+}
+
+// 读本机已安装版本的元信息。
+// 发布版会在应用根目录带 version.json（我们打 exe/fpk 时写进去的），
+// 其内容形如 {"tag":"v0.20.0-win.9","date":"2026-11-25T...","name":"..."}。
+// 没有这个文件说明是开发检出，直接返回 null，面板就不显示 GitHub 版标记。
+function readInstalledVersion() {
+  const roots = [
+    process.env.CHATES_APP_ROOT,
+    join(fileURLToPath(new URL('..', import.meta.url)), '..'),
+  ].filter(Boolean);
+  for (const root of roots) {
+    for (const name of ['version.json', 'app/version.json']) {
+      try {
+        const p = join(root, name);
+        if (!existsSync(p)) continue;
+        const j = JSON.parse(readFileSync(p, 'utf8'));
+        const tag = j.tag || j.version || '';
+        if (!tag) continue;
+        return { tag, date: j.date || j.published || '', name: j.name || '' };
+      } catch {
+        /* 换下一个候选 */
+      }
+    }
+  }
+  return null;
 }
 
 export function compareVersion(a, b) {
@@ -99,6 +129,18 @@ export function createUpdateHandler({ currentVersion, platform }) {
         assets: picked.length ? picked : rel.assets,
         pickup: picked.length ? 'matched' : 'none_for_platform',
       });
+    }
+
+    // GET /api/update/current —— 当前这份代码的发布版本（不联网，本地读）
+    // 面板拿它渲染 GitHub 版标记：装的是发布版就显示 tag，跑源码开发就不显示。
+    if (req.method === 'GET' && path === '/api/update/current') {
+      try {
+        const info = readInstalledVersion();
+        if (!info || !info.tag) return json({ ok: false, error: 'not_a_release' });
+        return json({ ok: true, ...info });
+      } catch (e) {
+        return json({ ok: false, error: e?.message || 'unreadable' });
+      }
     }
 
     // GET /api/update/releases —— 最近几版，便于手动翻

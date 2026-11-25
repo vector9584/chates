@@ -6,7 +6,7 @@ import {StateFile, safeId, stateError} from './panel-state.js';
 const PROMPT='Reply with exactly HERMES_OK and nothing else.';
 export function createModelSource({python,serverRoot,getConfig,varRoot,start=spawn}){
  return body=>new Promise((resolve,reject)=>{
-  const child=start(python,['-B',join(serverRoot,'panel-model-source.py'),getConfig(),varRoot],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});
+  const child=start(python,['-B',join(serverRoot,'panel-model-source.py'),getConfig(),varRoot],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
   let output='',settled=false;
   const finish=(error,result)=>{if(settled)return;settled=true;clearTimeout(timer);if(error)reject(error);else resolve(result);};
   const timer=setTimeout(()=>{child.kill('SIGTERM');finish(stateError('读取模型配置超时',504));},10000);

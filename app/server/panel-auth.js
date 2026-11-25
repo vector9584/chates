@@ -1,7 +1,5 @@
 import {createHash,randomBytes,timingSafeEqual} from 'node:crypto';
-import {statSync,renameSync} from 'node:fs';
-// 调试日志里有 UA / origin / path，可能是中文；Windows 省略 encoding 会用 GBK 写坏
-import {appendFileSync} from './panel-fs-utf8.js';
+import {appendFileSync,statSync,renameSync} from 'node:fs';
 import {StateFile,stateError} from './panel-state.js';
 
 const COOKIE='hermes_panel_device';
@@ -57,10 +55,13 @@ function localSource(context){
  // 局域网 192.168.x 仍照旧放行。
  if(!raw)return true;
  if(raw==='unix')return true;
- // 2026-11-25 Windows 本地部署：没有 fnOS gateway 的 unix socket，浏览器只能走 127.0.0.1:8650。
- // 原来 loopback 一律拒绝，导致 bootstrap 永远 401、生成授权码又要先登录 —— 死锁。
- // 只有在「纯 TCP 且监听 loopback 的独立部署」下才信 loopback，公网隧道场景靠 ALLOW_LOOPBACK_TRUST 关掉。
- if(raw==='::1'||raw==='127.0.0.1')return process.env.HERMES_PANEL_TRUST_LOOPBACK==='1';
+ // 2026-11-25：独立桌面版（Electron/Windows 双击即用）没有任何隧道，
+ // 8650 只 bind 127.0.0.1，对端必然是本机用户本人。那种部署下死守「127.0.0.1 不可信」
+ // 会让 /api/panel-auth/bootstrap 恒 401，而生成设备授权码又必须先登录 —— 死锁，应用直接不可用。
+ // 所以给一个显式开关，由独立版壳在 spawn 子进程时设 1；
+ // fpk/生产环境不设这个变量，行为与 2026-11-17 的决定完全一致（frp 隧道仍被拒）。
+ const trustLoopback=process.env.HERMES_PANEL_TRUST_LOOPBACK==='1';
+ if(raw==='::1'||raw==='127.0.0.1')return trustLoopback;
  return /^10\./.test(raw)||/^192\.168\./.test(raw)||/^172\.(1[6-9]|2\d|3[01])\./.test(raw);
 }
 export function panelPath(url,base='') {let path=new URL(url).pathname;if(base&&path.startsWith(base+'/'))path=path.slice(base.length);else if(path===base)path='/';return path;}

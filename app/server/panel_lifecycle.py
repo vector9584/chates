@@ -3,14 +3,7 @@
 Serialize lifecycle commands with flock; match exact executable/script and
 start ticks before every signal. All bookkeeping is confined to application VAR.
 """
-import http.client,json,os,signal,socket,stat,struct,subprocess,sys,time
-try:import fcntl
-except ImportError:fcntl=None
-try:import pwd
-except ImportError:
- class _PwdStub:
-  def getpwuid(self,uid):raise KeyError(uid)
- pwd=_PwdStub()
+import fcntl,http.client,json,os,pwd,signal,socket,stat,struct,subprocess,sys,time
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'python'))
@@ -214,7 +207,6 @@ class Lifecycle:
 if __name__=='__main__':
  try:
   action,app,home,var,node=sys.argv[1:];lifecycle=Lifecycle(app,home,var,node)
-  if os.name=='nt':raise LifecycleError('Windows 上生命周期由计划任务管理')
   owner=lifecycle.app.stat()
   if os.geteuid()==0 and owner.st_uid!=0:
    account=pwd.getpwuid(owner.st_uid);os.initgroups(account.pw_name,owner.st_gid);os.setgid(owner.st_gid);os.setuid(owner.st_uid)
@@ -225,6 +217,6 @@ if __name__=='__main__':
   stop_targets=lifecycle.capture_stop() if action=='stop' else None
   fd=os.open(lifecycle.var/'lifecycle.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
   with os.fdopen(fd,'r+') as lock:
-   (None if fcntl is None else fcntl.flock(lock,fcntl.LOCK_EX));print(json.dumps(lifecycle.stop(stop_targets) if action=='stop' else lifecycle.start(),ensure_ascii=False))
+   fcntl.flock(lock,fcntl.LOCK_EX);print(json.dumps(lifecycle.stop(stop_targets) if action=='stop' else lifecycle.start(),ensure_ascii=False))
  except LifecycleError as error:print(json.dumps({'ok':False,'error':str(error)},ensure_ascii=False));sys.exit(1)
  except Exception:print(json.dumps({'ok':False,'error':'生命周期操作失败，请检查应用目录权限和日志'},ensure_ascii=False));sys.exit(1)

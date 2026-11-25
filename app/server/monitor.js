@@ -5,15 +5,12 @@ import {createServiceProcesses} from './panel-service-process.js';
 import {createRestartIngress} from './panel-restart-ingress.js';
 import {createChannelRuntime} from './panel-channel-runtime.js';
 import {inspectServicePortConflicts} from './panel-process-guard.js';
+import {createUpdateHandler} from './panel-update.js';
 // Hermes Agent 监控服务 — 基于 Node.js 的 HTTP 服务（Unix Socket），WebSocket 由 ws 库提供
 import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync as _writeFileSyncRaw, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync as _appendFileSyncRaw, renameSync } from "fs";
-// 强制 utf8 写：Windows 上省略 encoding 会用 CP936(GBK)，中文文件全写坏。
-// 说明见 panel-fs-utf8.js 顶部（auth.json 损坏 → 面板 503 → 启动超时的全过程）。
-import {writeFileSync, appendFileSync} from "./panel-fs-utf8.js";
-void _writeFileSyncRaw; void _appendFileSyncRaw;
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync, renameSync } from "fs";
 import { randomBytes, createHash } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
@@ -36,7 +33,6 @@ import { createCronHistoryHandler } from "./panel-cron-history.js";
 import { ModelChecks, createModelSource, createModelChecksHandler } from "./panel-model-checks.js";
 import {LibraryReviews,createLibraryReviewHandler} from './panel-library-reviews.js';
 import {LibraryStore,createLibraryHandler} from './panel-library.js';
-import {createUpdateHandler} from './panel-update.js';
 import {createLibrarySources} from './panel-library-sources.js';
 import {createArchiveVault} from './panel-archive.js';
 import {PlanStore,createPlanHandler,createPlanLaunch} from './panel-plans.js';
@@ -143,13 +139,6 @@ function readAppVersion() {
     "/var/apps/hermes-agent/manifest",
     `${process.cwd()}/manifest`,
   ];
-  // Windows 安装器把版本写在 app/version.json（install.ps1），没有 manifest，这里补上
-  for (const jf of [`${APP_DIR}/version.json`, `${APP_DIR}/../version.json`]) {
-    try {
-      const j = JSON.parse(readFileSync(jf, "utf8"));
-      if (j && j.version) return String(j.version).trim();
-    } catch {}
-  }
   // 尝试从 monitor.js 位置向上推导（兼容 ESM 与不同安装路径）
   try {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -548,40 +537,26 @@ function formatUptime(ms) {
 
 const GATEWAY_PORT   = Number(process.env.GATEWAY_PORT || "8742");
 const UI_PORT        = Number(process.env.UI_PORT || "8650");
-// Windows 本地部署默认只监听 loopback：局域网打不开是刻意的，面板没有密码体系，
-// 靠 loopback + 设备 cookie 挡人。要给局域网用就显式设 UI_HOST=0.0.0.0，
-// 那时浏览器要先用 auth.json 里的设备 cookie，别裸奔。
-const UI_BIND        = process.env.UI_HOST || "127.0.0.1";
 const SOCKET_PATH    = (process.env.MONITOR_SOCKET_PATH || "").trim();
 // 未设置 socket 路径时降级为纯 TCP 模式（跨平台 / 独立部署用；飞牛上始终会设这个变量）
 const UNIX_MODE      = SOCKET_PATH.length > 0;
-// 纯 TCP 独立部署没有 fnos gateway 签名，loopback 就是「本机用户」，应直接放行，
-// 否则 /api/panel-auth/bootstrap 恒 401，而生成授权码又必须先登录 —— 死锁。
-// 走 frp / 公网隧道部署时对端也可能是 127.0.0.1，那种场景把 UI_HOST 设 0.0.0.0
-// 或显式 HERMES_PANEL_TRUST_LOOPBACK=0 关掉。
-if(!UNIX_MODE&&UI_BIND==="127.0.0.1"&&process.env.HERMES_PANEL_TRUST_LOOPBACK===undefined)process.env.HERMES_PANEL_TRUST_LOOPBACK="1";
 if (!UNIX_MODE) {
   console.warn("[WARN] MONITOR_SOCKET_PATH 未设置，进入纯 TCP 模式（UI_PORT 可直连，无 unix socket）");
 }
 const BASE_PATH      = (process.env.BASE_PATH || "").replace(/\/+$/, "");
 const DASHBOARD_PORT = Number(process.env.DASHBOARD_PORT || "9219");
 const STATIC_DIR     = `${APP_DIR}/ui`;
-// Windows 的 venv 布局是 Scripts/ 不是 bin/，可执行文件要带 .exe，解释器叫 python.exe。
-// 这三处写死过一次 POSIX 路径，结果 Windows 上面板起不来 —— 别再改回常量。
+// Python 运行时位置：三个平台形态各不相同，写死 POSIX 路径会让独立桌面版起不来。
+//   fpk/Linux   → <data>/venv/bin/{python3,hermes,uv}
+//   fpk/Windows → <data>/venv/Scripts/{python.exe,hermes.exe,uv.exe}
+//   独立桌面版   → <root>/runtime/python/python.exe + <root>/runtime/python/Scripts/hermes.exe
+//                   （不在 data 下，由 Electron 壳用 CHATES_PYTHON_ROOT/SCRIPT 注入）
+// python.exe 与 hermes.exe 在独立版里是**两个不同目录**，必须拆开；
+// 在 fpk 版里它们是同一个目录，所以原本一个 VENV_BIN 够用。
 const IS_WIN         = process.platform === "win32";
-// 运行时位置允许被 CHATES_PYTHON_DIR 覆盖。
-// 独立桌面版把 python 打包在 <root>/runtime/python（和 data 平级，不在 data 下），
-// 跟 fpk 版「venv 在 data/venv」完全不同。写死前者会让独立版一直报
-// `Hermes Agent 版本: unknown`，因为它找不到可以执行 --version 的入口。
-// 独立桌面版把 python 解压成「独立解释器」形态：python.exe 在 runtime/python/，
-// 启动器（hermes.exe 等 console script shim）在 runtime/python/Scripts/。
-// 这两个位置在 fpk 版里是同一个目录（venv/Scripts 同时放 python.exe 和 hermes.exe），
-// 所以必须拆成两个变量，否则总有一半功能找不到入口。
 const CHATES_PY_ROOT   = process.env.CHATES_PYTHON_ROOT || "";   // .../runtime/python
 const CHATES_PY_SCRIPT = process.env.CHATES_PYTHON_SCRIPT || ""; // .../runtime/python/Scripts
-const VENV_BIN       = CHATES_PY_ROOT
-  ? CHATES_PY_ROOT
-  : (IS_WIN ? `${DATA_DIR}/venv/Scripts` : `${DATA_DIR}/venv/bin`);
+const VENV_BIN       = CHATES_PY_ROOT || (IS_WIN ? `${DATA_DIR}/venv/Scripts` : `${DATA_DIR}/venv/bin`);
 const SCRIPT_BIN     = CHATES_PY_SCRIPT || VENV_BIN;
 const PY_BIN         = IS_WIN ? "python.exe" : "python3";
 const HERMES_BIN     = IS_WIN ? `${SCRIPT_BIN}/hermes.exe` : `${SCRIPT_BIN}/hermes`;
@@ -1036,7 +1011,7 @@ try {
     // ① 旧版 wheel 模式：hermes_cli/tui_dist/entry.js（0.19.0）
     // ② v0.20.0 源码模式：hermes-src/ui-tui/dist/entry.js（打包时预构建）
     const pyResult = spawnSync(
-      `${VENV_BIN}/${PY_BIN}`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
+      `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
       { stdout: "pipe", stderr: "pipe" }
     );
     const hermesCli = pyResult.stdout?.toString().trim();
@@ -2917,10 +2892,10 @@ const panelRoomRunner = new RoomRunner({store:panelRoomStore,reconcile:id=>{try{
     ensureSession:(id,job)=>{if(!getSession(id))saveSession({id,title:job.member.label+' · 专家讨论',group:'room_'+job.room_id,messages:[],created_at:Date.now(),updated_at:Date.now()});}})});
 const handlePanelRooms=createRoomHandler({store:panelRoomStore,runner:panelRoomRunner,checkToken,modelCatalog:()=>panelModelChecks.source({action:"catalog"})});
 const panelFileRoots=createFileRoots({data:DATA_DIR,varDir:VAR_DIR,librarySources:createLibrarySources(DATA_DIR)});
-const handlePanelFiles=createFileHandler({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),roots:panelFileRoots,data:DATA_DIR,varDir:VAR_DIR,basePath:BASE_PATH,checkToken});
+// 面板内「检查更新」：只读公开 Release 元数据，不用 token、不落盘。
+// currentVersion 优先读安装器写的 version.json（Windows 打包版没有 manifest）。
 const handlePanelUpdate=createUpdateHandler({
   currentVersion:()=>{
-    // Windows 安装器把版本写进 app/version.json；manifest 只在 fpk 里才有
     for(const f of [join(APP_DIR,'version.json'), join(APP_DIR,'..','version.json')]){
       try{ const j=JSON.parse(readFileSync(f,'utf8')); if(j&&j.version) return String(j.version).trim(); }catch{}
     }
@@ -2928,6 +2903,7 @@ const handlePanelUpdate=createUpdateHandler({
   },
   platform:process.platform,
 });
+const handlePanelFiles=createFileHandler({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),roots:panelFileRoots,data:DATA_DIR,varDir:VAR_DIR,basePath:BASE_PATH,checkToken});
 const panelConfigRecovery=createConfigRecovery({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),home:DATA_DIR,state:join(VAR_DIR,'panel-state'),checkToken,changed:reason=>panelRuntime.changed(reason)});
 const serviceHealth=new ServiceHealth({gateway:{url:`http://127.0.0.1:${GATEWAY_PORT}/health/detailed`,token:()=>MONITOR_TOKEN},dashboard:{url:`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/status`,token:()=>DASHBOARD_SESSION_TOKEN},identity:kind=>serviceProcesses.read(kind)||serviceProcesses.find(kind)});
 const panelDrain=new PanelDrain({python:join(VENV_BIN,PY_BIN),root:join(VAR_DIR,'panel-state'),identity:()=>serviceProcesses.read('gateway')||serviceProcesses.find('gateway'),health:serviceHealth});
@@ -2949,7 +2925,7 @@ function sessionActivity(){
    'rows=c.execute("select id,last_activity_at,coalesce(last_activity_description,\'\') from sessions'
     +' where coalesce(last_activity_at,0)>? order by last_activity_at desc limit 8",(time.time()-7200,)).fetchall()',
    'print(json.dumps(rows))'].join('\n');
-  const r=spawnSync(`${VENV_BIN}/${PY_BIN}`,['-c',probe,`${DATA_DIR}/state.db`],{encoding:'utf8',timeout:5000});
+  const r=spawnSync(`${VENV_BIN}/python3`,['-c',probe,`${DATA_DIR}/state.db`],{encoding:'utf8',timeout:5000});
   const rows=JSON.parse(String(r.stdout||'[]').trim()||'[]');
   const t=Math.floor(Date.now()/1000);
   let at=0, pick=null;
@@ -4344,7 +4320,7 @@ toolGuardLoad();
 
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
 const panelModelChecks = new ModelChecks({root: join(VAR_DIR, 'panel-state/model-checks'),
-  source: createModelSource({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'), varRoot: VAR_DIR,
+  source: createModelSource({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), varRoot: VAR_DIR,
     getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; }})});
 let panelModelChecksLoadError = null;
 try { panelModelChecks.load(); } catch (error) { panelModelChecksLoadError = error; log('[model-checks] state cannot load: '+error.message); }
@@ -4354,10 +4330,10 @@ async function handleModelChecks(req, path) {
     return new Response(JSON.stringify({ok:false,error:'验证记录无法读取，原文件已保留，请检查存储'}), {status:503,headers:{'Content-Type':'application/json'}});
   return modelChecksHandler(req,path);
 }
-const handleAuxiliary = createAuxiliaryHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'),
+const handleAuxiliary = createAuxiliaryHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
   getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; },
   backupRoot: join(VAR_DIR, 'panel-state/auxiliary-backups'), checkToken});
-const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'),
+const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
   getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; },
   lockRoot: join(VAR_DIR, 'panel-state'), checkToken});
 const handleConnectorTools = createConnectorToolsHandler({getConnector, readState: () => panelConnectorStore.all(), checkToken, call: callConnectorTool});
@@ -4366,8 +4342,8 @@ const handleMaintenance = createMaintenanceHandler({checkToken, repositories: [
   {id: 'panel', name: '面板源码仓库', path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src')},
   {id: 'python', name: 'Hermes Python 内核', path: join(APP_DIR, 'hermes-src')},
 ]});
-const handleUsage = createUsageHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
-const handleEcho = createEchoHandler({python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'),
+const handleUsage = createUsageHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
+const handleEcho = createEchoHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
   queueFile: '/vol1/1000/飞牛文件/html/.acl/tasks/tasks.json', backupRoot: join(VAR_DIR, 'panel-state/echo-backups'),
   draftFile: join(VAR_DIR, 'panel-state/echo-drafts.json'), checkToken});
 const handleCronHistory = createCronHistoryHandler({checkToken, getHome: () => {
@@ -4379,7 +4355,7 @@ const handleCronHooks = createCronHookHandler({hooks: panelCronHooks, checkToken
   return (Array.isArray(raw) ? raw : raw.jobs).some(job => job.id === id);
 }});
 const handleCronUpdate = createCronUpdateHandler({
-  python: `${VENV_BIN}/${PY_BIN}`, serverRoot: join(APP_DIR, 'server'), nativeRoot: join(APP_DIR, 'hermes-src'),
+  python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), nativeRoot: join(APP_DIR, 'hermes-src'),
   backupRoot: join(VAR_DIR, 'panel-state/cron-backups'), checkToken,
   getHome: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile)) : DATA_DIR; },
 });
@@ -6579,7 +6555,7 @@ async function handleFetch(req) {
   function _findHermesRoot(){
     try {
       const pyResult = spawnSync(
-        `${VENV_BIN}/${PY_BIN}`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
+        `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
         { stdout: "pipe", stderr: "pipe" }
       );
       const root = (pyResult.stdout ? pyResult.stdout.toString() : "").trim();
@@ -7998,7 +7974,20 @@ function _saveChannelChanges(id, body){
         });
       } catch (e) {}
       Object.keys(groups).forEach(k => groups[k].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)));
-      return new Response(JSON.stringify({ ok: true, groups }), { headers: jsonHeaders() });
+      // 3) 分组显示名（2026-11-25 加）：前端拿不到渠道定义时直接用 platform 原文，
+      //    于是侧栏出现 "cron" / "cli" / "subagent" 这种看不懂的英文。
+      //    这里补一份中文名 + 图标，前端 def.name 读不到时退到 labels。
+      const GROUPS_LABELS = {
+        cron: { name: "定时任务运行记录", icon: "⏰" },
+        cli: { name: "本机命令会话", icon: "🖥" },
+        subagent: { name: "子代理会话", icon: "🧩" },
+        qqbot: { name: "QQ", icon: "📨" },
+        weixin: { name: "微信", icon: "💬" },
+        feishu: { name: "飞书", icon: "📘" },
+        telegram: { name: "Telegram", icon: "✈️" },
+        discord: { name: "Discord", icon: "🎮" },
+      };
+      return new Response(JSON.stringify({ ok: true, groups, labels: GROUPS_LABELS }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: true, groups: {}, error: e.message }), { headers: jsonHeaders() });
     }
@@ -9413,26 +9402,7 @@ function _saveChannelChanges(id, body){
 
   // 静态 UI — 根路径返回 index.html
   if (path === "/") {
-    // index.html 里的 <base href> 是发布时按部署前缀写死的。NAS 上走 fnOS 网关
-    // （/app/hermes-agent/），Windows 桌面版是直连 8650、BASE_PATH 为空，
-    // 那个前缀就变成凭空多出来的一节：浏览器把 css/base.css 解析成
-    // /app/hermes-agent/css/base.css → 404 → 整站裸样式（只有文字、没有布局）。
-    // 所以按运行时 BASE_PATH 重写，不信任文件里的值。
-    // 2026-11-25 Windows 实测：base=/ 时 base.css 200，写死前缀时全 404。
-    const htmlPath = `${STATIC_DIR}/index.html`;
-    let html;
-    try { html = readFileSync(htmlPath, "utf8"); }
-    catch { return new Response("Not Found", { status: 404 }); }
-    const baseHref = (BASE_PATH ? BASE_PATH : "") + "/";
-    html = html.replace(/<base\s+href="[^"]*"\s*\/?>/i, `<base href="${baseHref}">`);
-    return new Response(html, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return serveFile(`${STATIC_DIR}/index.html`, "text/html; charset=utf-8", { req, cacheable: false });
   }
 
   // ─── PWA 根目录文件：manifest / favicon.ico 必须免鉴权（2026-11-18）───
@@ -9636,7 +9606,7 @@ function startServer() {
         // 真实 PTY：由 pty_bridge.py（pty.openpty + setsid + TIOCSCTTY）提供控制终端，
         // 修复 pipe spawn 下 bash -i 报 “cannot set terminal process group / no job control”，
         // Ctrl+C、前后台任务、vim 等全屏程序均可正常工作。
-        const pty = spawn(`${VENV_BIN}/${PY_BIN}`, [
+        const pty = spawn(`${VENV_BIN}/python3`, [
           `${APP_DIR}/server/pty_bridge.py`,
           "--shell", "/bin/bash",
           "--cwd", existsSync(cwd) ? cwd : WORKSPACE_DIR,
@@ -9712,8 +9682,8 @@ function startServer() {
     if (err?.code === "EADDRINUSE") log(`[WARN] UI TCP port ${UI_PORT} already in use, standalone access disabled`);
     else log(`TCP server error: ${err?.message || err}`);
   });
-  tcpServer.listen(UI_PORT, UI_BIND, () => {
-    log(`Standalone UI available at http://${UI_BIND}:${UI_PORT}/`);
+  tcpServer.listen(UI_PORT, "0.0.0.0", () => {
+    log(`Standalone UI available at http://0.0.0.0:${UI_PORT}/`);
   });
 
   return server;

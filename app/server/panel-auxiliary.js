@@ -10,7 +10,7 @@ export function createAuxiliaryHandler({python,serverRoot,getConfig,backupRoot,c
    const body=req.method==='GET'?{action:'read'}:{...await req.json(),action:'update'};
    const serialized=JSON.stringify(body);if(serialized.length>128000)return reply({ok:false,error:'辅助模型配置过大'},413);
    return await new Promise(resolve=>{
-    const child=start(python,['-B',join(serverRoot,'panel-auxiliary.py'),getConfig(),backupRoot],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});let output='',settled=false;
+    const child=start(python,['-B',join(serverRoot,'panel-auxiliary.py'),getConfig(),backupRoot],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',settled=false;
     const finish=(data,status)=>{if(settled)return;settled=true;clearTimeout(timer);resolve(reply(data,status));};
     const timer=setTimeout(()=>{child.kill('SIGTERM');finish({ok:false,error:'读取或保存超时，请刷新核对配置'},504);},15000);
     child.stdout.on('data',chunk=>{output+=chunk;if(output.length>1024*1024){child.kill('SIGTERM');finish({ok:false,error:'配置返回内容过大'},502);}});child.stderr.resume();child.stdin.on('error',()=>{});

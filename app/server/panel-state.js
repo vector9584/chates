@@ -34,24 +34,14 @@ export function atomicWrite(file, contents, io = fs) {
   let fd;
   try {
     fd = io.openSync(temp, 'wx', 0o600);
-    // 必须显式 utf8。省略编码时 Node 用「系统代码页」写：
-    // Windows 上是 CP936(GBK)，中文设备名（如「飞牛浏览器」）里的字编不出来，
-    // 被替换成 '?'，引号前的半个字符直接吃掉，JSON 字符串失去闭合 ——
-    // 读端固定 utf8，于是整个 auth.json 解析失败，面板一路 503
-    // 「设备授权记录读取失败」，Electron 壳等 60 秒报「面板启动超时」。
-    // Linux/macOS 默认就是 utf8，所以这个坑只在 Windows 现形（2026-11-25 实测）。
-    io.writeFileSync(fd, contents, 'utf8');
+    io.writeFileSync(fd, contents);
     io.fsyncSync(fd);
     io.closeSync(fd); fd = undefined;
     io.renameSync(temp, file);
     // Persist the directory entry on Linux. macOS also supports directory fsync.
-    // Windows: 目录不能用 openSync(dir,'r') 打开（EISDIR/EPERM），而且 NTFS 本身
-    // 不掉目录项，跳过即可。之前这里必抛，导致 bootstrap 一直 500「设备授权记录失败」。
-    if (process.platform !== 'win32') {
-      fd = io.openSync(dir, 'r');
-      io.fsyncSync(fd);
-      io.closeSync(fd); fd = undefined;
-    }
+    fd = io.openSync(dir, 'r');
+    io.fsyncSync(fd);
+    io.closeSync(fd); fd = undefined;
   } finally {
     if (fd !== undefined) io.closeSync(fd);
     if (io.existsSync(temp)) io.unlinkSync(temp);

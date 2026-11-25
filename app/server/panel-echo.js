@@ -27,7 +27,7 @@ export function createEchoHandler({python, serverRoot, queueFile, backupRoot, dr
       if (Buffer.byteLength(payload) > 256 * 1024) return reply({ok: false, error: '任务内容过长'}, 413);
       return await new Promise(resolve => {
         const child = start(python, ['-B', join(serverRoot, 'panel-echo.py'), queueFile, backupRoot, draftFile || join(backupRoot, 'echo-drafts.json')],
-          {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8'}});
+          {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, PYTHONDONTWRITEBYTECODE: '1'}});
         let output = '', settled = false;
         const finish = (body, status) => { if (settled) return; settled = true; clearTimeout(timer); resolve(reply(body, status)); };
         const timer = setTimeout(() => { child.kill('SIGTERM'); finish({ok: false, error: '队列操作超时，请刷新核对任务状态'}, 504); }, 15000);

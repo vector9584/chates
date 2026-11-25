@@ -367,6 +367,7 @@ panel-*.css       →  页面层（只管该页面独有的布局，不许重定
 - 新造按钮类名：`*-btn`、`xxxBtn`、`actbtn`、`q-btn` 一律不许新增。
 - 新造卡片类名：`xxx-card`（存量在基线里，只减不增）。要差异化用 `.card` ＋ 修饰符。
 - 在页面 css 里重写 `padding`/`border-radius`/`background` 来改按钮外观 —— 那是组件的活。
+- 在 ID 选择器上写 `display` 来管显隐 —— 特异性 1,0,0 会压过 `.ws-pane{display:none}`（0,1,0），被切走的面板不退场。2026-11-23 工作区终端「点不开」就是这么来的：两个 pane 同时 flex，后一个盖住前一个。ID 上只留 `flex-direction`/`overflow`/`min-*` 这类纯布局属性，`display` 交还给管显隐的那套 class。
 
 ### 已知历史包袱
 

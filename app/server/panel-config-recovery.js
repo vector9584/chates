@@ -3,7 +3,7 @@ import {existsSync} from 'node:fs';
 import {join} from 'node:path';
 export function createConfigRecovery({python,serverRoot,home,state,checkToken,changed=()=>{},run=spawnSync}){
  function execute(body){
-  const result=run(python,['-B',join(serverRoot,'panel-config-recovery.py'),home,state],{input:JSON.stringify(body),encoding:'utf8',timeout:15000,maxBuffer:1024*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8'}});
+  const result=run(python,['-B',join(serverRoot,'panel-config-recovery.py'),home,state],{input:JSON.stringify(body),encoding:'utf8',timeout:15000,maxBuffer:1024*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
   let data;try{data=JSON.parse(result.stdout);}catch{return {ok:false,error:'配置恢复服务未返回结果，请刷新核对',status:503};}
   if(data.ok&&data.changed){try{changed('配置保存恢复');}catch{return {...data,ok:false,saved:true,error:'配置已处理，但待应用记录未写入，请刷新核对后重启应用',status:503};}}
   return data;
