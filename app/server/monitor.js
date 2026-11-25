@@ -9413,7 +9413,26 @@ function _saveChannelChanges(id, body){
 
   // 静态 UI — 根路径返回 index.html
   if (path === "/") {
-    return serveFile(`${STATIC_DIR}/index.html`, "text/html; charset=utf-8", { req, cacheable: false });
+    // index.html 里的 <base href> 是发布时按部署前缀写死的。NAS 上走 fnOS 网关
+    // （/app/hermes-agent/），Windows 桌面版是直连 8650、BASE_PATH 为空，
+    // 那个前缀就变成凭空多出来的一节：浏览器把 css/base.css 解析成
+    // /app/hermes-agent/css/base.css → 404 → 整站裸样式（只有文字、没有布局）。
+    // 所以按运行时 BASE_PATH 重写，不信任文件里的值。
+    // 2026-11-25 Windows 实测：base=/ 时 base.css 200，写死前缀时全 404。
+    const htmlPath = `${STATIC_DIR}/index.html`;
+    let html;
+    try { html = readFileSync(htmlPath, "utf8"); }
+    catch { return new Response("Not Found", { status: 404 }); }
+    const baseHref = (BASE_PATH ? BASE_PATH : "") + "/";
+    html = html.replace(/<base\s+href="[^"]*"\s*\/?>/i, `<base href="${baseHref}">`);
+    return new Response(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   }
 
   // ─── PWA 根目录文件：manifest / favicon.ico 必须免鉴权（2026-11-18）───

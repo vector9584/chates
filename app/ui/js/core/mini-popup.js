@@ -65,7 +65,9 @@ function pushReasoningToServer(sid, level){
   try{
     var payload = (level==='off') ? {reasoning:{enabled:false}} : {reasoning:{enabled:true, effort:level}};
     var body = JSON.stringify(payload);
-    fetch('/app/hermes-agent/api/workspace-ui/session-reasoning/'+encodeURIComponent(sid), {
+    // 不用写死 /app/hermes-agent 前缀：Windows 桌面版直连 8650、BASE_PATH 为空，
+    // 写死就等于把请求打到不存在的路径。apiUrl() 会按实际部署前缀解析。
+    fetch(apiUrl('/api/workspace-ui/session-reasoning/'+encodeURIComponent(sid)), {
       method:'PUT', headers:{'Content-Type':'application/json'}, body:body, credentials:'same-origin'
     }).catch(function(){});
   }catch(e){}
@@ -74,7 +76,7 @@ function pushReasoningToServer(sid, level){
 function pullReasoningFromServer(sid){
   if(!sid) return;
   try{
-    fetch('/app/hermes-agent/api/workspace-ui/session-reasoning/'+encodeURIComponent(sid), {credentials:'same-origin'})
+    fetch(apiUrl('/api/workspace-ui/session-reasoning/'+encodeURIComponent(sid)), {credentials:'same-origin'})
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(!d || !d.ok) return;
