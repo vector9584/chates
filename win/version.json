@@ -1,7 +1,7 @@
 {
   "name": "HermesWin",
-  "version": "0.20.0-win.2",
-  "kernel_commit": "9456c23",
+  "version": "0.20.0-win.3",
+  "kernel_commit": "f30ae8e",
   "built": "2026-11-25",
   "repo": "https://github.com/vector9584/hermes-agent-custom"
 }
