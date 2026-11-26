@@ -208,23 +208,35 @@ fi
 # 另外必须用非 editable 安装：CI 的 build 路径（D:\a\...）与安装后的
 # resources 路径不同，-e 生成的 .pth 会把用户机器指向一个不存在的目录。
 c '1;36' "== 安装 runtime python 依赖 =="
+SITE="$RES/runtime/python/Lib/site-packages"
+# hermes 的 pyproject 主动拒绝非 editable 安装（构建时直接 RuntimeError:
+# "Building wheels or sdists for hermes-agent is not supported"），所以只能 -e。
+# 但 -e 生成的 __editable__* 锚点里写的是构建机绝对路径（D:\a\chates\...），
+# 用户机器上没有那个目录，装上去 hermes.exe 一跑就 ImportError。
+# 解法：-e 装（拿到全部依赖 + 生成 Scripts/hermes.exe），装完删掉绝对路径锚点，
+# 换成用 sys.prefix 相对定位的 .pth：依赖已经在 site-packages 里，源码靠相对路径找。
 "$RES/runtime/python/python.exe" -m pip install -q --break-system-packages --no-warn-script-location \
-  -e "app/hermes-src[all]" >/dev/null 2>&1 || true
-"$RES/runtime/python/python.exe" -m pip install -q --break-system-packages --no-warn-script-location \
-  "app/hermes-src[all]" || die "runtime python 依赖安装失败（hermes-src[all]）"
-"$RES/runtime/python/python.exe" -c "import fcntl, ruamel.yaml, aiohttp, dotenv" 2>/dev/null \
-  || "$RES/runtime/python/python.exe" -c "import ruamel.yaml, dotenv" || die "runtime python 依赖校验失败"
-ok "python/ 依赖就位"
+  -e "app/hermes-src[all]" || die "runtime python 依赖安装失败（hermes-src[all]）"
+rm -f "$SITE"/__editable__*hermes*.py "$SITE"/__editable__*hermes*.pth 2>/dev/null || true
+printf "import os,sys;sys.path.insert(0,os.path.abspath(os.path.join(sys.prefix,'..','..','app','hermes-src')))\n" \
+  > "$SITE/zz-hermes-src-path.pth"
+ok "python/ 依赖就位（editable 锚点已换成相对路径）"
 
 # Unix 专有模块垫片：Windows 没有 fcntl，cron/panel-echo 的 import 链会整条断掉。
 SHIM_DIR="release-tools/py-shims"
 if [ -f "$SHIM_DIR/fcntl.py" ]; then
-  # 之前可能被 -e 安装残留带进来过，先移除再放，保证是仓里那份
-  cp -f "$SHIM_DIR/fcntl.py" "$RES/runtime/python/Lib/site-packages/fcntl.py"
+  cp -f "$SHIM_DIR/fcntl.py" "$SITE/fcntl.py"
   ok "shim/    fcntl.py"
 else
   die "缺 $SHIM_DIR/fcntl.py（Windows 无 fcntl，cron 会 import 失败）"
 fi
+
+# 校验放在锚点替换之后，否则测的还是安装时的绝对路径
+"$RES/runtime/python/python.exe" -c "import fcntl, hermes_cli, gateway, cron, ruamel.yaml, aiohttp, dotenv" \
+  || die "runtime python 依赖校验失败"
+"$RES/runtime/python/Scripts/hermes.exe" --version >/dev/null 2>&1 \
+  || die "Scripts/hermes.exe 不可用"
+ok "校验 依赖+hermes.exe"
 
 # 关键：绝不写 pyvenv.cfg（写了 python 会认成 venv，prefix 错到上一层）
 rm -f "$RES/runtime/python/pyvenv.cfg" 2>/dev/null || true
