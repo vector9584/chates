@@ -12,10 +12,10 @@
 
 <p align="center">
   <img alt="kernel" src="https://img.shields.io/badge/kernel-0.20.0-71dbc0">
-  <img alt="panel" src="https://img.shields.io/badge/panel-1.20.7-5e64f3">
+  <img alt="panel" src="https://img.shields.io/badge/panel-1.20.9-5e64f3">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20fnOS-2f3a46">
   <img alt="pages" src="https://img.shields.io/badge/panel-8%20%E6%9D%BF%E5%9D%97%2021%20%E9%A1%B5-71dbc0">
-  <img alt="skills" src="https://img.shields.io/badge/skills-397-5e64f3">
+  <img alt="skills" src="https://img.shields.io/badge/skills-399-5e64f3">
   <img alt="license" src="https://img.shields.io/badge/license-MIT%20%2B%20GPL--3.0-green">
 </p>
 
@@ -56,11 +56,11 @@
 | 你的机器 | 装什么 | 怎么装 |
 |---|---|---|
 | **Windows** | [CHATES-Setup-*.exe](https://github.com/vector9584/chates/releases/latest) | 下载双击，一路下一步 |
-| **fnOS / 飞牛** | [hermes-agent_*.fpk](https://github.com/vector9584/chates/releases/latest) | 应用中心 → 手动安装 → 选这个文件 |
+| **fnOS / 飞牛** | [chates_*.fpk](https://github.com/vector9584/chates/releases/latest) | 应用中心 → 手动安装 → 选这个文件 |
 
 Windows 版装在 `%APPDATA%\CHATÈS`，**升级不覆盖你的配置**：`.env`、`config.yaml`、`SOUL.md`、笔记、知识库、会话记录，一个字节都不动，只换程序本体。
 
-> fpk 装之前请确认应用中心里已经有 `nodejs_v24`。装的时候它会让你确认一次依赖变更，点确认即可。
+> fpk 装之前请先在应用中心装好 `nodejs_v24`。包清单里**不声明**这个依赖（声明了应用中心会判「依赖变更」，只肯走 UI 装、CLI 和升级路径都会报错），所以它不会自动帮你装，也不会让你点确认。
 
 ## 打开之后长这样
 
@@ -104,17 +104,19 @@ Windows 版装在 `%APPDATA%\CHATÈS`，**升级不覆盖你的配置**：`.env`
 
 前端是静态 HTML + CSS + 原生 JS，**没有打包器**。`index.html` 里 `<script>` 的顺序就是依赖顺序——改一行刷新就能看见，代价是顺序不能乱挪。这条写进了 `app/ui/ARCHITECTURE.md`。
 
-当前面板侧：**45 个 `panel-*.js`、18,326 行**。技能 **397 个**，知识库笔记 **1,100 篇**。
+当前面板侧：**45 个 `panel-*.js`、13,843 行**。运行态这边技能 **399 个**、知识库笔记 **1,109 篇**（`data/skills`、`data/knowledge` 现数）。
 
 ## 怎么证明没改坏
 
-改内核最怕的就是「面板还能开，但某个功能悄悄死了」。所以每轮改动都跑同一套门禁：
+改内核最怕的就是「面板还能开，但某个功能悄悄死了」。所以每轮改动都跑同一套门禁。
+
+这个仓库是**精简仓**：内核源码（`agent/`、`gateway/`、`tools/` 等上游 Python）不打进来，走 Release(tag=kernel) 上的 `hermes-src.tgz`。所以测试也只有 `tests-js/` 这一层：
 
 ```bash
-npm run check     # 四个 workspace 的测试 + lint
+cd tests-js && npm ci && npm run check   # typecheck + vitest + eslint
 ```
 
-覆盖 `apps/shared`（23 文件 / 225 测试）、`ui-tui`（138 文件 / 1,529 测试）、`web`（22 文件 / 156 测试）、`tests-js`（3 文件）。**185 个测试文件、1,915 个测试**，加上 eslint，全绿才算过。最近一次跑：退出码 0，0 error、41 warning。
+当前 `tests-js/` 三个测试文件覆盖：安装器依赖懒加载、桌面端 Mac 权限声明、助手界面点击兼容。完整的内核测试套件（`apps/shared`、`ui-tui`、`web`，1,686 个用例）在全量仓里跑，不在这个仓。
 
 面板侧另有静态检查脚本，盯着两件最容易出事的：`<script>` 顺序、以及 `panel-*.js` 之间不该出现的循环引用。
 
@@ -138,7 +140,7 @@ bash release-tools/build-fpk.sh --tag <tag>   # 打 fpk（含版本递增门禁�
 
 ## 已知限制
 
-- **fpk 只能走应用中心 UI 装**。`fnos-cli app install-fpk` 在应用声明了 `install_dep_apps` 时会拒绝，报 `dependency app changes that require App Center UI`——这是 CLI 的硬判定，绕不过。命令行装会返回 `code 10236`。
+- **fpk 走应用中心 UI 装**。包清单现在不声明 `install_dep_apps`（声明了应用中心会判「依赖变更」，只肯走 UI 装，升级路径还报 20002），前置的 `nodejs_v24` 改在 `desc` 里写明，所以 CLI 安装不再被这条拦，但仍然建议走 UI 装、方便看依赖。
 - **Windows 大文件下载慢**。这台机器直连 `objects.githubusercontent.com` 只有 20–68 KB/s。Release 页下 exe 建议挂代理，`ghproxy.net` 实测能到 371 KB/s。
 - **升级不动配置**：exe 用 `.seeded` 标记 + `force:false`，fpk 的 `app.tgz` 里没有 `data/` 条目——这是设计出来的，不是巧合。
 - 面板不做打包器，所以没有 tree-shaking、没有模块解析。好处是透明，坏处是文件一多就得靠约定维持顺序。
@@ -147,4 +149,4 @@ bash release-tools/build-fpk.sh --tag <tag>   # 打 fpk（含版本递增门禁�
 
 内核是 [Nous Research 的 Hermes Agent](https://github.com/NousResearch/hermes-agent)，MIT。本仓库的内核部分（`agent/`、`gateway/`、`hermes_cli/`、`tools/` 等）沿用 MIT；面板与安装器部分 GPL-3.0。
 
-上游基线 `715201b`，之上 **69 个提交**，主要是 Windows 兼容层、面板配置事务、会话状态拆分，以及 cron 与 gateway 的若干修复。完整清单在 `UPDATE-LOG.md`。
+上游基线是 `715201b`（Hermes 0.21.149 内核快照，2026-11-04），之上累计 **101 个提交**：Windows 兼容层、面板配置事务、会话状态拆分、cron 与 gateway 修复，以及星图反馈上报。完整清单在 `UPDATE-LOG.md`。
