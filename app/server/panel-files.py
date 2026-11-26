@@ -19,8 +19,8 @@ except Exception:
   pass
 
 LIMIT = 8 * 1024 * 1024
-NOFOLLOW = os.O_NOFOLLOW
-DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | NOFOLLOW
+NOFOLLOW = getattr(os, 'O_NOFOLLOW', 0)
+DIR_FLAGS = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | NOFOLLOW
 
 
 class FileError(Exception):
@@ -47,7 +47,7 @@ def json_file(path, value):
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
-        fd = os.open(os.path.dirname(path), os.O_RDONLY | os.O_DIRECTORY)
+        fd = os.open(os.path.dirname(path), os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
         try:
             os.fsync(fd)
         finally:
@@ -354,7 +354,7 @@ class Files:
             try:
                 with os.fdopen(descriptor, 'wb') as stream:
                     stream.write(after)
-                    if previous and (previous.st_uid != os.getuid() or previous.st_gid != os.getgid()):
+                    if previous and hasattr(os,'getuid') and (previous.st_uid != os.getuid() or previous.st_gid != os.getgid()):
                         os.fchown(stream.fileno(), previous.st_uid, previous.st_gid)
                     os.fsync(stream.fileno())
                 if previous:

@@ -115,6 +115,15 @@ def config_lock(root,*,recover=True):
    yield
   finally:holder.depth=0;os.close(fd)
 
+def _sync_dir(path):
+ try:
+  fd=os.open(path,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
+ except (OSError,AttributeError):
+  return
+ try:os.fsync(fd)
+ except OSError:pass
+ finally:os.close(fd)
+
 def read_file(path):
  path=Path(path)
  # Reject intermediate symlinks as well as a final link. Runtime resolves the
@@ -154,10 +163,8 @@ def commit(path,root,raw,encoded,reason,details=None):
  with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
  metadata={'id':identifier,'file':str(path),'before':checksum(raw),'after':checksum(encoded),'reason':str(reason)[:160],'created_at':int(time.time()*1000),'details':details or {}}
  fd=os.open(directory/(identifier+'.json'),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
- with os.fdopen(fd,'w') as stream:json.dump(metadata,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
- fd=os.open(directory,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
- try:os.fsync(fd)
- finally:os.close(fd)
+ with os.fdopen(fd,'w',encoding='utf-8') as stream:json.dump(metadata,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
+ _sync_dir(directory)
  fd,temp=tempfile.mkstemp(prefix='.panel-config-',dir=Path(path).parent)
  try:
   with os.fdopen(fd,'wb') as stream:
@@ -172,9 +179,7 @@ def commit(path,root,raw,encoded,reason,details=None):
   latest,latest_stat=read_file(path)
   if latest!=raw or (latest_stat.st_dev,latest_stat.st_ino)!=(stat.st_dev,stat.st_ino):raise ConfigError('保存前配置发生变化，请重新读取',409)
   os.replace(temp,path)
-  fd=os.open(Path(path).parent,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
-  try:os.fsync(fd)
-  finally:os.close(fd)
+  _sync_dir(Path(path).parent)
  finally:
   if os.path.exists(temp):os.unlink(temp)
  return {'changed':True,'revision':checksum(encoded),'change_id':identifier}

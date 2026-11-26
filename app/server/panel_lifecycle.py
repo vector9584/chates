@@ -57,9 +57,9 @@ class Lifecycle:
   except (OSError,ValueError):return None
  def write_pid(self,pid):
   if self.pidfile.is_symlink():raise LifecycleError('PID文件是链接，已拒绝操作')
-  temp=self.var/('.app.pid-'+str(os.getpid()));fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+  temp=self.var/('.app.pid-'+str(os.getpid()));fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,'O_NOFOLLOW',0),0o600)
   try:
-   with os.fdopen(fd,'w') as stream:stream.write(str(pid));stream.flush();os.fsync(stream.fileno())
+   with os.fdopen(fd,'w',encoding='utf-8') as stream:stream.write(str(pid));stream.flush();os.fsync(stream.fileno())
    os.replace(temp,self.pidfile)
   finally:
    if temp.exists():temp.unlink()
@@ -130,7 +130,7 @@ class Lifecycle:
   if self.connected_socket():raise LifecycleError('应用套接字已被其他进程占用，未接管')
   if self.sock.exists():self.sock.unlink()
   env={**os.environ,'HOME':str(self.home),'HERMES_HOME':str(self.home),'APP_DIR':str(self.app),'DATA_DIR':str(self.home),'VAR_DIR':str(self.var),'MONITOR_SOCKET_PATH':str(self.sock),'BASE_PATH':'/app/chates','PATH':str(self.home/'venv/bin')+':'+os.environ.get('PATH','')}
-  fd=os.open(self.var/'info.log',os.O_WRONLY|os.O_APPEND|os.O_CREAT|os.O_NOFOLLOW,0o600)
+  fd=os.open(self.var/'info.log',os.O_WRONLY|os.O_APPEND|os.O_CREAT|getattr(os,'O_NOFOLLOW',0),0o600)
   try:child=subprocess.Popen([self.node,self.script],env=env,stdin=subprocess.DEVNULL,stdout=fd,stderr=fd,start_new_session=True,close_fds=True)
   finally:os.close(fd)
   record=None
@@ -221,7 +221,7 @@ if __name__=='__main__':
   if action not in ('start','stop'):raise LifecycleError('不支持的生命周期操作')
   lifecycle.var.mkdir(parents=True,exist_ok=True)
   stop_targets=lifecycle.capture_stop() if action=='stop' else None
-  fd=os.open(lifecycle.var/'lifecycle.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+  fd=os.open(lifecycle.var/'lifecycle.lock',os.O_CREAT|os.O_RDWR|getattr(os,'O_NOFOLLOW',0),0o600)
   with os.fdopen(fd,'r+') as lock:
    fcntl.flock(lock,fcntl.LOCK_EX);print(json.dumps(lifecycle.stop(stop_targets) if action=='stop' else lifecycle.start(),ensure_ascii=False))
  except LifecycleError as error:print(json.dumps({'ok':False,'error':str(error)},ensure_ascii=False));sys.exit(1)

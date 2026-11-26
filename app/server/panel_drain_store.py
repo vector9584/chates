@@ -13,7 +13,7 @@ class DrainStoreError(Exception):pass
 @contextlib.contextmanager
 def locked_record(path):
  path=Path(path);path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
- fd=os.open(path.with_name('gateway-drain.lock'),os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+ fd=os.open(path.with_name('gateway-drain.lock'),os.O_RDWR|os.O_CREAT|getattr(os,'O_NOFOLLOW',0),0o600)
  with os.fdopen(fd,'r+') as lock:
   deadline=time.monotonic()+2
   while True:
@@ -33,9 +33,9 @@ def locked_record(path):
 
 def write_record(path,record):
  path=Path(path);temp=path.with_name('.gateway-drain-'+uuid.uuid4().hex)
- fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+ fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,'O_NOFOLLOW',0),0o600)
  try:
-  with os.fdopen(fd,'w') as stream:json.dump(record,stream);stream.flush();os.fsync(stream.fileno())
+  with os.fdopen(fd,'w',encoding='utf-8') as stream:json.dump(record,stream);stream.flush();os.fsync(stream.fileno())
   os.replace(temp,path)
   fd=os.open(path.parent,os.O_RDONLY)
   try:os.fsync(fd)

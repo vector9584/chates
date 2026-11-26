@@ -14,7 +14,7 @@ def receipt_path(var,request_id):
  return Path(var)/'panel-state/restart-receipts'/(request_id+'.json')
 
 def open_receipt_dir(var,create=True):
- flags=os.O_RDONLY|os.O_DIRECTORY|getattr(os,'O_NOFOLLOW',0)
+ flags=os.O_RDONLY|getattr(os,'O_DIRECTORY',0)|getattr(os,'O_NOFOLLOW',0)
  # fnOS: /vol1 是 btrfs 子卷根（mode=000 + trim_acl），非 root 只有遍历权限、没有读权限，
  # 从 '/' 逐级 O_RDONLY|O_DIRECTORY 打开走到 vol1 这一跳直接 EACCES，
  # 于是回执永远写不出、重启核验永远失败（2026-11-11 面板卡在 failed/timeout 的根因）。
@@ -65,7 +65,7 @@ def finish(var,request_id,pid,start,exit_code,proc_root='/proc'):
  fd=None
  try:
   fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,'O_NOFOLLOW',0),0o600,dir_fd=directory)
-  with os.fdopen(fd,'w') as stream:fd=None;json.dump(payload,stream);stream.flush();os.fsync(stream.fileno())
+  with os.fdopen(fd,'w',encoding='utf-8') as stream:fd=None;json.dump(payload,stream);stream.flush();os.fsync(stream.fileno())
   try:
    existing=os.open(name,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0),dir_fd=directory)
    try:

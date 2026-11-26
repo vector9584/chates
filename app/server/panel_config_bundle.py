@@ -11,18 +11,21 @@ from pathlib import Path
 from panel_config_txn import ConfigError,checksum,read_file
 
 def sync_dir(path):
- fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY)
+ # Windows: 没有 O_DIRECTORY，也无法对目录 fsync；降级为跳过（Linux 行为不变）
+ try:fd=os.open(path,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
+ except (OSError,AttributeError):return
  try:os.fsync(fd)
+ except OSError:pass
  finally:os.close(fd)
 
 def private_write(path,raw):
- fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+ fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,'O_NOFOLLOW',0),0o600)
  with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
 
 def state_write(path,value):
  fd,temp=tempfile.mkstemp(prefix='.journal-',dir=path.parent)
  try:
-  with os.fdopen(fd,'w') as stream:json.dump(value,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
+  with os.fdopen(fd,'w',encoding='utf-8') as stream:json.dump(value,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
   os.replace(temp,path);sync_dir(path.parent)
  finally:
   if os.path.exists(temp):os.unlink(temp)
@@ -45,8 +48,8 @@ def publish(path,encoded,before,metadata):
  try:
   with os.fdopen(fd,'wb') as stream:
    if st:
-    os.fchmod(stream.fileno(),stat.S_IMODE(st.st_mode))
-    if (st.st_uid,st.st_gid)!=(os.getuid(),os.getgid()):os.fchown(stream.fileno(),st.st_uid,st.st_gid)
+    if hasattr(os,'fchmod'):os.fchmod(stream.fileno(),stat.S_IMODE(st.st_mode))
+    if hasattr(os,'getuid') and (st.st_uid,st.st_gid)!=(os.getuid(),os.getgid()):os.fchown(stream.fileno(),st.st_uid,st.st_gid)
    stream.write(encoded);stream.flush();os.fsync(stream.fileno())
   latest,latest_st=current(path)
   if latest!=before or (st is not None and (latest_st.st_dev,latest_st.st_ino)!=(st.st_dev,st.st_ino)):raise ConfigError('配置在提交期间改变，请重新读取核对',409)
@@ -54,7 +57,11 @@ def publish(path,encoded,before,metadata):
   else:
    try:os.link(temp,path)
    except FileExistsError:raise ConfigError('配置文件已被创建，请重新读取核对',409)
-   os.unlink(temp)
+   except (OSError,NotImplementedError):
+    # Windows 无硬链接权限时退化为非原子落盘
+    if os.path.exists(path):raise ConfigError('配置文件已被创建，请重新读取核对',409)
+    os.replace(temp,path)
+   else:os.unlink(temp)
   sync_dir(path.parent)
  finally:
   if os.path.exists(temp):os.unlink(temp)

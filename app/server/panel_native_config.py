@@ -141,9 +141,12 @@ def create_missing(path,root,encoded):
   try:os.link(temp,path)
   except FileExistsError:raise txn.ConfigError('配置在创建期间已出现，请重新读取',409)
   os.unlink(temp)
-  fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
-  try:os.fsync(fd)
-  finally:os.close(fd)
+  try:fd=os.open(path.parent,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
+  except (OSError,AttributeError):fd=None
+  if fd is not None:
+   try:os.fsync(fd)
+   except OSError:pass
+   finally:os.close(fd)
  finally:
   if os.path.exists(temp):os.unlink(temp)
 

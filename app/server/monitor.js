@@ -1008,6 +1008,49 @@ function _moduleLevelAutoRegisterMcp() {
     if(result.changed)log(`[MCP-BRIDGE] 已核对 ${Object.keys(entries).length} 个面板连接器，其余MCP配置保留`);
   }catch(error){log('[MCP-BRIDGE] 注册未完成，原配置保留: '+error.message);}
 }
+// ─── 本机桌面操作（windows-mcp）─────────────────────────────────────────
+// 出厂骨架的 mcp_servers 必须为空（CI 审计硬规则：出厂配置不许带任何 MCP），
+// 所以这条能力只能在启动时按本机实际情况补：
+//   装了 windows-mcp → 登记成 stdio 服务（无端口、无 token、跑在 App 自己的
+//   交互会话里，天然能操作桌面）；没装 → 一个字节都不动。
+// 只登记一次：用户主动删掉后不再硬塞回来。
+function _windowsMcpLaunch() {
+  if (process.platform !== 'win32') return null;
+  var home = process.env.USERPROFILE || '';
+  var appdata = process.env.APPDATA || '';
+  var cands = [];
+  if (process.env.WINDOWS_MCP_PY) cands.push({ command: process.env.WINDOWS_MCP_PY, args: ['-m', 'windows_mcp', 'serve', '--transport', 'stdio'] });
+  if (appdata) cands.push({ command: join(appdata, 'uv', 'tools', 'windows-mcp', 'Scripts', 'python.exe'), args: ['-m', 'windows_mcp', 'serve', '--transport', 'stdio'] });
+  if (home) cands.push({ command: join(home, '.local', 'bin', 'windows-mcp.exe'), args: ['serve', '--transport', 'stdio'] });
+  for (var i = 0; i < cands.length; i++) {
+    try { if (cands[i].command && existsSync(cands[i].command)) return cands[i]; } catch (e) {}
+  }
+  return null;
+}
+function _ensureWindowsDesktopMcp() {
+  try {
+    var stamp = join(VAR_DIR, 'windows-mcp-registered.json');
+    if (existsSync(stamp)) return;
+    var launch = _windowsMcpLaunch();
+    if (!launch) return;
+    var raw = '';
+    try { raw = readFileSync(HERMES_CONFIG, 'utf8'); } catch (e) { return; }
+    if (/^mcp_servers:\s*\n(?:[ \t].*\n)*?[ \t]+windows:/m.test(raw)) {
+      writeFileSync(stamp, JSON.stringify({ skipped: 'already-configured', at: new Date().toISOString() }));
+      return;
+    }
+    var result = configTransaction({
+      python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'),
+      state: join(VAR_DIR, 'panel-state'), file: HERMES_CONFIG,
+      body: { action: 'mcp_entry', name: 'windows', reason: '登记本机桌面操作',
+              entry: { command: launch.command, args: launch.args, timeout: 180 } }
+    });
+    if (result && result.ok) {
+      log('[WINDOWS-MCP] 已登记本机桌面操作（stdio）: ' + launch.command);
+      writeFileSync(stamp, JSON.stringify({ command: launch.command, at: new Date().toISOString() }));
+    }
+  } catch (error) { log('[WINDOWS-MCP] 登记未完成，原配置保留: ' + error.message); }
+}
 // 定期自愈：mcp_servers 被外部写操作（hermes 保存配置等）抹掉/覆盖时自动补回，
 // 解决连接器工具"过一段时间消失"的问题
 setInterval(function(){ try { _moduleLevelAutoRegisterMcp(); } catch (e) {} }, 180000);
@@ -1024,6 +1067,7 @@ function generateApiKey() {
 }
 
 mkdirSync(VAR_DIR, { recursive: true });
+_ensureWindowsDesktopMcp();
 initChatData();
 // No startup migration of user configuration.
 
