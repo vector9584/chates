@@ -223,7 +223,14 @@
           title: payload.title,
           body: payload.detail,
           contact: payload.name || '',
-          env: { version: payload.version || '', os: os, from: 'desktop' }
+          /* from 标来源：桌面 exe（Electron 注入了 CHATES_SHELL）记 desktop，
+             网页面板/公网入口记 web。以前写死 desktop，星图里所有记录都长一样，
+             排查时区分不出是哪个客户端来的。 */
+          env: {
+            version: payload.version || '',
+            os: os,
+            from: (shell ? 'desktop' : 'web')
+          }
         })
       }).catch(function () {});     /* 静默失败 */
     } catch (e) {}
@@ -406,21 +413,16 @@
     }
   }, true);
 
-  /* 右上角「问题反馈」图标：打开对外的问题提交页（2026-11-26 改）
+  /* 右上角「问题反馈」图标：本地表单（2026-11-26 定稿）
    *
-   * 为什么不再用本地弹窗：本地弹窗只是把问题写进本机的 var/issues/issues.jsonl，
-   * 装在别人电脑上时，那条记录永远躺在对方硬盘里，我这边一条都收不到 ——
-   * 用户以为反馈了，其实石沉大海。
+   * 表单先交到自己这一侧（POST /api/issue → <home>/var/issues/issues.jsonl），
+   * 生成本地编号；成功后静默再交一份到星图（reportUpstream），由 NAS 上的
+   * cron 同步成 GitHub issue。
    *
-   * 现在改成打开星图的 /report/ 页面，提交后经中转落到 NAS，再由后台同步成
-   * GitHub issue。页面地址从主进程注入（CHATES_SHELL.reportUrl），因为这个
-   * 地址不该硬编码在前端代码里，打包时按环境给。
-   *
-   * 带过去的参数：
-   *   code —— 上报码，让用户不用注册就能提交（码只能提交，读不到任何东西）
-   *   v    —— 客户端版本，省得用户自己填
-   *   os   —— 系统
-   *   from —— 来源标记，方便我区分是客户端还是网页提交的
+   * 为什么不是"点图标直接跳星图页面"：跳过去要重新填一遍，还要自己带版本号；
+   * 而本地这一份让「装在自己机器上」的用户也能在面板里看到自己报过什么。
+   * 为什么客户端不持上报码：安装包谁都能拿到，包里的码等于公开 —— 防线放在
+   * 服务端的指纹限流与去重上（见星图 api.php）。
    */
   window.pwIssueOpen = function () { open('form'); };
   window.pwIssueSummary = function () { open('summary'); };
