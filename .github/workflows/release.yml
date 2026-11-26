@@ -38,12 +38,15 @@ jobs:
           E=$(python3 -c "import json;print(json.load(open('electron/package.json'))['version'])")
           echo "win/version.json      = $V"
           echo "electron/package.json = $E"
+          # 版本号就是 tag，不加 v 前缀、不加 -win.N 后缀（2026-11-26 定）。
+          # 手工补 tag 时也兼容老写法 v1.20.8，剥掉前缀再比对。
           if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
             TAG="${GITHUB_REF_NAME}"
-            [ "$TAG" = "v$V" ] || { echo "::error::tag=$TAG 与版本 $V 不一致"; exit 1; }
+            PLAIN="${TAG#v}"
+            [ "$PLAIN" = "$V" ] || { echo "::error::tag=$TAG 与版本 $V 不一致"; exit 1; }
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=v$V" >> "$GITHUB_OUTPUT"
+            echo "tag=$V" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 凭据闸

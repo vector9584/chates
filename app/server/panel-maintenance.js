@@ -56,9 +56,9 @@ export function createMaintenanceHandler({repositories, checkToken, run = execFi
       url:d.html_url || `https://github.com/${cfg.owner}/${cfg.repo}/releases/latest`, assets};
   }
   function git(repo, args) {
-    return new Promise((resolve, reject) => run('git', ['-c', 'safe.directory='+repo.path, '-C', repo.path, ...args],
+    return new Promise((resolve, reject) => run('git', ['-c', 'safe.directory=*', '-C', repo.path, ...args],
       {timeout:10000, maxBuffer:2*1024*1024, env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}},
-      (error, stdout) => error ? reject(new Error(error.killed?'读取版本记录超时，请重试':'无法读取此仓库，请检查仓库路径、访问权限或升级后的 Git 指针')) : resolve(stdout)));
+      (error, stdout) => error ? reject(new Error(error.killed?'读取版本记录超时，请重试':'仓库暂时读不到')) : resolve(stdout)));
   }
   return async function maintenance(req, path) {
     if (!path.startsWith('/api/maintenance/') && !frozen.test(path)) return null;
