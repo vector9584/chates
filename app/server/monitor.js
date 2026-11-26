@@ -10,7 +10,7 @@ import {createUpdateHandler} from './panel-update.js';
 import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync, renameSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync, renameSync, cpSync } from "fs";
 import { randomBytes, createHash } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join, basename } from "path";
