@@ -156,15 +156,19 @@ def commit(path,root,raw,encoded,reason,details=None):
  if raw==encoded:return {'changed':False,'revision':checksum(raw)}
  current,stat=read_file(path)
  if current!=raw:raise ConfigError('配置已被其他进程修改，请重试',409)
- directory=Path(root)/'config-history';directory.mkdir(parents=True,exist_ok=True,mode=0o700)
- identifier=str(time.time_ns())+'-'+checksum(raw)[:12]
- backup=directory/(identifier+'.yaml')
- fd=os.open(backup,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
- with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
- metadata={'id':identifier,'file':str(path),'before':checksum(raw),'after':checksum(encoded),'reason':str(reason)[:160],'created_at':int(time.time()*1000),'details':details or {}}
- fd=os.open(directory/(identifier+'.json'),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
- with os.fdopen(fd,'w',encoding='utf-8') as stream:json.dump(metadata,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
- _sync_dir(directory)
+ directory=Path(root)/'config-history'
+ try:
+  directory.mkdir(parents=True,exist_ok=True,mode=0o700)
+  identifier=str(time.time_ns())+'-'+checksum(raw)[:12]
+  backup=directory/(identifier+'.yaml')
+  fd=os.open(backup,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+  with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
+  metadata={'id':identifier,'file':str(path),'before':checksum(raw),'after':checksum(encoded),'reason':str(reason)[:160],'created_at':int(time.time()*1000),'details':details or {}}
+  fd=os.open(directory/(identifier+'.json'),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+  with os.fdopen(fd,'w',encoding='utf-8') as stream:json.dump(metadata,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
+  _sync_dir(directory)
+ except PermissionError as error:
+  raise ConfigError('配置备份目录不可写：'+str(directory)+'（Windows 上常见于该目录曾由管理员/系统身份创建、当前用户无写权限；可用 icacls 给当前用户 (OI)(CI)F 授权后重试）',403) from error
  fd,temp=tempfile.mkstemp(prefix='.panel-config-',dir=Path(path).parent)
  try:
   with os.fdopen(fd,'wb') as stream:
