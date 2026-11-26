@@ -1,9 +1,60 @@
 import {execFile} from 'node:child_process';
+import {readFileSync} from 'node:fs';
 
 const frozen = /^\/api\/(?:hermes\/update(?:\/|$)|app\/(?:update(?:\/|$)|auto-update$|hot-patch$))/;
-export function createMaintenanceHandler({repositories, checkToken, run = execFile}) {
+export function createMaintenanceHandler({repositories, checkToken, run = execFile, releases = {}}) {
   const reply = (body, status = 200) => new Response(JSON.stringify(body), {status,
     headers: {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
+  /* 版本来源：Gitea 全量仓（内网，可能不可达）+ GitHub 发布仓（外网，人人可见）。
+     两边都查，前端自己决定显示哪几张。node fetch 在 TUN 下会被 RST，所以一律走 curl 子进程。 */
+  function curlJson(url, timeout = 8000) {
+    return new Promise(resolve => run('curl', ['-sS','-L','--max-time',String(Math.round(timeout/1000)),
+      '-H','Accept: application/vnd.github+json','-H','User-Agent: chates-panel', url],
+      {timeout: timeout + 2000, maxBuffer: 4*1024*1024, env: {...process.env, CURL_SSL_NO_REVOKE:'1'}},
+      (error, stdout) => {
+        if (error) return resolve({ok:false, error: error.killed ? '读取超时' : '无法连接'});
+        try { resolve({ok:true, data: JSON.parse(stdout)}); }
+        catch (_) { resolve({ok:false, error:'返回内容无法解析'}); }
+      }));
+  }
+  async function giteaRelease() {
+    const cfg = releases.gitea;
+    if (!cfg || !cfg.path) return {available:false, error:'未配置全量仓'};
+    try {
+      const [head, date, remote, file] = await Promise.all([
+        git({path:cfg.path}, ['rev-parse','--verify','HEAD']).catch(() => ''),
+        git({path:cfg.path}, ['log','-1','--no-show-signature','--format=%aI']).catch(() => ''),
+        git({path:cfg.path}, ['ls-remote','origin','refs/heads/main']).catch(() => ''),
+        Promise.resolve(cfg.versionFile || ''),
+      ]);
+      if (!head.trim()) return {available:false, error:'全量仓无法读取'};
+      let version = '', built = '';
+      if (file) {
+        try {
+          const raw = JSON.parse(readFileSync(file, 'utf8'));
+          version = raw.version || ''; built = raw.built || '';
+        } catch (_) {}
+      }
+      const remoteHead = (remote.trim().split('\t')[0] || '');
+      const localShort = head.trim(), ahead = remoteHead && remoteHead !== localShort;
+      return {available:true, kind:'gitea', version, built, head:localShort,
+        date: date.trim(), remoteHead: remoteHead.slice(0,12), synced: !ahead,
+        url: cfg.webUrl || ''};
+    } catch (error) { return {available:false, error:error.message}; }
+  }
+  async function githubRelease() {
+    const cfg = releases.github;
+    if (!cfg || !cfg.owner) return {available:false, error:'未配置发布仓'};
+    const api = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/releases/latest`;
+    const got = await curlJson(api);
+    if (!got.ok) return {available:false, error:got.error};
+    const d = got.data || {};
+    const assets = (d.assets || []).map(a => ({name:a.name, size:a.size,
+      url:a.browser_download_url, downloads:a.download_count}));
+    return {available:true, kind:'github', tag:d.tag_name || '', name:d.name || '',
+      published:d.published_at || '', prerelease: !!d.prerelease,
+      url:d.html_url || `https://github.com/${cfg.owner}/${cfg.repo}/releases/latest`, assets};
+  }
   function git(repo, args) {
     return new Promise((resolve, reject) => run('git', ['-c', 'safe.directory='+repo.path, '-C', repo.path, ...args],
       {timeout:10000, maxBuffer:2*1024*1024, env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}},
@@ -24,6 +75,10 @@ export function createMaintenanceHandler({repositories, checkToken, run = execFi
         } catch(error) {return {id:repo.id,name:repo.name,available:false,error:error.message};}
       }));
       return reply({ok:true,repositories:items});
+    }
+    if (path === '/api/maintenance/releases') {
+      const [gitea, github] = await Promise.all([giteaRelease(), githubRelease()]);
+      return reply({ok:true, gitea, github});
     }
     if (path === '/api/maintenance/activity') {
       const aurl = new URL(req.url), arepo = repositories.find(item => item.id === aurl.searchParams.get('repo'));

@@ -4353,9 +4353,13 @@ const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/pytho
 const handleConnectorTools = createConnectorToolsHandler({getConnector, readState: () => panelConnectorStore.all(), checkToken, call: callConnectorTool});
 const handleConnectorConfig = createConnectorHandler({catalog: CONNECTOR_CATALOG, store: panelConnectorStore, checkToken, probe: probeConnector});
 const handleMaintenance = createMaintenanceHandler({checkToken, repositories: [
-  {id: 'panel', name: '面板源码仓库', path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src')},
-  {id: 'python', name: 'Hermes Python 内核', path: join(APP_DIR, 'hermes-src')},
-]});
+  {id: 'panel', name: 'CHATÈS 全量源码仓', path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src')},
+], releases: {
+  /* Gitea 全量仓：只有拿得到内网的人才有这个目录，没有就自动退化成只显示 GitHub。 */
+  gitea: {path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src'),
+    versionFile: join(DATA_DIR, 'workspace/fnos-hermes-agent-src/win/version.json')},
+  github: {owner: 'vector9584', repo: 'chates'},
+}});
 const handleUsage = createUsageHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
 const handleEcho = createEchoHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
   queueFile: '/vol1/1000/飞牛文件/html/.acl/tasks/tasks.json', backupRoot: join(VAR_DIR, 'panel-state/echo-backups'),

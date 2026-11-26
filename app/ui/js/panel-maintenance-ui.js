@@ -337,7 +337,78 @@
     });
   }
 
+  /* ── 双版本并列：Gitea 全量仓（内网）+ GitHub 发布版（外网） ──
+     内网拿不到全量仓时 gitea.available=false，这里就不渲染那张卡，
+     只剩 GitHub 一张——外部用户看到的就是发布情况。 */
+  function bytes(n){
+    if(!n)return '0 B';
+    var u=['B','KB','MB','GB'],i=0;var v=Number(n)||0;
+    while(v>=1024&&i<u.length-1){v/=1024;i++;}
+    return (i?v.toFixed(1):v)+' '+u[i];
+  }
+  function dayText(iso){
+    if(!iso)return '';
+    var d=new Date(iso);
+    if(isNaN(d.getTime()))return String(iso).slice(0,10);
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function releaseCard(data){
+    var isGitea=data.kind==='gitea';
+    var card=el('article',undefined,'maintenance-release'+(isGitea?' is-gitea':' is-github'));
+    var head=el('div',undefined,'maintenance-release-head');
+    head.append(el('span',isGitea?'Gitea 全量仓':'GitHub 发布版','maintenance-release-kind'));
+    if(data.url){
+      var link=el('a','打开','maintenance-release-link');
+      link.href=data.url;link.target='_blank';link.rel='noopener';
+      head.append(link);
+    }
+    card.append(head);
+    var body=el('div',undefined,'maintenance-release-body');
+    if(isGitea){
+      body.append(el('strong',data.version||'未标记版本','maintenance-release-version'));
+      var meta=el('div',undefined,'maintenance-release-meta');
+      if(data.head)meta.append(el('code',String(data.head).slice(0,12)));
+      if(data.date)meta.append(el('span',dayText(data.date)+' 提交'));
+      if(data.head)meta.append(el('em',data.synced?'已同步到 Gitea':'本地领先于 Gitea',
+        'maintenance-release-sync'+(data.synced?' is-ok':' is-warn')));
+      body.append(meta);
+    }else{
+      body.append(el('strong',data.tag||'暂无发布','maintenance-release-version'));
+      var meta2=el('div',undefined,'maintenance-release-meta');
+      if(data.published)meta2.append(el('span',dayText(data.published)+' 发布'));
+      if(data.assets&&data.assets.length)meta2.append(el('span',data.assets.length+' 个下载'));
+      if(data.prerelease)meta2.append(el('em','预发布','maintenance-release-sync is-warn'));
+      body.append(meta2);
+      if(data.assets&&data.assets.length){
+        var list=el('ul',undefined,'maintenance-release-assets');
+        data.assets.slice(0,6).forEach(function(asset){
+          var li=el('li');
+          var link2=el('a',asset.name);
+          link2.href=asset.url;link2.target='_blank';link2.rel='noopener';
+          li.append(link2,el('span',bytes(asset.size)));
+          list.append(li);
+        });
+        body.append(list);
+      }
+    }
+    card.append(body);
+    return card;
+  }
+  async function renderReleases(){
+    var box=document.getElementById('maintenanceReleases');
+    if(!box)return;
+    try{
+      var data=await request('/api/maintenance/releases'),cards=[];
+      if(data.gitea&&data.gitea.available)cards.push(releaseCard(data.gitea));
+      if(data.github&&data.github.available)cards.push(releaseCard(data.github));
+      box.replaceChildren();
+      cards.forEach(function(card){box.append(card);});
+      box.hidden=!cards.length;
+    }catch(_){box.hidden=true;}
+  }
+
   window.renderMaintenancePage=async function(){
+    renderReleases();
     if(busy)return;busy=true;controls();feedback('正在读取本地仓库状态…');
     try{
       var data=await request('/api/maintenance/repositories'),tabs=document.getElementById('maintenanceRepositories');tabs.replaceChildren();
