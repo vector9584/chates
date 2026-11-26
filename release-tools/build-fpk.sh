@@ -151,7 +151,21 @@ rm -rf "$STAGE"; mkdir -p "$STAGE"
 #    关键：别自己预先打 app.tgz。fnpack 期望看到 app/ 目录并自行压缩；
 #    预先压好的 app.tgz 会被它当普通文件再压一层，导致内部 bin/ 找不到。
 mkdir -p "$STAGE/app"
-cp -a app/server app/ui app/version.json "$STAGE/app/" 2>/dev/null || true
+# 发布标记：面板顶栏 brandWordmark 与维护页靠 <APPDEST>/app/version.json 显示 GitHub 版本号
+# （server/panel-update.js 的 readInstalledVersion 读它；以前这里 cp 一个不存在的源文件，
+#  || true 把错误吞了，结果装上永远 not_a_release、顶栏空着 —— 2026-11-26 修）
+VER_PLAIN=$(python3 -c "import json;print(json.load(open('win/version.json'))['version'].split('-')[0])")
+cat > "$STAGE/app/version.json" <<JSON
+{
+  "name": "CHATES",
+  "tag": "$TAG",
+  "version": "$VER_PLAIN",
+  "date": "$(date -u +%Y-%m-%d)",
+  "repo": "https://github.com/vector9584/chates"
+}
+JSON
+ok "version.json  tag=$TAG  version=$VER_PLAIN"
+cp -a app/server app/ui "$STAGE/app/"
 # 内核 hermes-src 不在 app/ 下，在 electron 组装产物里（88MB，61.8MB 压缩后）。
 # 它是整个包体积的主体；漏了这层，产物 8.9MB vs 应有的 68MB —— 一眼能看出不对。
 SRC_CANDIDATES="electron/resources/chates/app/hermes-src app/hermes-src"
