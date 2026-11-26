@@ -58,11 +58,11 @@ Dashboard: 端口 9219
 
 | 环境变量 | 绝对路径 | 等价路径 | 用途 |
 |----------|----------|----------|------|
-| `$TRIM_PKGHOME` | `/vol1/@apphome/hermes-agent` | `/var/apps/hermes-agent/home` | 持久数据（config、venv、.env、sessions） |
+| `$TRIM_PKGHOME` | `/vol3/@apphome/chates` | `/var/apps/hermes-agent/home` | 持久数据（config、venv、.env、sessions） |
 | `$TRIM_PKGVAR` | `/vol1/@appdata/hermes-agent` | — | 运行时数据（tmp、logs、pid） |
 | `$TRIM_APPDEST` | `/var/apps/hermes-agent/target` | — | 运行路径（cmd 脚本、socket） |
 
-**`$TRIM_PKGHOME/data/` = `/vol1/@apphome/hermes-agent/data/` = `/var/apps/hermes-agent/home/data/`** — 这三个是**同一个目录**，Hermes 的 .env、config.yaml、weixin/accounts/ 都在这里。
+**`$TRIM_PKGHOME/data/` = `/vol3/@apphome/chates/data/` = `/var/apps/hermes-agent/home/data/`** — 这三个是**同一个目录**，Hermes 的 .env、config.yaml、weixin/accounts/ 都在这里。
 
 - 系统没有全局 python/pip，所有 Python 操作用 `uv`（如 `uv pip install <包>`、`uv pip list`）。uv 已软链接到 venv/bin，在 PATH 中可直接调用。
 - TRIM_* 环境变量仅 fnOS 回调时自动设置，SSH 直接执行为空，cmd/main 头部有 fallback 默认值

@@ -75,32 +75,37 @@ ok "manifest / app / cmd / 图标 齐"
 # 也就是说脱敏根本没进包，包一旦发出去就是泄漏。
 # 定则：app/ 为唯一真源，组包前单向同步过去。不带 --delete，
 # 避免误删 electron 侧特有的构建产物。
-if [ -d app/hermes-src ] && [ -d electron/resources/chates/app/hermes-src ]; then
-  rsync -a \
-    --exclude='web_dist' --exclude='node_modules' --exclude='__pycache__' \
-    --exclude='*.pyc' --exclude='.git' \
-    app/hermes-src/ electron/resources/chates/app/hermes-src/ \
-    || die "双副本同步失败（app/hermes-src -> electron/resources/chates/app/hermes-src）"
-  ok "双副本已同步（真源 app/hermes-src）"
-else
-  c '33' "  跳过双副本同步（app/hermes-src 或 electron 副本不存在）"
-fi
+# 注意不只是 hermes-src：electron 侧还有 server/、ui/ 两棵独立副本，
+# 实测 electron/.../app/server/panel_ds_suite.py 里同样留着真实姓名
+# （fpk 组包取 hermes-src 那份、不受影响，但 Windows exe 打的就是这一份）。
+# 三棵都同步，漏一棵就等于漏一条发布通道。
+for d in hermes-src server ui; do
+  if [ -d "app/$d" ] && [ -d "electron/resources/chates/app/$d" ]; then
+    rsync -a \
+      --exclude='web_dist' --exclude='node_modules' --exclude='__pycache__' \
+      --exclude='*.pyc' --exclude='.git' \
+      "app/$d/" "electron/resources/chates/app/$d/" \
+      || die "双副本同步失败（app/$d -> electron/resources/chates/app/$d）"
+  fi
+done
+ok "双副本已同步（真源 app/，覆盖 hermes-src/server/ui）"
 
 # ------------------------------------------------ 脱敏闸（2026-11-26 加）
 # 按值反搜，不按 key 名猜。命中即 die —— 宁可不发包，也不发泄漏包。
 # 注意 pipefail：grep 无匹配返回 1，管道整体就返回 1，set -e 会当场静默退出。
 # 必须用 { grep ... || true; } | wc -l 兜住（和上面 data-skeleton 凭据闸同一个坑）。
 LEAK_HITS=""
-for kw in '王瑞兵' '姜楠' '王娇'; do
-  n=$( { grep -rl "$kw" app/ 2>/dev/null || true; } | wc -l )
+SCAN_DIRS="app electron/resources/chates/app data-skeleton fpk-init"
+for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D'; do
+  n=$( { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | wc -l )
   if [ "${n:-0}" -gt 0 ]; then LEAK_HITS="$LEAK_HITS $kw($n)"; fi
 done
 if [ -n "$LEAK_HITS" ]; then
   c '31' "  脱敏闸命中:$LEAK_HITS"
-  for kw in '王瑞兵' '姜楠' '王娇'; do
-    { grep -rl "$kw" app/ 2>/dev/null || true; } | sed 's/^/    /'
+  for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D'; do
+    { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | sed 's/^/    /'
   done
-  die "app/ 里仍有真实姓名，先脱敏再打包"
+  die "仍有真实身份痕迹（app/、electron 副本、data-skeleton、fpk-init），先脱敏再打包"
 fi
 ok "脱敏闸通过（真实姓名 0 命中）"
 

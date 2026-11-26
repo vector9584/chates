@@ -501,13 +501,39 @@ if [ -d "${PROMPTS_SRC}" ]; then
     # AGENTS.md — 不存在才复制
     if [ -f "${PROMPTS_SRC}/AGENTS.md" ] && [ ! -f "${DATA_DIR}/AGENTS.md" ]; then
         cp "${PROMPTS_SRC}/AGENTS.md" "${DATA_DIR}/AGENTS.md"
-        log_msg "AGENTS.md deployed (first install)"
+        # 同 config.yaml：出厂文档里的绝对路径是构建机的，逐处改成本机实际位置
+        chmod 644 "${DATA_DIR}/AGENTS.md" 2>/dev/null || true
+        # 顺序要紧：带 /data 的长前缀先替换，否则裸前缀先命中的话
+        # 会得到 ${TRIM_PKGHOME}/data/data 这种双拼路径。
+        sed -i \
+            -e "s|/vol3/@apphome/chates/data|${DATA_DIR}|g" \
+            -e "s|/vol1/@apphome/hermes-agent/data|${DATA_DIR}|g" \
+            -e "s|/vol3/@apphome/chates|${TRIM_PKGHOME}|g" \
+            -e "s|/vol1/@apphome/hermes-agent|${TRIM_PKGHOME}|g" \
+            -e "s|/vol1/@appdata/hermes-agent|${VAR_DIR}|g" \
+            -e "s|/vol3/@appdata/chates|${VAR_DIR}|g" \
+            -e "s|/vol3/@appcenter/chates|${APP_DIR}|g" \
+            "${DATA_DIR}/AGENTS.md"
+        log_msg "AGENTS.md deployed (first install, 路径已重写)"
     fi
 
     # config.yaml — 不存在才复制（使用 prompts/ 中的模板）
     if [ -f "${PROMPTS_SRC}/config.yaml" ] && [ ! -f "${DATA_DIR}/config.yaml" ]; then
         cp "${PROMPTS_SRC}/config.yaml" "${DATA_DIR}/config.yaml"
-        log_msg "config.yaml deployed (first install)"
+        # 出厂模板里的绝对路径是构建机上的，装到别的机器全是死路径
+        # （MCP 命令、tts provider、media_delivery_allow_dirs 会一起失效）。
+        # 统一换成实际安装位置；notify-hub 是外部应用，不动。
+        # 顺序要紧：带 /data 的长前缀先替换，再替换裸前缀。
+        chmod 644 "${DATA_DIR}/config.yaml" 2>/dev/null || true
+        sed -i \
+            -e "s|/vol3/@apphome/chates/data|${DATA_DIR}|g" \
+            -e "s|/vol1/@apphome/hermes-agent/data|${DATA_DIR}|g" \
+            -e "s|/vol3/@apphome/chates|${TRIM_PKGHOME}|g" \
+            -e "s|/vol1/@apphome/hermes-agent|${TRIM_PKGHOME}|g" \
+            -e "s|/vol1/@appdata/hermes-agent|${VAR_DIR}|g" \
+            -e "s|/vol3/@appdata/chates|${VAR_DIR}|g" \
+            "${DATA_DIR}/config.yaml"
+        log_msg "config.yaml deployed (first install, 路径已重写为实际安装位置)"
     fi
 
     # 清理源目录（install_callback 只运行一次）

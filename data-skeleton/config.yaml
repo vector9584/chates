@@ -494,7 +494,7 @@ tts:
   providers:
     windows-indextts:
       type: command
-      command: /vol1/@apphome/hermes-agent/data/venv/bin/python /vol1/@apphome/hermes-agent/data/scripts/tts_windows.py {input_path} {output_path}
+      command: /vol3/@apphome/chates/data/venv/bin/python /vol3/@apphome/chates/data/scripts/tts_windows.py {input_path} {output_path}
       output_format: mp3
       timeout: 900
       max_text_length: 900
@@ -671,7 +671,7 @@ network:
   force_ipv4: false
 gateway:
   strict: true
-  media_delivery_allow_dirs: '["/vol1/@apphome/hermes-agent/data/assets"]'
+  media_delivery_allow_dirs: '["/vol3/@apphome/chates/data/assets"]'
   trust_recent_files: true
   trust_recent_files_seconds: 600
 streaming:
@@ -837,7 +837,7 @@ known_builtin_toolsets:
   - yuanbao
 mcp_servers:
   zotero:
-    command: /vol1/@apphome/hermes-agent/data/.local/bin/zotero-mcp
+    command: /vol3/@apphome/chates/data/.local/bin/zotero-mcp
     timeout: 60
     env:
       ZOTERO_LIBRARY_ID: ${ZOTERO_LIBRARY_ID}
@@ -852,7 +852,7 @@ mcp_servers:
     env:
       NOTIFY_HUB_TOKEN: ${NOTIFY_HUB_TOKEN}
   telegram:
-    command: /vol1/@apphome/hermes-agent/data/bin/tg-mcp-locked
+    command: /vol3/@apphome/chates/data/bin/tg-mcp-locked
     timeout: 60
     enabled: 'false'
   windows:
@@ -863,19 +863,19 @@ mcp_servers:
     headers:
       Authorization: Bearer ${WINDOWS_MCP_TOKEN}
   nekowhale-stickers:
-    command: /vol1/@apphome/hermes-agent/data/.local/bin/node
+    command: /vol3/@apphome/chates/data/.local/bin/node
     args:
-    - /vol1/@apphome/hermes-agent/data/.local/share/nk-stickers/node_modules/dsh-nekowhale-stickers/lib/cli.js
+    - /vol3/@apphome/chates/data/.local/share/nk-stickers/node_modules/dsh-nekowhale-stickers/lib/cli.js
     - mcp
     - --data
-    - /vol1/@apphome/hermes-agent/data/assets/nekowhale-stickers
+    - /vol3/@apphome/chates/data/assets/nekowhale-stickers
     env:
-      HOME: /vol1/@apphome/hermes-agent/data
-      PATH: /vol1/@apphome/hermes-agent/data/.local/bin:/usr/local/bin:/usr/bin:/bin
+      HOME: /vol3/@apphome/chates/data
+      PATH: /vol3/@apphome/chates/data/.local/bin:/usr/local/bin:/usr/bin:/bin
     timeout: 60
     connect_timeout: 10
   conn-tencent-news:
-    command: /vol1/@apphome/hermes-agent/data/node/bin/node
+    command: /vol3/@apphome/chates/data/node/bin/node
     args:
     - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
     - tencent-news
@@ -885,13 +885,13 @@ mcp_servers:
     headers:
       Authorization: Bearer lc1LUvvLuX81b4OsVS3b4SC952XDvGtARnrR5k3p6mR7OoHR
   conn-baidu-map:
-    command: /vol1/@apphome/hermes-agent/data/node/bin/node
+    command: /vol3/@apphome/chates/data/node/bin/node
     args:
     - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
     - baidu-map
     - '8650'
   conn-yuandian:
-    command: /vol1/@apphome/hermes-agent/data/node/bin/node
+    command: /vol3/@apphome/chates/data/node/bin/node
     args:
     - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
     - yuandian
@@ -916,9 +916,9 @@ platforms:
     enabled: true
     home_channel:
       platform: qqbot
-      chat_id: 8232B16CA5CBE30F3EAD47F358606507
+      chat_id: ""
       name: QQ 绑定会话
-      user_id: 8232B16CA5CBE30F3EAD47F358606507
+      user_id: ""
   weixin:
     token: [REDACTED]
     extra:
