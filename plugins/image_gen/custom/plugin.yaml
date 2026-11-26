@@ -1,7 +1,0 @@
-name: custom
-version: 1.0.0
-description: 自定义生图中转站（OpenAI 兼容 / Gemini 原生，三端点兜底）
-author: vector
-kind: backend
-provides_tools: []
-provides_hooks: []
