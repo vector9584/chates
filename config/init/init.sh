@@ -5,7 +5,7 @@
 
 set -u
 # 路径环境变量：fnOS 标准回调传入 TRIM_PKGHOME/TRIM_APPDEST/TRIM_PKGVAR
-DATA_DIR="${TRIM_PKGHOME:-/vol1/@apphome/hermes-agent}/data"
+DATA_DIR="${TRIM_PKGHOME:-/vol3/@apphome/chates}/data"
 INIT_DIR="${TRIM_APPDEST:-/var/apps/hermes-agent/target}/init"
 LOG_FILE="${TRIM_PKGVAR:-/var/apps/hermes-agent/var}/info.log"
 

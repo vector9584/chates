@@ -196,7 +196,7 @@ Dashboard: 端口 9219
 3. 若发现自己将输出与上一轮相同内容（复读），立即停止，改为汇报现状或建 todo 换路径。
 4. **同一「现象」连续两轮改不动，也必须停（2026-11-19，一天盲改十轮）**：判据不是"同一条命令"，是用户对**同一个症状**说第二次「不行 / 还是不行 / 没有效果」。第 3 次动同一个假设之前必须先拿到真实值（设备截图、线上读数、他的版本号），拿不到就摊牌"这条路我证伪不了"并回滚，禁止在未验证的假设上叠第三个补丁。**「不行」出现时的第二动作（第一动作是读 todo）是主动 `skill_view` 加载相关技能**——症状词不含领域关键词，索引匹配不到，不主动加载就只能凭印象改。改了前端还必须 bump `?v=`，否则等于没改。
 
-0i. **本机提权走免密 key，禁止 `sshpass -p`**：`ssh vector-nas 'sudo -n <cmd>'` 就是 root（key + sudo 免密已配好，别名在 `/home/hermes-agent/.ssh/config`）。`sshpass -p` 会让密码明文进 `ps`，本机任何用户都看得见，禁用。其他服务凭据（GITEA_TOKEN、NOWEN_* 等）统一在 `data/.env`，用时 source，不落明文。细节见 `fnos-remote-access`。
+0i. **本机提权走免密 key，禁止 `sshpass -p`**：`ssh <你配好的别名> 'sudo -n <cmd>'` 就是 root（key + sudo 免密需自行配好，别名在 `~/.ssh/config`）。`sshpass -p` 会让密码明文进 `ps`，本机任何用户都看得见，禁用。其他服务凭据统一在 `data/.env`，用时 source，不落明文。
 
 **0j. 改 Hermes 源码必须回流 git（双轨，2026-11-18 校准）**：改完 `target/ui/`、`target/server/` 等运行时代码，先在运行时验证生效，再把同一改动 commit + push 到源码仓 `data/workspace/fnos-hermes-agent-src`，否则算未完成。**Gitea（origin）= 真源，全量不脱敏，改完即推**；**GitHub = 阶段性脱敏产物，他说推才推**，别主动把原始内容推公开仓。
 

@@ -39,31 +39,39 @@ die() { c '31' "  FAIL $*"; exit 1; }
 # 版本号：fpk 的 manifest.version 用三段纯数字（0.21.149 这种），
 # 不能带 win.9 后缀——fnOS 应用中心按数字比对版本做升级判断。
 #
-# 语义映射：exe 用 semver 0.20.8，fpk 用 0.21.149 这一系。
-# 两边是不同分发通道，各自版本线性递增，不需要相等。
-FPK_VER="${FPK_VERSION:-$(python3 -c "
-import json,re
+# 来源优先级：
+#   1. FPK_VERSION 环境变量（显式覆盖）
+#   2. --tag 里的数字部分（v0.21.157 → 0.21.157；v0.20.0-win.9 → 0.21.0 由 minor+1 得）
+#   3. electron/package.json 推导（semver 通道 → fpk 通道 minor+1）
+FPK_VER="${FPK_VERSION:-}"
+if [ -z "$FPK_VER" ]; then
+  m=$(printf '%s' "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  if [ -n "$m" ]; then
+    FPK_VER="$m"
+  else
+    FPK_VER=$(python3 -c "
+import json
 d=json.load(open('electron/package.json', encoding='utf-8'))
-v=d['version']                     # 0.20.8
-maj,minor,patch=v.split('.')
+maj,minor,patch=d['version'].split('.')
 print(f'{maj}.{int(minor)+1}.{patch}')
-")}"
+")
+  fi
+fi
 
 # ------------------------------------------------ 预检
 c '1;36' "== fpk 预检 =="
 [ -f manifest ] || die "缺 manifest"
 [ -d app ]     || die "缺 app/"
 
-# 仓库里目录名带 fpk- 前缀（fpk-cmd/fpk-bin/fpk-init/fpk-wizard），
-# 而 fpk 内部结构要求叫 cmd/。这里做一次映射，别去改仓库目录名。
+# 仓库目录名与 fpk 内部结构一致（cmd/），保持对齐主仓命名。
 CMD_SRC=""
-for cand in cmd fpk-cmd; do [ -d "$cand" ] && { CMD_SRC="$cand"; break; }; done
-[ -n "$CMD_SRC" ] || die "缺 cmd/（或 fpk-cmd/）"
+for cand in cmd; do [ -d "$cand" ] && { CMD_SRC="$cand"; break; }; done
+[ -n "$CMD_SRC" ] || die "缺 cmd/"
 
-# fpk 资产（图标 + privilege + bootstrap）从真 fpk 提取后存在 fpk-assets/，
-# 不在仓库根目录乱放，也避免和 electron 的 icon.ico 混淆。
-[ -f fpk-assets/ICON.PNG ] || die "缺 fpk-assets/ICON.PNG（从官方 fpk 提取）"
-[ -f fpk-assets/privilege ] || die "缺 fpk-assets/privilege"
+# fpk 资产（图标 + privilege + bootstrap）从真 fpk 提取后存在 config/，
+# 与主仓 config/ 对齐；避免和 electron 的 icon.ico 混淆。
+[ -f config/ICON.PNG ] || die "缺 config/ICON.PNG（从官方 fpk 提取）"
+[ -f config/privilege ] || die "缺 config/privilege"
 ok "manifest / app / cmd / 图标 齐"
 
 # ------------------------------------------------ 双副本同步（2026-11-26 踩过）
@@ -95,7 +103,7 @@ ok "双副本已同步（真源 app/，覆盖 hermes-src/server/ui）"
 # 注意 pipefail：grep 无匹配返回 1，管道整体就返回 1，set -e 会当场静默退出。
 # 必须用 { grep ... || true; } | wc -l 兜住（和上面 data-skeleton 凭据闸同一个坑）。
 LEAK_HITS=""
-SCAN_DIRS="app electron/resources/chates/app data-skeleton fpk-init"
+SCAN_DIRS="app electron/resources/chates/app data-skeleton config/init"
 for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D'; do
   n=$( { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | wc -l )
   if [ "${n:-0}" -gt 0 ]; then LEAK_HITS="$LEAK_HITS $kw($n)"; fi
@@ -105,7 +113,7 @@ if [ -n "$LEAK_HITS" ]; then
   for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D'; do
     { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | sed 's/^/    /'
   done
-  die "仍有真实身份痕迹（app/、electron 副本、data-skeleton、fpk-init），先脱敏再打包"
+  die "仍有真实身份痕迹（app/、electron 副本、data-skeleton、config/init），先脱敏再打包"
 fi
 ok "脱敏闸通过（真实姓名 0 命中）"
 
@@ -206,7 +214,7 @@ ok "cmd/     $(ls "$CMD_SRC" | wc -l) 个脚本"
 # config/resource 是 fpk 声明共享数据目录的 JSON 文件（不是目录）。
 # 内容必须和 config/privilege 的 username 一致，否则装完数据目录归错属主。
 mkdir -p "$STAGE/config/prompts" "$STAGE/config/bootstrap"
-PKG_USER=$(python3 -c "import json;print(json.load(open('fpk-assets/privilege', encoding='utf-8'))['username'])")
+PKG_USER=$(python3 -c "import json;print(json.load(open('config/privilege', encoding='utf-8'))['username'])")
 cat > "$STAGE/config/resource" <<EOF
 {
     "data-share": {
@@ -223,9 +231,9 @@ cat > "$STAGE/config/resource" <<EOF
     }
 }
 EOF
-cp fpk-assets/privilege "$STAGE/config/privilege"
-if [ -f fpk-assets/hermes-version.env ]; then
-  cp fpk-assets/hermes-version.env "$STAGE/config/bootstrap/"
+cp config/privilege "$STAGE/config/privilege"
+if [ -f config/hermes-version.env ]; then
+  cp config/hermes-version.env "$STAGE/config/bootstrap/"
 fi
 # prompts 用脱敏骨架，不用本机 data（本机 data 有 169 个含指纹的技能 + .env 真凭据）
 cp data-skeleton/SOUL.md      "$STAGE/config/prompts/SOUL.md"
@@ -244,18 +252,18 @@ PY
 ok "manifest version = $FPK_VER"
 
 # 5) 图标（两个尺寸，应用中心要 ICON_256.PNG）
-cp fpk-assets/ICON.PNG "$STAGE/"
-if [ -f fpk-assets/ICON_256.PNG ]; then
-  cp fpk-assets/ICON_256.PNG "$STAGE/"
+cp config/ICON.PNG "$STAGE/"
+if [ -f config/ICON_256.PNG ]; then
+  cp config/ICON_256.PNG "$STAGE/"
 fi
 ok "ICON.PNG + ICON_256.PNG"
 
 # 6) LICENSE + wizard
 [ -f LICENSE ] && cp LICENSE "$STAGE/" || true
 # wizard 是应用中心的安装引导页（JSON 数组），缺了安装时会少一步说明
-if [ -d fpk-wizard ]; then
+if [ -d wizard ]; then
   mkdir -p "$STAGE/wizard"
-  cp -a fpk-wizard/. "$STAGE/wizard/" 2>/dev/null || true
+  cp -a wizard/. "$STAGE/wizard/" 2>/dev/null || true
   ok "wizard/  $(ls "$STAGE/wizard" | tr '\n' ' ')"
 fi
 
