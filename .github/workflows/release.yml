@@ -7,8 +7,21 @@ name: release
 # 为什么这么做：内核是上游代码快照，塞进 git 会让每次 clone 多搬 29MB，
 # 而且它跟本仓的改动节奏不同步。用 Release 资产 = 有版本、有 hash、可按需换。
 
+# 触发（2026-11-27 补 push 触发）：
+#   1) push tag             → 正式发版（版本号就是 tag，不加 v 前缀）
+#   2) push main            → 自动构建；版本号在 Release 里还不存在就一并发布，
+#                             已存在就只构建出 artifact 供下载，绝不覆盖线上资产
+#   3) workflow_dispatch    → 手动，dry=true 时只构建不发布
+# 这样"提交 GitHub 就自动打包"才成立：以前只认 tag，普通提交压根不触发。
 on:
   push:
+    branches:
+      - main
+    # 纯文档/说明改动不占 runner（打一次包：fpk ~10min + exe ~20min）
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
     tags:
       - '[0-9]*.[0-9]*.[0-9]*'
       - 'v[0-9]*'
@@ -28,27 +41,41 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.ver.outputs.tag }}
+      publish: ${{ steps.ver.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
 
       - name: 读版本号并校验 tag
         id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           V=$(python3 -c "import json;print(json.load(open('win/version.json'))['version'])")
           E=$(python3 -c "import json;print(json.load(open('electron/package.json'))['version'])")
           echo "win/version.json      = $V"
           echo "electron/package.json = $E"
+          [ "$V" = "$E" ] || { echo "::error::两个版本号不一致：$V vs $E"; exit 1; }
           # 版本号就是 tag，不加 v 前缀、不加 -win.N 后缀（2026-11-26 定）。
           # 手工补 tag 时也兼容老写法 v1.20.8，剥掉前缀再比对。
           if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
             TAG="${GITHUB_REF_NAME}"
             PLAIN="${TAG#v}"
             [ "$PLAIN" = "$V" ] || { echo "::error::tag=$TAG 与版本 $V 不一致"; exit 1; }
-            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=$V" >> "$GITHUB_OUTPUT"
+            TAG="$V"
+            # 普通提交：Release 里已经有这个版本号（且带资产）就只构建、不覆盖。
+            # 判据是资产是否存在，不是 Release 是否存在 —— 空壳 release 补传是合理的。
+            if gh release view "$TAG" --json assets -q '.assets | length' 2>/dev/null | grep -qv '^0$'; then
+              echo "Release $TAG 已有资产 → 本次只构建，不覆盖已发布产物"
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Release $TAG 无资产或不存在 → 构建后发布"
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: 凭据闸
         run: |
@@ -175,7 +202,7 @@ jobs:
   # 发布：两个产物 + latest.yml + SHA256SUMS 传同一个 Release
   publish:
     needs: [gate, fpk, exe]
-    if: ${{ !inputs.dry }}
+    if: ${{ needs.gate.outputs.publish == 'true' && !inputs.dry }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
