@@ -320,7 +320,60 @@
     }
   }, true);
 
-  window.pwIssueOpen = function () { open('form'); };
+  /* 右上角「问题反馈」图标：打开对外的问题提交页（2026-11-26 改）
+   *
+   * 为什么不再用本地弹窗：本地弹窗只是把问题写进本机的 var/issues/issues.jsonl，
+   * 装在别人电脑上时，那条记录永远躺在对方硬盘里，我这边一条都收不到 ——
+   * 用户以为反馈了，其实石沉大海。
+   *
+   * 现在改成打开星图的 /report/ 页面，提交后经中转落到 NAS，再由后台同步成
+   * GitHub issue。页面地址从主进程注入（CHATES_SHELL.reportUrl），因为这个
+   * 地址不该硬编码在前端代码里，打包时按环境给。
+   *
+   * 带过去的参数：
+   *   code —— 上报码，让用户不用注册就能提交（码只能提交，读不到任何东西）
+   *   v    —— 客户端版本，省得用户自己填
+   *   os   —— 系统
+   *   from —— 来源标记，方便我区分是客户端还是网页提交的
+   */
+  window.pwIssueOpen = function () {
+    var shell = (typeof window !== 'undefined' && window.CHATES_SHELL) || null;
+    var base = shell && shell.reportUrl ? String(shell.reportUrl) : '';
+    if (!base) {
+      /* 没注入地址（比如跑在浏览器里而不是客户端里）就退回本地弹窗，
+         至少别让按钮点了没反应。 */
+      open('form');
+      return;
+    }
+    var params = [];
+    var code = shell.reportCode ? String(shell.reportCode) : '';
+    if (code) params.push('code=' + encodeURIComponent(code));
+
+    var ver = (shell.appVersion ? String(shell.appVersion) : '');
+    if (ver) params.push('v=' + encodeURIComponent(ver));
+
+    var os = '';
+    try {
+      var ua = navigator.userAgent || '';
+      if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
+      else if (/Windows NT/.test(ua)) os = 'Windows';
+      else if (/Mac OS X/.test(ua)) os = 'macOS';
+      else if (/Linux/.test(ua)) os = 'Linux';
+    } catch (e) {}
+    if (os) params.push('os=' + encodeURIComponent(os));
+
+    var from = (shell.isDesktop ? 'desktop' : 'web');
+    params.push('from=' + from);
+
+    var sep = base.indexOf('?') >= 0 ? '&' : '?';
+    var url = base + (params.length ? sep + params.join('&') : '');
+
+    if (shell.openExternal && typeof shell.openExternal === 'function') {
+      shell.openExternal(url);          // 客户端：交给系统浏览器，别在应用内跳走
+    } else {
+      window.open(url, '_blank', 'noopener');
+    }
+  };
   window.pwIssueSummary = function () { open('summary'); };
   window.pwIssueClose = close;
 })();

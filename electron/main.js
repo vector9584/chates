@@ -18,7 +18,7 @@
 // 4. 端口被占时不硬起，先探一下是不是自己的实例。
 //    是 → 直接复用（用户双击两次不该起两个）；不是 → 报错让用户知道。
 
-const { app, BrowserWindow, dialog, shell, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, dialog, shell, Menu, nativeImage, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -26,6 +26,19 @@ const http = require('http');
 const net = require('net');
 
 const IS_WIN = process.platform === 'win32';
+
+// ── 离线优先：不因 Chromium 的后台联网动作拖慢启动 ────────────────
+// 用户 2026-11-26 报"打开后还要做一次联网请求"。除了 electron-updater
+// 拉 latest.yml（已改成手动触发），Chromium 自己还会做两件容易被误认为
+// "程序在联网"的事，在纯本机应用里都该关掉：
+//   1. 联网校验 SSL 证书吊销列表（CRL/OCSP）—— 内网无外网时会等到超时；
+//   2. 拼写检查词典下载 —— 我们本就没开 spellcheck，但后台仍可能拉。
+// 这两项不影响任何本地功能，关掉只减少启动路上的不确定等待。
+app.commandLine.appendSwitch('disable-features', 'SpellcheckService,OptimizationHints,MediaRouter');
+app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-component-update');
+app.commandLine.appendSwitch('no-pings');
+
 const RES = process.resourcesPath;           // 打包后 = <app>/resources
 
 // userData 默认按 app.getName() 落在 %APPDATA%\<name>。
@@ -43,7 +56,30 @@ let quitting = false;
 // ── 路径解析 ───────────────────────────────────────────────
 // 开发态（electron . 直接跑）与打包态目录结构不同，两边都要能跑，
 // 否则每次改壳都得先打包一遍才敢测。
+// 安装包里的运行时是单个 tar（见 assemble.sh 第 8 段）。
+// 安装器正常会解开它，但用户可能手工 copy 安装目录、或解压中途被打断，
+// 所以这里再兜一层：目录不在就自己解一次，而不是直接报"找不到 monitor.js"。
+function ensureRuntimeExtracted() {
+  const target = path.join(RES, 'chates');
+  const tarball = path.join(RES, 'chates.tgz');
+  if (fs.existsSync(path.join(target, 'app', 'server', 'monitor.js'))) return target;
+  if (!fs.existsSync(tarball)) return null;
+  try {
+    console.log('[chates] extracting runtime tarball -> ' + target);
+    fs.mkdirSync(target, { recursive: true });
+    const { execFileSync } = require('child_process');
+    // Windows 10 1803+ 自带 bsdtar，参数用 GNU 兼容写法
+    execFileSync('tar', ['-xzf', tarball, '-C', target], { stdio: 'ignore', windowsHide: true });
+    if (fs.existsSync(path.join(target, 'app', 'server', 'monitor.js'))) return target;
+    console.error('[chates] tar 解开后仍找不到 monitor.js');
+  } catch (e) {
+    console.error('[chates] extract failed: ' + e.message);
+  }
+  return null;
+}
+
 function resolveRoots() {
+  ensureRuntimeExtracted();
   const candidates = [
     path.join(RES, 'chates'),                    // 打包：resources/chates/
     path.join(__dirname, 'resources', 'chates'), // 开发
@@ -258,6 +294,12 @@ function createMainWindow() {
     },
   });
 
+  // 页面 <title> 不要覆盖窗口标题（2026-11-26 用户报"窗口左上角怎么还
+  // 写的 Hermes"）。虽然 index.html 的 <title> 已经改成 CHATÈS，但只要
+  // 网页里任何脚本改了 document.title，Electron 默认就会同步到窗口，
+  // 左上角又跑偏。这里显式接管：窗口标题永远是我们设的那个。
+  mainWindow.on('page-title-updated', (e) => { e.preventDefault(); });
+
   // 站内链接窗口内开，站外链接交给系统浏览器 —— 否则用户点个文档链接
   // 整个应用就变成网页浏览器了，回不来。
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -304,7 +346,6 @@ function createMainWindow() {
 // latest.yml 由 electron-builder 在 publish 配置存在时自动产出，和 Setup.exe 一起传上
 // Release —— 少了它 autoUpdater 会一直说"没有新版本"，这是最容易漏的一步。
 let updater = null;
-let manualCheck = false;   // 手动检查时把结果弹给用户，静默检查只写日志
 
 function loadUpdater() {
   if (!app.isPackaged) return null;
@@ -320,32 +361,19 @@ function loadUpdater() {
   updater.logger = logger;
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
+  // 手动检查时也别无限等：GitHub 在国内经常连不上，卡住不如早点告诉他。
+  updater.requestHeaders = { 'Cache-Control': 'no-cache' };
 
+  /* 常驻监听只记日志。给用户的提示统一由 checkUpdates 的 finish() 弹，
+     否则手动检查时这里弹一个、那边弹一个，一次点击两个框。 */
   updater.on('error', (e) => {
     logLine('update error: ' + (e && e.message));
-    if (manualCheck) {
-      manualCheck = false;
-      dialog.showMessageBox({ type: 'warning', title: '检查更新失败',
-        message: '没能连上更新服务器。',
-        detail: String((e && e.message) || e) + '\n\n网络恢复后可在「帮助 → 检查更新」重试。' });
-    }
   });
   updater.on('update-available', (info) => {
     logLine(`update available: ${info && info.version}`);
-    if (manualCheck) {
-      manualCheck = false;
-      dialog.showMessageBox({ type: 'info', title: '发现新版本',
-        message: `发现新版本 ${info && info.version}，正在后台下载。`,
-        detail: '下载完成后会提示你重启安装，不影响当前使用。' });
-    }
   });
   updater.on('update-not-available', () => {
     logLine('update: 已是最新');
-    if (manualCheck) {
-      manualCheck = false;
-      dialog.showMessageBox({ type: 'info', title: '已是最新版本',
-        message: `当前版本 ${app.getVersion()} 是最新的。` });
-    }
   });
   updater.on('download-progress', (p) => {
     if (p && p.percent) logLine(`update download ${p.percent.toFixed(1)}%`);
@@ -368,15 +396,154 @@ function loadUpdater() {
   return updater;
 }
 
-function checkUpdates(manual) {
+/* 检查更新。返回 Promise<{status, version?, message?}>，status 取值：
+     dev | update | latest | error | timeout
+   两条调用路径共用它：
+     - 菜单「帮助 → 检查更新」：quiet=false，自己弹系统对话框
+     - 顶栏版本号药丸（IPC）：quiet=true，结果回给页面，用页面内的 toast 提示
+   为什么改成返回 Promise：原来它只弹 dialog 不返回结果，页面那头只能干等，
+   最后落到 30 秒超时 —— 看不出到底是"已是最新"还是"连不上"。
+   updater 的事件回调在 updater.js 里（update-available / update-not-available /
+   error），这里用一次性监听把结果等出来，超时兜底。 */
+function checkUpdates(manual, quiet) {
   const u = loadUpdater();
   if (!u) {
-    if (manual) dialog.showMessageBox({ type: 'info', title: '当前为开发模式',
+    if (manual && !quiet) dialog.showMessageBox({ type: 'info', title: '当前为开发模式',
       message: '开发态不检查更新，打包安装后才生效。' });
-    return;
+    return Promise.resolve({ status: 'dev' });
   }
-  manualCheck = !!manual;
-  u.checkForUpdates().catch((e) => logLine('checkForUpdates 抛出: ' + (e && e.message)));
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (r) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(guard);
+      try { u.removeListener('update-available', onAvail); } catch (_) {}
+      try { u.removeListener('update-not-available', onNone); } catch (_) {}
+      try { u.removeListener('error', onErr); } catch (_) {}
+      if (manual && !quiet) {
+        if (r.status === 'update') {
+          dialog.showMessageBox({ type: 'info', title: '发现新版本',
+            message: `发现新版本 ${r.version || ''}，正在后台下载。`,
+            detail: '下载完成后会提示重启安装。' });
+        } else if (r.status === 'latest') {
+          dialog.showMessageBox({ type: 'info', title: '已是最新版本',
+            message: `当前 ${app.getVersion()} 已是最新。` });
+        } else if (r.status === 'timeout') {
+          dialog.showMessageBox({ type: 'warning', title: '检查更新超时',
+            message: '连不上更新服务器（30 秒无响应）。',
+            detail: '国内访问 GitHub 常常不通。这不影响本地功能，联网后点顶栏版本号重试。' });
+        } else if (r.status === 'error') {
+          dialog.showMessageBox({ type: 'warning', title: '检查更新失败',
+            message: String(r.message || '未知错误') });
+        }
+      }
+      resolve(r);
+    };
+    const onAvail = (info) => finish({ status: 'update', version: (info && info.version) || '' });
+    const onNone = () => finish({ status: 'latest' });
+    const onErr = (e) => { logLine('checkForUpdates 抛出: ' + (e && e.message)); finish({ status: 'error', message: String(e && e.message || e) }); };
+    const guard = setTimeout(() => {
+      logLine('checkForUpdates 超时（30s），按无网处理');
+      finish({ status: 'timeout' });
+    }, 30000);
+
+    try {
+      u.on('update-available', onAvail);
+      u.on('update-not-available', onNone);
+      u.on('error', onErr);
+    } catch (_) {}
+
+    u.checkForUpdates()
+      .then((res) => {
+        /* electron-updater 的返回值里通常带 updateInfo，
+           但事件也可能先触发。谁先到谁说话，finish 幂等。 */
+        if (res && res.updateInfo && !settled) {
+          const cur = app.getVersion();
+          const nv = res.updateInfo.version || '';
+          if (nv && nv !== cur) finish({ status: 'update', version: nv });
+          else if (nv) finish({ status: 'latest' });
+        }
+      })
+      .catch(onErr);
+  });
+}
+
+/* 顶栏「GitHub 版本号」点一下触发检查更新（2026-11-26）。
+   原来这个功能只在「帮助 → 检查更新」，但主窗口 autoHideMenuBar: true，
+   菜单栏默认不显示，用户压根找不到 —— 报"你是不是乱说的"。
+   改成同时提供 IPC 入口，页面上的版本号药丸就是按钮。
+   返回 { ok, status, message }，页面据此提示；永远 resolve，不抛。 */
+ipcMain.handle('chates:check-updates', async () => {
+  try {
+    const r = await checkUpdates(true, true);
+    const map = {
+      dev: '开发模式下不检查更新',
+      update: `发现新版本 ${(r && r.version) || ''}，正在后台下载`,
+      latest: '已是最新版本',
+      timeout: '连不上更新服务器（30 秒无响应）',
+      error: (r && r.message) || '检查更新失败',
+    };
+    return {
+      ok: !!(r && (r.status === 'update' || r.status === 'latest')),
+      status: (r && r.status) || 'unknown',
+      version: (r && r.version) || '',
+      message: map[(r && r.status)] || '检查完成',
+    };
+  } catch (e) {
+    return { ok: false, status: 'error', message: String(e && e.message || e) };
+  }
+});
+
+/* 打开外部链接（2026-11-26，问题上报用）。
+   为什么走 IPC 而不是页面里直接 window.open：页面里开外链会被 setWindowOpenHandler
+   拦成 deny，用户点了图标看起来没反应。这里显式交给系统浏览器。
+   只放行 http/https —— 别让前端随便传一个 file:// 过来读本机文件。 */
+ipcMain.handle('chates:open-external', async (_evt, url) => {
+  const u = String(url || '');
+  if (!/^https?:\/\//i.test(u)) return { ok: false, error: '只允许 http/https' };
+  try {
+    await shell.openExternal(u);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
+/* 问题上报配置加载（2026-11-26）。
+ *
+ * 放哪儿：userData/report.json（Windows 下是 %APPDATA%\CHATÈS\report.json）。
+ * 为什么不写进代码里：
+ *   1. 上报码是可吊销的 —— 万一被滥用，我在服务端换一个码，用户不用重装；
+ *   2. 安装包不该内嵌任何会变的东西，否则每改一次都要重新打包发版。
+ *
+ * 文件长这样：
+ *   { "url": "https://ruibing.wang/report/", "code": "ct_xxxx" }
+ *
+ * 带默认值兜底：文件不存在 / 解析失败 / 字段缺失，都退回内置默认，
+ * 不让「反馈按钮点了没反应」这种小故障变成一个空白弹窗。
+ * 注意这里绝不写 key 日志 —— 码本身不是密钥，但它不该满日志乱飞。 */
+const DEFAULT_REPORT_URL = 'https://ruibing.wang/report/';
+
+function loadReportConfig() {
+  process.env.CHATES_APP_VERSION = app.getVersion();
+
+  let cfg = {};
+  try {
+    const p = path.join(app.getPath('userData'), 'report.json');
+    if (fs.existsSync(p)) {
+      cfg = JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+    }
+  } catch (e) {
+    // 配置坏了不影响启动，用默认值
+  }
+
+  const url = (typeof cfg.url === 'string' && /^https?:\/\//i.test(cfg.url))
+    ? cfg.url
+    : DEFAULT_REPORT_URL;
+  process.env.CHATES_REPORT_URL = url;
+  process.env.CHATES_REPORT_CODE = (typeof cfg.code === 'string') ? cfg.code : '';
 }
 
 function buildMenu() {
@@ -484,11 +651,16 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    loadReportConfig();
     buildMenu();
     boot();
     // 启动 20 秒后静默查一次：错开启动高峰。失败不弹窗——
     // 首次安装当天没网很常见，等用户手动查再报。
-    setTimeout(() => checkUpdates(false), 20000);
+    // 不在启动后自动联网检查（2026-11-26 用户报"打开后还要做一次联网请求"）。
+    // 原因：electron-updater 会去 github.com 拉 latest.yml。国内网络下这一步
+    // 要么等很久，要么一直挂着，用户看到的就是"启动完还在转"。
+    // 改成只在「帮助 → 检查更新」里手动触发；有网的时候顺手去点一次即可。
+    // 不想联网就完全不会发请求，本地功能一概不受影响。
   });
 
   app.on('window-all-closed', () => {
