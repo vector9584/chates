@@ -15,6 +15,12 @@ from panel_config_txn import config_lock
 from panel_model_catalog import entries as model_entries,enabled,available_models,provider_fields
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 TASKS = [('vision','图像理解'),('web_extract','网页提取'),('compression','上下文压缩'),
          ('skills_hub','技能库'),('approval','审批判定'),('mcp','MCP 调用'),

@@ -34,21 +34,70 @@ function setBrandConnection(state,label){
    有未提交改动时药丸带一个 * ；标题里给全 sha / 时间 / 提交说明；点一下复制全号。
    为什么不用匿名 GitHub API：NAS 出口 IP 是共享的，60 次/小时早被别的活吃光——今天实测就撞了 403，
    药丸一直挂在「--」上，比不显示还糟。 */
+/* 顶栏「GitHub 版本号」药丸的点击行为：检查更新；Shift+点击复制版本号。
+   抽成函数是因为两条分支都要它 —— 有版本信息时（显示 tag）和没有时
+   （显示"检查更新"）绑的是同一套逻辑，各写一遍必然走岔。
+   NAS 网页端没有 CHATES_SHELL，退回复制，不报错。 */
+function bindCheckUpdate(el, tag, ev){
+  if(ev && ev.shiftKey){
+    if(!tag) return;
+    try{ navigator.clipboard.writeText(tag); if(window.ui&&ui.toast) ui.toast('已复制 '+tag); }
+    catch(e){}
+    return;
+  }
+  var shellWin = window.CHATES_SHELL;
+  if(!shellWin || typeof shellWin.checkUpdates!=='function'){
+    /* 浏览器 / NAS 网页环境：没有桌面壳，退回复制版本号 */
+    if(!tag) return;
+    try{ navigator.clipboard.writeText(tag); if(window.ui&&ui.toast) ui.toast('已复制 '+tag); }
+    catch(e){}
+    return;
+  }
+  if(el.dataset.checking==='1') return;
+  el.dataset.checking='1';
+  var prev = el.textContent;
+  el.textContent = '检查中…';
+  var tip = function(msg){
+    try{
+      if(window.__hzToast) window.__hzToast({key:'chk-upd',type:'info',duration:4000,title:'检查更新',message:msg});
+      else if(window.ui&&ui.toast) ui.toast(msg);
+    }catch(e){}
+  };
+  shellWin.checkUpdates().then(function(r){
+    el.dataset.checking='';
+    el.textContent = prev;
+    if(!r){ tip('检查完成'); return; }
+    if(r.status==='update') tip(r.message||('发现新版本 '+(r.version||'')));
+    else if(r.status==='latest') tip('已是最新版本');
+    else if(r.status==='dev') tip('开发模式下不检查更新');
+    else if(r.status==='timeout') tip('连不上更新服务器（30 秒无响应），本地功能不受影响');
+    else tip(r.message||'检查更新失败');
+  }).catch(function(e){
+    el.dataset.checking='';
+    el.textContent = prev;
+    tip('检查更新失败：'+((e&&e.message)||e));
+  });
+}
+
 function applyPanelVerGh(d){
   var el=document.getElementById('brandVerGh'); if(!el) return;
-  if(!d||!d.tag){ el.style.display='none'; return; }
+  if(!d||!d.tag){
+    /* 没有 GitHub 版本信息也保留药丸：桌面壳里它是「检查更新」的入口，
+       藏起来等于功能没了。文字退成提示语，点一下照样能用。 */
+    el.textContent='检查更新';
+    el.title='点击检查更新\nShift+点击复制版本号';
+    el.style.display='';
+    el.style.cursor='pointer';
+    el.onclick=function(ev){ bindCheckUpdate(el, '', ev); };
+    return;
+  }
   el.textContent=d.tag;
   var full='GitHub 发布版 '+d.tag;
   if(d.date) full+='\n'+String(d.date).replace('T',' ').slice(0,16);
   if(d.name) full+='\n'+d.name;
   el.title=full;
   el.style.display='';
-  el.onclick=function(){
-    var t=d.tag||'';
-    if(!t) return;
-    try{ navigator.clipboard.writeText(t); if(window.ui&&ui.toast) ui.toast('已复制 '+t); }
-    catch(e){}
-  };
+  el.onclick=function(ev){ bindCheckUpdate(el, d.tag||'', ev); };
 }
 /* GitHub 版标记：只有真的从 GitHub 发布版跑起来时才显示。
    NAS 开发机上两个标都有（Gitea 提交号 + GitHub 版本），别人装 exe 只看到 GitHub 那个。
@@ -61,7 +110,11 @@ function loadGitHubVersion(){
   }).then(function(j){
     if(!j||!j.ok||!j.tag) throw new Error('no tag');
     applyPanelVerGh(j);
-  }).catch(function(){ el.style.display='none'; });
+  }).catch(function(){
+    /* 拿不到 GitHub 版本不能让药丸消失 —— 它是检查更新的入口。
+       喂个空对象，落进 applyPanelVerGh 的「无版本号」分支。 */
+    applyPanelVerGh(null);
+  });
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(loadGitHubVersion,1100); });
 else setTimeout(loadGitHubVersion,1100);

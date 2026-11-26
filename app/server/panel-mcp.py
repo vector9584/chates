@@ -7,6 +7,12 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 from panel_config_txn import ConfigError,config_lock,read_file,load_yaml,plain,semantic,checksum,commit
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 VISIBLE=('command','args','url','transport','timeout','connect_timeout','tools')
 def revision(value):return checksum(semantic(value).encode())

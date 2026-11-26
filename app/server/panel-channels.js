@@ -3,9 +3,13 @@ import {join} from 'node:path';
 export function createChannelsService({python,serverRoot,getConfig,state,checkToken,changed=()=>{},observe=()=>({verified:false,reason:"record_unavailable",platforms:{}}),start=spawn}){
  async function execute(body){
   const result=await new Promise(resolve=>{
-   const child=start(python,['-B',join(serverRoot,'panel-channels.py'),getConfig(),state],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',done=false;
+   // Windows 下子进程的 locale 编码是系统代码页（简体中文 = 936/GBK），
+   // node 直接 `output += part` 会按 UTF-8 解码，于是渠道名、备注全成乱码。
+   // 两条一起做：显式声明子进程 stdin/stdout 用 UTF-8，同时把收到的
+   // Buffer 明确按 utf8 转字符串，不让 += 的隐式转换决定编码。
+   const child=start(python,['-B',join(serverRoot,'panel-channels.py'),getConfig(),state],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONIOENCODING:'utf-8',PYTHONUTF8:'1'}});let output='',bytes=0,done=false;
    const finish=data=>{if(done)return;done=true;clearTimeout(timer);resolve(data);};const timer=setTimeout(()=>{child.kill();finish({ok:false,error:'通讯配置处理超时，请刷新核对',status:504});},15000);
-   child.stdout.on('data',part=>{output+=part;if(Buffer.byteLength(output)>2*1024*1024){child.kill();finish({ok:false,error:'通讯配置内容过大',status:413});}});child.stderr.resume();child.stdin.on('error',()=>{});child.on('error',()=>finish({ok:false,error:'通讯配置服务无法启动',status:503}));child.on('close',()=>{try{finish(JSON.parse(output));}catch{finish({ok:false,error:'通讯配置未返回处理结果，请刷新核对',status:502});}});child.stdin.end(JSON.stringify(body));
+   child.stdout.on('data',part=>{output+=part.toString('utf8');bytes+=part.length;if(bytes>2*1024*1024){child.kill();finish({ok:false,error:'通讯配置内容过大',status:413});}});child.stderr.resume();child.stdin.on('error',()=>{});child.on('error',()=>finish({ok:false,error:'通讯配置服务无法启动',status:503}));child.on('close',()=>{try{finish(JSON.parse(output));}catch{finish({ok:false,error:'通讯配置未返回处理结果，请刷新核对',status:502});}});child.stdin.end(JSON.stringify(body));
   });
   if(result.ok&&result.changed){try{changed('通讯渠道配置');}catch{return {...result,ok:false,saved:true,error:'通讯配置已保存，但待应用记录未写入，请刷新核对后重启应用',status:503};}}
   return result;

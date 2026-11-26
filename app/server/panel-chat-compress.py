@@ -29,6 +29,12 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 # ── 与 monitor.js estimateTokens 完全同口径，保证压缩前后百分比可比 ──────────
 _CJK_RANGES = (

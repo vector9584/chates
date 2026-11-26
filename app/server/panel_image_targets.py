@@ -17,6 +17,12 @@
 """
 import json
 import sys
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 
 def load_yaml(path):

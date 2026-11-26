@@ -16,6 +16,12 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 from ruamel.yaml import YAML
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 class ConfigError(Exception):
  def __init__(self,message,status=400):super().__init__(message);self.status=status

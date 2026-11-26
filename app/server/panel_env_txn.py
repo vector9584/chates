@@ -6,6 +6,12 @@ import sys
 from pathlib import Path
 from dotenv.parser import parse_stream
 from panel_config_txn import ConfigError,checksum,config_lock,read_file,commit
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 def parse(raw):
  try:text=(raw.decode('utf-8-sig') if isinstance(raw,bytes) else raw).removeprefix('\ufeff')

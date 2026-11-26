@@ -1,6 +1,12 @@
 """Serialized VAR drain record mutations shared by Monitor and fnOS stop."""
 import contextlib,fcntl,json,os,sys,time,uuid
 from pathlib import Path
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 class DrainStoreError(Exception):pass
 

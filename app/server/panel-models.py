@@ -12,6 +12,12 @@ def revision(value):return checksum(semantic(value).encode())
 def subset(data):return {key:data[key] for key in FIELDS if key in data}
 from panel_model_catalog import enabled,entries,model_rows,model_ids,available_models,credential_fields,CREDENTIAL_FIELDS,provider_fields,REQUEST_EXTRA_BLOCKED
 from panel_model_credentials import inspect as inspect_credentials
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 # ── 官方服务商预设：面板下拉的唯一数据源 ──────────────────────────────
 # 2026-11-16：这份表原来在 app/server/provider-config.js 里，全仓没有任何文件

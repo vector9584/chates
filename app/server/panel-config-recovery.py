@@ -3,6 +3,12 @@ import json,sys
 from pathlib import Path
 from panel_config_txn import ConfigError,config_lock
 from panel_config_bundle import inspect_pending,resolve_pending
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 def execute(body,home,state):
  home=Path(home);allowed=[home]

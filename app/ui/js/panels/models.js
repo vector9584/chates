@@ -50,6 +50,19 @@ function loadConfig(){
 }
 /* 未配置模型的提示：2026-11-14 起不再往聊天页 DOM 里插一条 #modelConfigBanner，
    改走统一通知组件（key='model-config'）。语义不变：提醒 + 一键去「模型」页。 */
+/* 统一的「去配置模型」落点：服务商 → LLM 服务。
+   多处入口共用，改一处就够，不会出现某个入口还停在概览页。 */
+function gotoProviderConfig(){
+  try {
+    if (window.MV2 && typeof window.MV2.go === 'function') {
+      window.MV2.go('providers', 'llm');
+      return;
+    }
+  } catch (_) {}
+  try { switchPage('models'); } catch (_) {}
+}
+window.gotoProviderConfig = gotoProviderConfig;
+
 function renderConfigBanner(){
   if(window.__hermesConfigured !== false){
     if(window.__hzToast && window.__hzToast.dismiss) window.__hzToast.dismiss('model-config');
@@ -62,7 +75,12 @@ function renderConfigBanner(){
     message:'先添加一个模型供应商并填写 API Key，配好就能直接对话。',
     actions:[
       {label:'稍后', onClick:'close'},
-      {label:'去配置模型', primary:true, onClick:function(){ switchPage('models'); }}
+      /* 2026-11-26：未配置时应直接落在「服务商 → LLM 服务」。
+         原来只 switchPage('models')，停在概览页，得再点两下才到能填
+         API Key 的地方 —— 用户报"跳转到的是模型-概览，应该直接跳转到服务商"。
+         MV2.go 负责域切换 + 子页签 + 重渲染；MV2 未加载时（首启首屏）
+         退回 switchPage，至少不白屏。 */
+      {label:'去配置模型', primary:true, onClick:function(){ gotoProviderConfig(); }}
     ]
   });
 }

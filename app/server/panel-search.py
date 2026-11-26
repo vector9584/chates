@@ -12,6 +12,12 @@
 """
 import json, sqlite3, sys, time
 from pathlib import Path
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 root = Path(sys.argv[1]); var = Path(sys.argv[2])
 q = sys.argv[3].strip(); offset = int(sys.argv[4]) if len(sys.argv) > 4 else 0

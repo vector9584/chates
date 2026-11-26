@@ -11,6 +11,12 @@ import stat
 import sys
 import time
 import uuid
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 LIMIT = 8 * 1024 * 1024
 NOFOLLOW = os.O_NOFOLLOW

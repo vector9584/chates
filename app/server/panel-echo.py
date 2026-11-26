@@ -10,6 +10,12 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 STATUSES = ('staged', 'pending', 'doing', 'review', 'done', 'failed', 'dropped')
 TYPES = ('开发', '研究', '运维', '内容', '生活', '其他')

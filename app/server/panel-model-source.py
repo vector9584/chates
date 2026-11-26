@@ -5,6 +5,12 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from panel_model_catalog import entries,enabled,available_models,detected_mode,credential_fields,provider_fields
 from panel_config_txn import ConfigError,read_file,load_yaml,config_lock
 from panel_env_txn import parse
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 class Failure(Exception):pass
 

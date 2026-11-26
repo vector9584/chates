@@ -10,6 +10,12 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'python'))
 
 from panel_drain_store import locked_record,write_record,DrainStoreError
 from panel_drain_bridge import _live_stop_owner
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 class LifecycleError(Exception):pass
 

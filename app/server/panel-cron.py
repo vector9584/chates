@@ -7,6 +7,12 @@ import re
 import sys
 import time
 from pathlib import Path
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 EDITABLE = ('name', 'prompt', 'schedule', 'deliver', 'skills', 'repeat', 'script', 'workdir', 'model', 'provider', 'base_url', 'no_agent', 'context_from', 'enabled_toolsets', 'attach_to_session')
 

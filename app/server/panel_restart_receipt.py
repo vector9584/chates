@@ -2,6 +2,12 @@
 import json,os,re,secrets,stat,sys,time
 from pathlib import Path
 from panel_lifecycle import Lifecycle
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 def receipt_path(var,request_id):
  if not isinstance(request_id,str) or not re.fullmatch(r'[0-9a-f-]{36}',request_id):raise ValueError('invalid restart request id')

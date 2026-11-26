@@ -9,6 +9,12 @@ from panel_config_txn import ConfigError,config_lock,read_file,load_yaml,checksu
 from panel_config_bundle import commit_bundle,payload
 from panel_env_txn import parse,render
 from panel_channel_schema import CATALOG,AUTH_PREFIXES,ACCESS_FIELDS
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 def startup_authorization(state,env):
  # Match spawnHermes: inherited env -> app default -> .env.providers -> .env.

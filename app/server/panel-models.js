@@ -269,7 +269,7 @@ export function createModelsService({python,serverRoot,getConfig,state,varRoot,c
  }
  async function execute(body){
   const result=await new Promise(resolve=>{
-   const child=start(python,['-B',join(serverRoot,'panel-models.py'),getConfig(),state,...(varRoot?[varRoot]:[])],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});let output='',done=false;
+   const child=start(python,['-B',join(serverRoot,'panel-models.py'),getConfig(),state,...(varRoot?[varRoot]:[])],{stdio:['pipe','pipe','pipe'],env:{...process.env,PYTHONIOENCODING:'utf-8',PYTHONUTF8:'1',PYTHONDONTWRITEBYTECODE:'1'}});let output='',done=false;
    const finish=data=>{if(done)return;done=true;clearTimeout(timer);resolve(data);};
    /* 2026-11-23：能力批量探测要真发请求（思考强度那一项 single 就要 40~100 秒），
       15 秒的固定窗口会把它砍成 504「模型配置处理超时」，用户看到的是超时而不是结果。
@@ -277,7 +277,7 @@ export function createModelsService({python,serverRoot,getConfig,state,varRoot,c
       放宽了反而会把「Python 卡住」这种真故障藏起来。 */
    const budget=/^(cap_batch_run|ds_suite_run)$/.test(String(body&&body.action||''))?240000:15000;
    const timer=setTimeout(()=>{child.kill();finish({ok:false,error:'模型配置处理超时，请刷新核对',status:504});},budget);
-   child.stdout.on('data',part=>{output+=part;if(Buffer.byteLength(output)>2*1024*1024){child.kill();finish({ok:false,error:'模型配置内容过大',status:413});}});child.stderr.resume();child.stdin.on('error',()=>{});child.on('error',()=>finish({ok:false,error:'模型配置服务无法启动',status:503}));child.on('close',()=>{try{finish(JSON.parse(output));}catch(_){finish({ok:false,error:'模型配置未收到处理结果，请刷新核对',status:502});}});child.stdin.end(JSON.stringify(body));
+   child.stdout.on('data',part=>{output+=part.toString('utf8');if(Buffer.byteLength(output)>2*1024*1024){child.kill();finish({ok:false,error:'模型配置内容过大',status:413});}});child.stderr.resume();child.stdin.on('error',()=>{});child.on('error',()=>finish({ok:false,error:'模型配置服务无法启动',status:503}));child.on('close',()=>{try{finish(JSON.parse(output));}catch(_){finish({ok:false,error:'模型配置未收到处理结果，请刷新核对',status:502});}});child.stdin.end(JSON.stringify(body));
   });
   if(result.ok&&result.changed){try{changed('模型服务与路线');}catch(_){return {...result,ok:false,saved:true,error:'模型配置已保存，但待应用记录未写入，请刷新核对后重启应用',status:503};}}
   return result;

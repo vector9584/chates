@@ -5,6 +5,12 @@ import json
 import sys
 from pathlib import Path
 from panel_config_txn import ConfigError,config_lock,read_file,load_yaml,semantic,checksum,assign,commit
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 def mapping(value):return value if isinstance(value,dict) else {}
 def coerce(value):

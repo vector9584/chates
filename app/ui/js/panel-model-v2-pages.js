@@ -591,9 +591,11 @@
     var cat = S.catalog || {};
     var providers = cat.providers || [];
 
-    out.append(ph('LLM 服务商', 'providers: 注册表 · 只放推理端点', [
-      btn('+ 添加服务', 'btn sm primary', function () { M.sheets.providerAdd && M.sheets.providerAdd(S); })
-    ]));
+    /* 2026-11-26：页头右上角的「+ 添加服务」去掉了。它和卡片区末尾那张
+       「+ 添加 LLM 服务」卡做的是同一件事（都开 M.sheets.providerAdd），
+       两个入口并排摆着只会让人犹豫点哪个。留卡片那条，位置更顺 ——
+       视线扫完已有服务，自然落到「再加一个」上。 */
+    out.append(ph('LLM 服务商', 'providers: 注册表 · 只放推理端点'));
 
     // 后端给 groups：同一个中转站的多把 key 收成一张卡。老后端没有 groups 就按
     // providers 一对一渲染 —— 没有 group 的服务，行为跟以前完全一样。

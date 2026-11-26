@@ -4,6 +4,12 @@ import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
+try:
+  import sys as _sys_enc
+  _sys_enc.stdout.reconfigure(encoding='utf-8')
+  _sys_enc.stderr.reconfigure(encoding='utf-8')
+except Exception:
+  pass
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
