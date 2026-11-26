@@ -22,6 +22,7 @@
 <p align="center">
   <a href="https://vector9584.github.io/chates/">项目主页</a> ·
   <a href="https://github.com/vector9584/chates/releases/latest">下载</a> ·
+  <a href="docs/DOWNLOAD.md">下载慢怎么办</a> ·
   <a href="docs/ARCHITECTURE.md">仓库结构</a> ·
   <a href="JOURNEY.md">改造历程</a>
 </p>
