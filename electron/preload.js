@@ -14,15 +14,16 @@ contextBridge.exposeInMainWorld('CHATES_SHELL', {
   checkUpdates: () => ipcRenderer.invoke('chates:check-updates'),
 
   /* 问题上报（2026-11-26）：
-     reportUrl  —— 对外提交页地址
-     reportCode —— 一次性上报码，只能提交问题，读不到任何东西
-     appVersion —— 客户端版本，提交页自动填，省得用户自己找
-     openExternal —— 用系统默认浏览器打开，不在应用窗口里跳走
+     右上角的反馈面板原样保留，只是提交时额外往星图推一份 ——
+     页面没法直接跨域 POST（星图是另一个域名），所以地址和码从这里注入。
 
-     地址和码从运行时配置读（main.js 那边在 app.whenReady 里解析完写进 env），
-     不硬编码在这里 —— 换地址、吊销旧码都不用重新打包。 */
+       reportUrl  —— 星图接口根地址，如 https://ruibing.wang/report/
+       reportCode —— 上报码，只能提交，读不到任何东西
+       appVersion —— 客户端版本，随单带上，省得用户自己填
+
+     三个值都从运行时配置读（main.js 在 whenReady 里解析完写进 env），
+     不硬编码 —— 换地址、吊销旧码都不用重新打包。 */
   reportUrl: process.env.CHATES_REPORT_URL || '',
   reportCode: process.env.CHATES_REPORT_CODE || '',
   appVersion: process.env.CHATES_APP_VERSION || '',
-  openExternal: (url) => ipcRenderer.invoke('chates:open-external', String(url)),
 });

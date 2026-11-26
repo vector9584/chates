@@ -496,21 +496,6 @@ ipcMain.handle('chates:check-updates', async () => {
   }
 });
 
-/* 打开外部链接（2026-11-26，问题上报用）。
-   为什么走 IPC 而不是页面里直接 window.open：页面里开外链会被 setWindowOpenHandler
-   拦成 deny，用户点了图标看起来没反应。这里显式交给系统浏览器。
-   只放行 http/https —— 别让前端随便传一个 file:// 过来读本机文件。 */
-ipcMain.handle('chates:open-external', async (_evt, url) => {
-  const u = String(url || '');
-  if (!/^https?:\/\//i.test(u)) return { ok: false, error: '只允许 http/https' };
-  try {
-    await shell.openExternal(u);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: String((e && e.message) || e) };
-  }
-});
-
 /* 问题上报配置加载（2026-11-26）。
  *
  * 放哪儿：userData/report.json（Windows 下是 %APPDATA%\CHATÈS\report.json）。

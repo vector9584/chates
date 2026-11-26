@@ -148,6 +148,71 @@
   }
 
   /* ─── 提交 ─────────────────────────────────────────────────── */
+  /* --- 上报星图（2026-11-26）---
+   *
+   * 本地 /api/issue 只写本机 var/issues/issues.jsonl —— 装在别人电脑上时
+   * 那条记录永远躺在对方硬盘里，我这边收不到。所以本地记录之外再推一份到星图，
+   * 由 NAS 上的 cron 转成 GitHub issue。
+   *
+   * 为什么是「额外推一份」而不是「只推星图」：
+   *   本地那份是用户自己能在汇总视图里看到的，砍掉他这边就空了；
+   *   星图那份是给我看的。两边各留各的，互不依赖。
+   *
+   * 失败不打扰用户：星图不通就当没这回事，本地提交已经成功了，
+   * 给他弹一个「上传失败」纯属添堵。
+   */
+  function reportUpstream(payload) {
+    var shell = (typeof window !== 'undefined' && window.CHATES_SHELL) || null;
+    var base = shell && shell.reportUrl ? String(shell.reportUrl) : '';
+    var code = shell && shell.reportCode ? String(shell.reportCode) : '';
+    if (!base || !code) return;   /* 开发环境/网页版没配，直接跳过 */
+
+    var api = base.replace(/\/?$/, '') + '/api.php?a=submit';
+
+    /* 面板分类是本地那套树，星图是扁平 id。对不上就报「其他」，
+       别硬塞一个对方不认识的 id —— 那边会降级，但白跑一趟。 */
+    var MAP = {
+      'runtime-start': 'runtime-start',  'runtime-update': 'runtime-update',
+      'runtime-perf':  'runtime-perf',   'runtime-error':  'runtime-error',
+      'chat-render':   'chat-render',    'chat-stream':    'chat-stream',
+      'chat-session':  'chat-session',   'chat-input':     'chat-input',
+      'panel-model':   'panel-model',    'panel-nav':      'panel-nav',
+      'panel-theme':   'panel-theme',    'panel-file':     'panel-file',
+      'panel-voice':   'panel-voice',    'channel-recv':   'channel-recv',
+      'channel-send':  'channel-send',   'channel-media':  'channel-media',
+      'other-feature': 'other-feature',  'other-doc':      'other-doc',
+      'other-misc':    'other-misc'
+    };
+    var cat = MAP[payload.category] || 'other-misc';
+
+    var os = '';
+    try {
+      var ua = navigator.userAgent || '';
+      if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
+      else if (/Windows NT/.test(ua)) os = 'Windows';
+      else if (/Mac OS X/.test(ua)) os = 'macOS';
+      else if (/Linux/.test(ua)) os = 'Linux';
+    } catch (e) {}
+
+    /* credentials: omit —— 跨域 POST，别把本机 session 捎过去 */
+    try {
+      fetch(api, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: code,
+          category: cat,
+          title: payload.title,
+          body: payload.detail,
+          contact: payload.name || '',
+          env: { version: payload.version || '', os: os, from: 'desktop' }
+        })
+      }).catch(function () {});     /* 静默失败 */
+    } catch (e) {}
+  }
+
   function submit(card) {
     var name = (card.querySelector('#pwIssueName').value || '').trim();
     var title = (card.querySelector('#pwIssueTitle').value || '').trim();
@@ -193,6 +258,11 @@
         renderGroups(card);
         card.querySelector('#pwIssueLeaves').innerHTML = '';
         updatePicked(card);
+        /* 本地记完再推一份到星图，失败静默 */
+        reportUpstream({
+          name: name, category: category, title: title,
+          detail: detail, version: version()
+        });
         showMsg(card, '已收到，编号 ' + (body.item && body.item.id ? body.item.id : '—'), 'ok');
         /* 让汇总视图下次打开重新拉 */
         try { window._issueSummaryDirty = true; } catch (e) {}
@@ -336,44 +406,7 @@
    *   os   —— 系统
    *   from —— 来源标记，方便我区分是客户端还是网页提交的
    */
-  window.pwIssueOpen = function () {
-    var shell = (typeof window !== 'undefined' && window.CHATES_SHELL) || null;
-    var base = shell && shell.reportUrl ? String(shell.reportUrl) : '';
-    if (!base) {
-      /* 没注入地址（比如跑在浏览器里而不是客户端里）就退回本地弹窗，
-         至少别让按钮点了没反应。 */
-      open('form');
-      return;
-    }
-    var params = [];
-    var code = shell.reportCode ? String(shell.reportCode) : '';
-    if (code) params.push('code=' + encodeURIComponent(code));
-
-    var ver = (shell.appVersion ? String(shell.appVersion) : '');
-    if (ver) params.push('v=' + encodeURIComponent(ver));
-
-    var os = '';
-    try {
-      var ua = navigator.userAgent || '';
-      if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
-      else if (/Windows NT/.test(ua)) os = 'Windows';
-      else if (/Mac OS X/.test(ua)) os = 'macOS';
-      else if (/Linux/.test(ua)) os = 'Linux';
-    } catch (e) {}
-    if (os) params.push('os=' + encodeURIComponent(os));
-
-    var from = (shell.isDesktop ? 'desktop' : 'web');
-    params.push('from=' + from);
-
-    var sep = base.indexOf('?') >= 0 ? '&' : '?';
-    var url = base + (params.length ? sep + params.join('&') : '');
-
-    if (shell.openExternal && typeof shell.openExternal === 'function') {
-      shell.openExternal(url);          // 客户端：交给系统浏览器，别在应用内跳走
-    } else {
-      window.open(url, '_blank', 'noopener');
-    }
-  };
+  window.pwIssueOpen = function () { open('form'); };
   window.pwIssueSummary = function () { open('summary'); };
   window.pwIssueClose = close;
 })();
