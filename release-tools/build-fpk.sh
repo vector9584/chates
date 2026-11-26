@@ -134,6 +134,11 @@ cat > "$STAGE/config/resource" <<EOF
                 "name": "$PKG_USER"
             }
         ]
+    },
+    "usr-local-linker": {
+        "bin": [
+            "bin/hermes"
+        ]
     }
 }
 EOF

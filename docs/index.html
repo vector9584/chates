@@ -1287,7 +1287,7 @@ body{
       <div class="tags"><span>独立实例</span><span>包内无密钥</span><span>校验值</span></div><div class="hint"><i>↘</i> 下包 / 对校验 / 看入口</div></aside>
     <div class="rv" style="--d:90ms">
       <div class="spec">
-        <div class="spec-bar"><span class="nm">安装包 · v0.21.149</span><span class="st" id="st9">65 MB</span></div>
+        <div class="spec-bar"><span class="nm">安装包 · v0.21.153</span><span class="st" id="st9">38.1 MB</span></div>
         <div class="spec-body">
           <div class="chips dl-tabs" id="dlTabs"></div>
           <div id="dlPane"></div>
@@ -1883,9 +1883,11 @@ document.getElementById('copy8').addEventListener('click',function(){
 })();
 
 (function(){
-  var DL_URL='https://github.com/vector9584/chates/releases/latest', HASH='049bcd861d776a5ed4f8f49b9dcbbec7a896643133d422e285da79fc3811853c', CMD='sha256sum hermes-agent_0.21.149.fpk';
+  var DL_URL='https://github.com/vector9584/chates/releases/latest', HASH='42ac724b5ca9e6aed0310dc5cb4afa33cfd1bfe083e7c38898173d8860dbc634', CMD='sha256sum hermes-agent_0.21.153.fpk';
+  // ghproxy.net 在 Windows 实测 371 KB/s，直连 objects.githubusercontent.com 只有 20-68 KB/s
+  var GH_PROXY='https://ghproxy.net/', PROXY_TESTED='2026-11-26 · Windows 实测 371 KB/s';
   var entries=[
-    ['网页面板','NAS-IP:5666','桌面图标进来落在 /app/hermes-agent-clean/；和原来的 8742 / 9219 / 8650 错开。'],
+    ['网页面板','NAS-IP:5666','桌面图标进来落在 /app/hermes-agent/；和 8742 / 9219 / 8650 这几个端口错开。'],
     ['面板直连','NAS-IP:18650','不经过应用中心时的入口，直接打开面板。'],
     ['网关 API','NAS-IP:18742','模型与消息通道走这里；没配模型时端口空闲属正常。'],
     ['仪表盘','NAS-IP:19219','上游 Hermes 自带的仪表盘，与面板不是同一个东西。']
@@ -1900,14 +1902,14 @@ document.getElementById('copy8').addEventListener('click',function(){
   function render(i){
     var h='';
     if(i===0){
-      h='<div class="dl-hero"><span class="dl-badge">v0.21.149 · 2026-11-17 发布</span>'+
-        '<span class="dl-file">hermes-agent_0.21.149.fpk</span>'+
-        '<a class="btn pri dl-down" href="'+DL_URL+'" download target="_blank" rel="noopener">下载 .fpk ↓</a>'+
-        '<span class="dl-sub">65 MB · GPL-3.0 · 包内不含任何 API Key</span></div>'+
+      h='<div class="dl-hero"><span class="dl-badge">v0.21.153 · 2026-11-26</span>'+
+        '<span class="dl-file">CHATES-Setup-0.20.10.exe ｜ hermes-agent_0.21.153.fpk</span>'+
+        '<a class="btn pri dl-down" href="'+DL_URL+'" download target="_blank" rel="noopener">打开 Release 页 ↓</a>'+
+        '<span class="dl-sub">Windows 151 MB · fnOS 38.1 MB · 包内不含任何 API Key</span></div>'+
         '<div class="dl-grid">'+
-        card('并存不冲突','应用名 hermes-agent-clean，与原来的 hermes-agent 各装各的，数据也分开。')+
-        card('密钥自己填','不配模型时网关不起、端口空闲属正常；模型页填自己的供应商即可。')+
-        card('装完就开','应用中心右上角「手动安装」→ 选包 → 下一步到底 → 桌面图标打开面板。')+
+        card('Windows · 下 exe','CHATES-Setup-0.20.10.exe，双击一路下一步。装完桌面就一个图标。升级只换程序本体，%APPDATA%\\CHATÈS 里的 .env、config.yaml、笔记、知识库一个字节不动。')+
+        card('fnOS · 下 fpk','hermes-agent_0.21.153.fpk 走应用中心右上角「手动安装」。中途它会问一次 nodejs_v24 依赖变更，点确认就行。')+
+        card('下载慢就挂代理','直连 objects.githubusercontent.com 实测只有 20–68 KB/s。把原始下载链接前面拼上 https://ghproxy.net/ 再下，'+PROXY_TESTED+'。')+
         '</div>';
     }else if(i===1){
       h='<div class="dl-card"><h3>SHA-256</h3><p class="dl-code">'+HASH+'</p></div>'+
@@ -1921,7 +1923,7 @@ document.getElementById('copy8').addEventListener('click',function(){
         '<div class="dl-card" style="margin-top:10px"><h3 id="dlEH">网页面板</h3><p id="dlEP">'+entries[0][2]+'</p></div>';
     }
     pane.innerHTML=h;
-    document.getElementById('st9').textContent=['65 MB','SHA-256','4 个入口'][i];
+    document.getElementById('st9').textContent=['38.9 MB','SHA-256','4 个入口'][i];
     if(i===1){
       var b1=document.getElementById('dlHash'),b2=document.getElementById('dlCmd');
       b1.addEventListener('click',function(){cp(HASH,b1,'复制校验值 ⧉')});

@@ -23,3 +23,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.tsbuildinfo
+
+# ---- 本地改动备份（2026-11-26 清理 60 个遗留）----
+# 改源码时的 .bak-* 副本一律不入库：git 本身就有历史，
+# 这些文件只会让仓库根目录和 agent/ gateway/ 越堆越乱。
+*.bak-*
+*.orig
+*.rej

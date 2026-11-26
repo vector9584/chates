@@ -2,6 +2,6 @@
     "defaults": {
         "run-as": "package"
     },
-    "username": "hermes-agent-clean",
-    "groupname": "hermes-agent-clean"
+    "username": "hermes-agent",
+    "groupname": "hermes-agent"
 }
