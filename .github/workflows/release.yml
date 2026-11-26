@@ -142,13 +142,17 @@ jobs:
           set -euo pipefail
           gh release download kernel -p 'hermes-src.tgz' -D /tmp/k
           mkdir -p app
+          # tgz 内层固定是 hermes-src/，解到 app 下即 app/hermes-src。
+          # 不用 find -printf：Windows runner 的 find 是 Git-for-Windows 版没有 -printf，
+          # 静默失败会让后面整形成空操作，job 停在找不到 app/hermes-src（1.20.8 首跑就是这么红的）。
           tar xzf /tmp/k/hermes-src.tgz -C app
-          if [ ! -d app/hermes-src ]; then
-            cand=$(find app -maxdepth 2 -name pyproject.toml -printf '%h\n' | head -1)
-            [ -n "$cand" ] && mv "$cand" app/hermes-src
+          if [ ! -f app/hermes-src/pyproject.toml ]; then
+            for d in app/*/; do
+              if [ -f "${d}pyproject.toml" ]; then mv "$d" app/hermes-src.tmp && mv app/hermes-src.tmp app/hermes-src && break; fi
+            done
           fi
-          [ -d app/hermes-src ] || { echo "::error::内核解压后找不到 app/hermes-src"; exit 1; }
-          echo "内核文件数: $(find app/hermes-src -type f | wc -l)"
+          [ -f app/hermes-src/pyproject.toml ] || { echo "::error::内核解压后找不到 app/hermes-src/pyproject.toml"; ls -la app | head -30; exit 1; }
+          echo "内核文件数: $(ls -R app/hermes-src | wc -l)"
 
       - name: 构建 NSIS 安装包
         shell: bash
