@@ -590,7 +590,15 @@ known_builtin_toolsets:
   - web
   - x_search
   - yuanbao
-mcp_servers: {}
+mcp_servers:
+  windows:
+    # 本机 Windows 桌面自动化（windows-mcp）。默认连本机 loopback，凭据走 .env。
+    command: ''
+    url: http://127.0.0.1:8000/mcp
+    timeout: 180
+    connect_timeout: 60
+    headers:
+      Authorization: Bearer ${WINDOWS_MCP_AUTH_KEY}
 platforms: {}
 onboarding:
   seen:
