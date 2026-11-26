@@ -13,6 +13,12 @@
 (function () {
   var TAXONOMY = null;       /* 缓存分类树，第二次打开直接复用 */
   var LAST_NAME_KEY = 'chates.issue.name';
+  /* 没送出去的反馈（网络抖动、星图限流）暂存本机，下次打开面板补发。
+     为什么要有：上报是 fire-and-forget，失败是静默的 —— 用户看到"已收到"
+     （本地确实存了），但我这边一条都没有。装在他电脑上的本地记录我永远读不到，
+     所以必须补发，否则又回到"石沉大海"。只存最近 20 条，防止 localStorage 涨。 */
+  var PENDING_KEY = 'chates.issue.pending';
+  var PENDING_MAX = 20;
 
   function esc(s) { return DOM.escAttr(s); }
 
@@ -178,6 +184,57 @@
    */
   var REPORT_URL = 'https://ruibing.wang/report/';
 
+  function pendingRead() {
+    try {
+      var raw = localStorage.getItem(PENDING_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function pendingWrite(arr) {
+    try {
+      if (!arr || !arr.length) localStorage.removeItem(PENDING_KEY);
+      else localStorage.setItem(PENDING_KEY, JSON.stringify(arr.slice(-PENDING_MAX)));
+    } catch (e) {}
+  }
+
+  function pendingPush(body) {
+    var arr = pendingRead();
+    var fp = (body.title || '') + '|' + (body.body || '');
+    for (var i = 0; i < arr.length; i++) {
+      if (((arr[i].title || '') + '|' + (arr[i].body || '')) === fp) return;
+    }
+    arr.push(body);
+    pendingWrite(arr);
+  }
+
+  /* 把队列里攒的补发掉。成功一条删一条；失败就留在队里等下次。 */
+  function pendingFlush() {
+    var arr = pendingRead();
+    if (!arr.length) return;
+    var shell = (typeof window !== 'undefined' && window.CHATES_SHELL) || null;
+    var base = (shell && shell.reportUrl) ? String(shell.reportUrl) : REPORT_URL;
+    if (!base) return;
+    var api = base.replace(/\/?$/, '') + '/api.php?a=submit';
+    var rest = [];
+    var left = arr.length;
+    arr.forEach(function (body) {
+      fetch(api, {
+        method: 'POST', mode: 'cors', credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        if (!r.ok) rest.push(body);
+      }).catch(function () {
+        rest.push(body);
+      }).then(function () {
+        left -= 1;
+        if (left === 0) pendingWrite(rest);
+      });
+    });
+  }
+
   function reportUpstream(payload) {
     var shell = (typeof window !== 'undefined' && window.CHATES_SHELL) || null;
     /* 允许桌面版用注入值覆盖（比如内网调试指向本地星图），没有就用常量 */
@@ -211,6 +268,17 @@
       else if (/Linux/.test(ua)) os = 'Linux';
     } catch (e) {}
 
+    /* from 标来源：桌面 exe（Electron 注入了 CHATES_SHELL）记 desktop，
+       网页面板/公网入口记 web。以前写死 desktop，星图里所有记录都长一样，
+       排查时区分不出是哪个客户端来的。 */
+    var body = {
+      category: cat,
+      title: payload.title,
+      body: payload.detail,
+      contact: payload.name || '',
+      env: { version: payload.version || '', os: os, from: (shell ? 'desktop' : 'web') }
+    };
+
     /* credentials: omit —— 跨域 POST，别把本机 session 捎过去 */
     try {
       fetch(api, {
@@ -218,22 +286,16 @@
         mode: 'cors',
         credentials: 'omit',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: cat,
-          title: payload.title,
-          body: payload.detail,
-          contact: payload.name || '',
-          /* from 标来源：桌面 exe（Electron 注入了 CHATES_SHELL）记 desktop，
-             网页面板/公网入口记 web。以前写死 desktop，星图里所有记录都长一样，
-             排查时区分不出是哪个客户端来的。 */
-          env: {
-            version: payload.version || '',
-            os: os,
-            from: (shell ? 'desktop' : 'web')
-          }
-        })
-      }).catch(function () {});     /* 静默失败 */
-    } catch (e) {}
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        /* 429（限流）与 5xx 也算没送到，攒着下次补 */
+        if (!r.ok) pendingPush(body);
+      }).catch(function () {
+        pendingPush(body);          /* 网络不通同样攒着 */
+      });
+    } catch (e) {
+      pendingPush(body);
+    }
   }
 
   function submit(card) {
@@ -373,6 +435,9 @@
       ov.querySelector('.pw-issue-x').onclick = close;
       ov.querySelector('#pwIssueCancel').onclick = close;
     }
+    /* 打开面板就是"下次开机"，先把上回没送出去的补一遍 */
+    try { pendingFlush(); } catch (e) {}
+
     var card = ov.querySelector('.pw-issue-card');
     card.querySelector('#pwIssueName').value = rememberedName();
     card.querySelector('#pwIssueSend').onclick = function () { submit(card); };
