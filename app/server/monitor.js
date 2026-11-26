@@ -574,7 +574,12 @@ const CHATES_PY_SCRIPT = process.env.CHATES_PYTHON_SCRIPT || ""; // .../runtime/
 const VENV_BIN       = CHATES_PY_ROOT || (IS_WIN ? `${DATA_DIR}/venv/Scripts` : `${DATA_DIR}/venv/bin`);
 const SCRIPT_BIN     = CHATES_PY_SCRIPT || VENV_BIN;
 const PY_BIN         = IS_WIN ? "python.exe" : "python3";
-const HERMES_BIN     = IS_WIN ? `${SCRIPT_BIN}/hermes.exe` : `${SCRIPT_BIN}/hermes`;
+// Windows 独立版不走 Scripts/*.exe：pip 的 distlib 启动器把**构建机**的
+// python 绝对路径写进 shebang，打进安装包分发到用户机器后一律 exit=1，
+// 连 --version 都没有输出（2026-11-26 实测，hermes/hermes-agent/hermes-acp 全中）。
+// 直接 python.exe -m hermes_cli.main，路径靠 sys.prefix 相对定位的 .pth 解析。
+const HERMES_BIN     = IS_WIN ? join(VENV_BIN, PY_BIN) : `${SCRIPT_BIN}/hermes`;
+const HERMES_ARG_PREFIX = IS_WIN ? ['-m', 'hermes_cli.main'] : [];
 const UV_BIN_PATH    = IS_WIN ? `${VENV_BIN}/uv.exe` : `${VENV_BIN}/uv`;
 const HERMES_CONFIG  = `${DATA_DIR}/config.yaml`;
 const HERMES_ENV     = `${DATA_DIR}/.env`;
@@ -3380,7 +3385,7 @@ function spawnHermes(name, pidPath, args) {
   }
 
   const logFd = openSync(logPath, "a");
-  const p = spawn(HERMES_BIN, args, {
+  const p = spawn(HERMES_BIN, HERMES_ARG_PREFIX.concat(args), {
     env,
     stdio: ["ignore", logFd, logFd],
   });
