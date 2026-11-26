@@ -35,13 +35,19 @@ export function atomicWrite(file, contents, io = fs) {
   try {
     fd = io.openSync(temp, 'wx', 0o600);
     io.writeFileSync(fd, contents);
-    io.fsyncSync(fd);
+    // Windows：fsync 可能返回 EPERM（杀软/文件系统策略），目录句柄更是打不开。
+    // 提交点是 rename，内容已经 write 完成；刷盘只做尽力而为，不能让一句 EPERM
+    // 冒泡到 panel-queue 被记成 storage_error —— 那会让整条消息队列永久停摆。
+    try { io.fsyncSync(fd); } catch (e) { if (e.code !== 'EPERM' && e.code !== 'EINVAL') throw e; }
     io.closeSync(fd); fd = undefined;
     io.renameSync(temp, file);
     // Persist the directory entry on Linux. macOS also supports directory fsync.
-    fd = io.openSync(dir, 'r');
-    io.fsyncSync(fd);
-    io.closeSync(fd); fd = undefined;
+    // Windows 不支持打开目录句柄，整段跳过。
+    if (process.platform !== 'win32') {
+      fd = io.openSync(dir, 'r');
+      io.fsyncSync(fd);
+      io.closeSync(fd); fd = undefined;
+    }
   } finally {
     if (fd !== undefined) io.closeSync(fd);
     if (io.existsSync(temp)) io.unlinkSync(temp);

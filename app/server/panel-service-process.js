@@ -2,9 +2,21 @@ import * as fs from 'node:fs';
 import {join} from 'node:path';
 import {isApplicationService} from './panel-process-guard.js';
 
+// Windows 独立桌面版没有 /proc：cmdline/stat/readdir 全不可用。这里用一个显式开关
+// （electron 壳 spawn monitor 时已设 HERMES_PANEL_TRUST_LOOPBACK=1）切到 pid-only 实现，
+// fpk/生产环境不设该变量，仍走完整的 /proc 归属与 starttime 校验。
+const PID_ONLY = process.platform === 'win32' && process.env.HERMES_PANEL_TRUST_LOOPBACK === '1';
+
 export function createServiceProcesses({hermesBin,venvBin,pidFiles,io=fs,proc='/proc',signal=(pid,name)=>process.kill(pid,name),delay=ms=>new Promise(r=>setTimeout(r,ms)),now=Date.now}){
  function identity(pid,kind){
   if(!Number.isSafeInteger(pid)||pid<=0)return null;
+  if(PID_ONLY){
+   // 没有 cmdline 可读，无法校验「这个 pid 确实是 gateway」；也没有 starttime。
+   // 独立版只 bind 127.0.0.1、pid 文件在用户私有目录，故以存活为判据，
+   // start 由 pid 派生以保证两次调用可比（ServiceHealth 用 start 做 same() 比对）。
+   try{process.kill(pid,0);}catch{return null;}
+   return {pid,kind,start:'w'+pid};
+  }
   try{
    const argv=io.readFileSync(join(proc,String(pid),'cmdline'),'utf8').split('\0').filter(Boolean);
    if(!isApplicationService(argv,{hermesBin,venvBin}))return null;
