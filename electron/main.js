@@ -496,41 +496,6 @@ ipcMain.handle('chates:check-updates', async () => {
   }
 });
 
-/* 问题上报配置加载（2026-11-26）。
- *
- * 放哪儿：userData/report.json（Windows 下是 %APPDATA%\CHATÈS\report.json）。
- * 为什么不写进代码里：
- *   1. 上报码是可吊销的 —— 万一被滥用，我在服务端换一个码，用户不用重装；
- *   2. 安装包不该内嵌任何会变的东西，否则每改一次都要重新打包发版。
- *
- * 文件长这样：
- *   { "url": "https://ruibing.wang/report/", "code": "ct_xxxx" }
- *
- * 带默认值兜底：文件不存在 / 解析失败 / 字段缺失，都退回内置默认，
- * 不让「反馈按钮点了没反应」这种小故障变成一个空白弹窗。
- * 注意这里绝不写 key 日志 —— 码本身不是密钥，但它不该满日志乱飞。 */
-const DEFAULT_REPORT_URL = 'https://ruibing.wang/report/';
-
-function loadReportConfig() {
-  process.env.CHATES_APP_VERSION = app.getVersion();
-
-  let cfg = {};
-  try {
-    const p = path.join(app.getPath('userData'), 'report.json');
-    if (fs.existsSync(p)) {
-      cfg = JSON.parse(fs.readFileSync(p, 'utf8')) || {};
-    }
-  } catch (e) {
-    // 配置坏了不影响启动，用默认值
-  }
-
-  const url = (typeof cfg.url === 'string' && /^https?:\/\//i.test(cfg.url))
-    ? cfg.url
-    : DEFAULT_REPORT_URL;
-  process.env.CHATES_REPORT_URL = url;
-  process.env.CHATES_REPORT_CODE = (typeof cfg.code === 'string') ? cfg.code : '';
-}
-
 function buildMenu() {
   // 只留必要项。默认菜单里 Electron 自带的 "Toggle Developer Tools"
   // 给普通用户点进 DevTools 是灾难，但排查问题又需要 —— 放「帮助」里加密码不合算，
@@ -636,7 +601,6 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
-    loadReportConfig();
     buildMenu();
     boot();
     // 启动 20 秒后静默查一次：错开启动高峰。失败不弹窗——

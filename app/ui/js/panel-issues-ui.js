@@ -161,11 +161,28 @@
    * 失败不打扰用户：星图不通就当没这回事，本地提交已经成功了，
    * 给他弹一个「上传失败」纯属添堵。
    */
+  /* 星图上报地址。写死是故意的 —— 见下面 why。
+   *
+   * why 不放配置、不读环境变量、不让客户端持有任何密钥：
+   *   分发出去的每个安装包都要能提交，不能让用户配任何东西。
+   *   原实现要求 CHATES_SHELL.reportCode（preload 从环境变量读），结果
+   *   (a) 网页版没有这个对象 → 静默跳过；
+   *   (b) 别人装的 exe 没配环境变量 → 也静默跳过。
+   *   等于只有开发者本机能用。所以码整条路砍掉。
+   *
+   * 滥用防线在服务端，不靠客户端持有的秘密：
+   *   来源指纹（sha256 后存，不存明文 IP）+ 双层限流 + 同内容去重
+   *   + 只写不读（数据在 .data 点目录，nginx 不服务）+ 长度上限。
+   *
+   * 想换地址只需改这一行，所有客户端下次更新自动跟随。
+   */
+  var REPORT_URL = 'https://ruibing.wang/report/';
+
   function reportUpstream(payload) {
     var shell = (typeof window !== 'undefined' && window.CHATES_SHELL) || null;
-    var base = shell && shell.reportUrl ? String(shell.reportUrl) : '';
-    var code = shell && shell.reportCode ? String(shell.reportCode) : '';
-    if (!base || !code) return;   /* 开发环境/网页版没配，直接跳过 */
+    /* 允许桌面版用注入值覆盖（比如内网调试指向本地星图），没有就用常量 */
+    var base = (shell && shell.reportUrl) ? String(shell.reportUrl) : REPORT_URL;
+    if (!base) return;
 
     var api = base.replace(/\/?$/, '') + '/api.php?a=submit';
 
@@ -202,7 +219,6 @@
         credentials: 'omit',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: code,
           category: cat,
           title: payload.title,
           body: payload.detail,
