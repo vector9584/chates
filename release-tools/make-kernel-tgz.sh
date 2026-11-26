@@ -26,7 +26,8 @@ if [ -z "$SRC" ] || [ ! -d "$SRC" ]; then
 fi
 
 # 出厂前必须消失的东西
-STRIP=( '*.bak-*' '__pycache__' '*.pyc' '.pytest_cache' '.mypy_cache' )
+# CLAUDE.md 是开发期笔记，含本机仓库绝对路径，对最终用户无用
+STRIP=( '*.bak-*' '__pycache__' '*.pyc' '.pytest_cache' '.mypy_cache' 'CLAUDE.md' )
 # 不该出现在别人机器上的词（演示提示词、调试样例里的真实身份）
 NEUTRALIZE=( '王瑞兵:示例用户' '姜亚楠:示例用户' '姜楠:示例用户' )
 
@@ -80,6 +81,9 @@ if [ "$n" -gt 0 ]; then
 fi
 if tar xzf "$OUT" -O 2>/dev/null | grep -qF '王瑞兵'; then
   echo "ERROR tgz 里还有真实姓名" >&2; bad=1
+fi
+if tar xzf "$OUT" -O 2>/dev/null | grep -qE '/vol[0-9]/@apphome/hermes-agent'; then
+  echo "ERROR tgz 里还有本机 hermes-agent 数据路径" >&2; bad=1
 fi
 if [ "$size" -lt 20000000 ]; then
   echo "ERROR 产物只有 $size 字节，缺内核（正常约 29MB）" >&2; bad=1
