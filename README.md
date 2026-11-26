@@ -12,7 +12,7 @@
 
 <p align="center">
   <img alt="kernel" src="https://img.shields.io/badge/kernel-0.20.0-71dbc0">
-  <img alt="panel" src="https://img.shields.io/badge/panel-0.21.153-5e64f3">
+  <img alt="panel" src="https://img.shields.io/badge/panel-1.20.3-5e64f3">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20fnOS-2f3a46">
   <img alt="pages" src="https://img.shields.io/badge/panel-8%20%E6%9D%BF%E5%9D%97%2021%20%E9%A1%B5-71dbc0">
   <img alt="skills" src="https://img.shields.io/badge/skills-397-5e64f3">
@@ -36,6 +36,18 @@
 原版只有命令行。这个仓库给它配了一个真正的控制台——八个板块、二十一个页面，聊天、定时任务、技能开关、模型凭据、知识库全在里面点。另外还有一层 Windows 安装器，装完桌面上就是一个图标，双击就开。
 
 **不需要 WSL，不需要 Git，不需要管理员权限。**
+
+## 仓库里哪部分是哪个
+
+根目录一打开一百多项平铺，看着乱——因为**上游 Hermes 内核**和**CHATÈS 加的层**混在一起了。判据很简单：
+
+| 你看到的 | 是什么 | 能动吗 |
+|---|---|---|
+| `agent/` `hermes_cli/` `tools/` `skills/` `web/` `providers/` `plugins/` `gateway/` `cron/` `locales/` `tests/` 和根目录那堆 `*.py` | 上游 Hermes 内核，原样保留 | 别动，改它 import 就炸 |
+| `app/` `electron/` `win/` `cmd/` `config/` `wizard/` `release-tools/` `data-skeleton/` `kernel/` `fpk-bin/` `manifest` | CHATÈS 自己的：面板 + 打包链 | 改这里 |
+| `README.md` `RELEASE.md` `ARCHITECTURE.md` `JOURNEY.md` `WORK-MEMORY.md` `UPDATE-LOG.md` | 文档 | 随便改 |
+
+完整清单和每个目录干什么，见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 装哪个
 
