@@ -6,7 +6,7 @@
 在后台定时把 memories/ 全量镜像到 knowledge/ 下，确保两边永不断档。
 
 运行方式：
-  python3 /vol3/@apphome/hermes-agent/data/scripts/knowledge-sync/mirror.py
+  HERMES_DATA_DIR=<data-dir> python3 <data-dir>/scripts/knowledge-sync/mirror.py
 
 建议 cron：每小时一次，或每次对话结束后触发。
 """
@@ -16,7 +16,9 @@ import sys
 import shutil
 import datetime
 
-DATA_DIR = os.environ.get("HERMES_DATA_DIR") or "/vol3/@apphome/hermes-agent/data"
+DATA_DIR = os.environ.get("HERMES_DATA_DIR") or ""
+if not DATA_DIR:
+    sys.exit("未设置 HERMES_DATA_DIR")
 MEMORIES_DIR = os.path.join(DATA_DIR, "memories")
 KNOWLEDGE_DIR = os.path.join(DATA_DIR, "knowledge", "项目", "00-memories-auto")
 

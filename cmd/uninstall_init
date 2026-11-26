@@ -4,7 +4,7 @@
 
 # pkill 必须收窄到本应用自己的路径。
 # 宽匹配 "hermes.*gateway" 会把并行安装的原 Hermes 一起杀掉
-# （/vol1/@apphome/hermes-agent/data/venv/bin/hermes gateway 同样命中），
+# （指向数据目录下 venv 里的 hermes gateway 同样命中），
 # 2026-11-26 实测：两应用并跑时这是必然误杀。
 #
 # 三类进程的落点不同，要分别锚定：

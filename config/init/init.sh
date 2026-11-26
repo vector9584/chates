@@ -6,7 +6,7 @@
 set -u
 # 路径环境变量：优先用 fnOS 标准回调传入的 TRIM_PKGHOME/TRIM_APPDEST/TRIM_PKGVAR。
 # 没传时从本脚本位置推导（<APP_DIR>/config/init/init.sh），不写死某个应用的绝对路径——
-# 原来默认值是 /vol3/@apphome/chates 和 /var/apps/hermes-agent/target，换个应用名或卷就全错。
+# 原来默认值写死了具体应用名与安装卷，换个应用名或卷就全错，故改为运行时探测。
 _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 兼容两种落位：安装后 <APP_DIR>/init（build-fpk 打进 app/init），
 # 开发仓里 <APP_DIR>/config/init。按父目录名判断，两种情况都能推出 APP_DIR。
