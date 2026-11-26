@@ -2,12 +2,31 @@
 # fnOS lifecycle entry. No name-based kills, recursive ownership changes or
 # socket permission widening. The helper serializes start/stop in application VAR.
 set -uo pipefail
-TRIM_APPDEST="${TRIM_APPDEST:-/var/apps/hermes-agent}"
-TRIM_PKGHOME="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}"
-TRIM_PKGVAR="${TRIM_PKGVAR:-/var/apps/hermes-agent/var}"
+TRIM_APPDEST="${TRIM_APPDEST:-/var/apps/chates}"
+TRIM_PKGHOME="${TRIM_PKGHOME:-/var/apps/chates/home}"
+TRIM_PKGVAR="${TRIM_PKGVAR:-/vol3/@appdata/chates}"
+# CHATÈS 与同机 hermes-agent 并存，三个端口必须错开（monitor.js 读这些环境变量）
+export UI_PORT=8660
+export GATEWAY_PORT=8752
+export DASHBOARD_PORT=9239
 export PATH=/var/apps/nodejs_v24/target/bin:/var/apps/nodejs_v22/target/bin:/var/apps/nodejs_v20/target/bin:/var/apps/nodejs/target/bin:$PATH
 case "${1:-}" in start|stop|status) ;; *) exit 1 ;; esac
-NODE_BIN=$(command -v node) || exit 1
+
+# node 定位三级兜底（2026-11-26）：系统 nodejs_v24/v22/v20 > 安装时下载到 data 的副本 > 报错。
+# 原来只有 `command -v node || exit 1`，机器上没装 nodejs 应用就直接启动失败，
+# 而 install_callback 明明已经下载过一份放在 data/node/bin，却从没被用上。
+NODE_BIN=$(command -v node || true)
+if [ -z "${NODE_BIN:-}" ]; then
+    for _c in "${TRIM_PKGHOME}/data/node/bin/node" \
+              "/var/apps/chates/home/data/node/bin/node" \
+              "/vol3/@apphome/chates/data/node/bin/node"; do
+        if [ -x "$_c" ]; then NODE_BIN="$_c"; break; fi
+    done
+fi
+if [ -z "${NODE_BIN:-}" ]; then
+    echo '找不到 node 运行时：应用中心未装 nodejs_v24，且本地副本缺失，无法启动'
+    exit 1
+fi
 PYTHON_BIN="${TRIM_PKGHOME}/data/venv/bin/python3"
 [ -x "$PYTHON_BIN" ] || { echo '应用Python环境不可执行，未修改任何运行进程'; exit 1; }
 exec "$PYTHON_BIN" -B "${TRIM_APPDEST}/server/panel_lifecycle.py" "$1" "$TRIM_APPDEST" "${TRIM_PKGHOME}/data" "$TRIM_PKGVAR" "$NODE_BIN"

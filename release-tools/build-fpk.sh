@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# build-fpk.sh — 从源码构建 fnOS 安装包（hermes-agent_<ver>.fpk）
+# build-fpk.sh — 从源码构建 fnOS 安装包（chates_<ver>.fpk）
 #
 # fpk 本质是个 gzip tar，结构固定：
 #   app.tgz          运行代码（解到 /var/apps/<name>/target）
@@ -66,6 +66,44 @@ for cand in cmd fpk-cmd; do [ -d "$cand" ] && { CMD_SRC="$cand"; break; }; done
 [ -f fpk-assets/privilege ] || die "缺 fpk-assets/privilege"
 ok "manifest / app / cmd / 图标 齐"
 
+# ------------------------------------------------ 双副本同步（2026-11-26 踩过）
+# 仓库里有两份 hermes-src：app/hermes-src（开发改这里）和
+# electron/resources/chates/app/hermes-src（build-fpk 实际组包取这里，
+# Electron 打包也用它）。以前靠手工同步，必然漂移。
+# 实测踩到的后果不只是「版本旧」：electron 那份的 panel_ds_suite.py
+# 里还留着真实姓名，而 app/ 那份早已脱敏成「示例用户」——
+# 也就是说脱敏根本没进包，包一旦发出去就是泄漏。
+# 定则：app/ 为唯一真源，组包前单向同步过去。不带 --delete，
+# 避免误删 electron 侧特有的构建产物。
+if [ -d app/hermes-src ] && [ -d electron/resources/chates/app/hermes-src ]; then
+  rsync -a \
+    --exclude='web_dist' --exclude='node_modules' --exclude='__pycache__' \
+    --exclude='*.pyc' --exclude='.git' \
+    app/hermes-src/ electron/resources/chates/app/hermes-src/ \
+    || die "双副本同步失败（app/hermes-src -> electron/resources/chates/app/hermes-src）"
+  ok "双副本已同步（真源 app/hermes-src）"
+else
+  c '33' "  跳过双副本同步（app/hermes-src 或 electron 副本不存在）"
+fi
+
+# ------------------------------------------------ 脱敏闸（2026-11-26 加）
+# 按值反搜，不按 key 名猜。命中即 die —— 宁可不发包，也不发泄漏包。
+# 注意 pipefail：grep 无匹配返回 1，管道整体就返回 1，set -e 会当场静默退出。
+# 必须用 { grep ... || true; } | wc -l 兜住（和上面 data-skeleton 凭据闸同一个坑）。
+LEAK_HITS=""
+for kw in '王瑞兵' '姜楠' '王娇'; do
+  n=$( { grep -rl "$kw" app/ 2>/dev/null || true; } | wc -l )
+  if [ "${n:-0}" -gt 0 ]; then LEAK_HITS="$LEAK_HITS $kw($n)"; fi
+done
+if [ -n "$LEAK_HITS" ]; then
+  c '31' "  脱敏闸命中:$LEAK_HITS"
+  for kw in '王瑞兵' '姜楠' '王娇'; do
+    { grep -rl "$kw" app/ 2>/dev/null || true; } | sed 's/^/    /'
+  done
+  die "app/ 里仍有真实姓名，先脱敏再打包"
+fi
+ok "脱敏闸通过（真实姓名 0 命中）"
+
 ok "fpk 资产齐全"
 
 # config/prompts 是 fpk 的出厂人格与配置，必须用脱敏后的骨架，
@@ -104,17 +142,55 @@ cp -a app/server app/ui app/version.json "$STAGE/app/" 2>/dev/null || true
 # 它是整个包体积的主体；漏了这层，产物 8.9MB vs 应有的 68MB —— 一眼能看出不对。
 SRC_CANDIDATES="electron/resources/chates/app/hermes-src app/hermes-src"
 for cand in $SRC_CANDIDATES; do
-  [ -d "$cand" ] && { cp -a "$cand" "$STAGE/app/hermes-src"; break; }
+  if [ -d "$cand" ]; then
+    cp -a "$cand" "$STAGE/app/hermes-src"
+    SRC_HERMES_USED="$cand"
+    break
+  fi
 done
 [ -d "$STAGE/app/hermes-src" ] || die "找不到 hermes-src 内核（试过: $SRC_CANDIDATES）"
 ok "内核    $(du -sh "$STAGE/app/hermes-src" | cut -f1)"
 
-[ -d app/python ]     && cp -a app/python     "$STAGE/app/"
-[ -d app/bin ]        && cp -a app/bin        "$STAGE/app/"
-[ -f app/package.json ] && cp app/package.json "$STAGE/app/"
+# dashboard 前端静态产物（hermes_cli/web_dist）—— 2026-11-26 踩过的坑：
+# 它是 web/ 源码的 npm 构建产物，被 .gitignore 排除，源码树里没有；
+# 但 monitor.js 起 dashboard 时会检测 ${APP_DIR}/hermes-src/hermes_cli/web_dist/index.html，
+# 找不到就退回「源码模式」，而源码模式要 npm 构建 → 机器上 npm 不在 PATH →
+# dashboard 直接不起（"Web UI frontend not built and npm is not available"）。
+# 表现是 /proxy/dashboard 打不开、面板右上角模型/用量页全灰。
+# 所以组包时必须把产物塞进包，来源优先级如下，全都找不到就报错——
+# 宁可打包失败，也不要产出一个 dashboard 打不开的包。
+WEB_DIST_DST="$STAGE/app/hermes-src/hermes_cli/web_dist"
+if [ -f "$WEB_DIST_DST/index.html" ]; then
+  ok "web_dist 随内核已带（$(du -sh "$WEB_DIST_DST" | cut -f1)）"
+else
+  WEB_DIST_SRC=""
+  # 顺序讲究：本机构建时 /vol3/@appcenter/chates 属 chates 用户，以 hermes-agent
+  # 身份读不了（实测 cp 报 Permission denied，脚本 fail-fast 退出）。
+  # 所以可读的原应用副本排在前面；CI 上用 HERMES_WEB_DIST_SRC 显式指定。
+  for cand in "${HERMES_WEB_DIST_SRC:-}" \
+              /vol1/@appcenter/hermes-agent/hermes-src/hermes_cli/web_dist \
+              /vol3/@appcenter/chates/hermes-src/hermes_cli/web_dist \
+              app/hermes-src/hermes_cli/web_dist; do
+    if [ -n "$cand" ] && [ -f "$cand/index.html" ] && [ -r "$cand/index.html" ]; then
+      WEB_DIST_SRC="$cand"; break
+    fi
+  done
+  [ -n "$WEB_DIST_SRC" ] || die "缺 web_dist 构建产物（dashboard 会打不开）。用 HERMES_WEB_DIST_SRC=<path> 指定，或先在 web/ 里 npm run build"
+  mkdir -p "$(dirname "$WEB_DIST_DST")"
+  cp -a "$WEB_DIST_SRC" "$WEB_DIST_DST" || die "复制 web_dist 失败（源: $WEB_DIST_SRC）"
+  ok "web_dist 注入 $(du -sh "$WEB_DIST_DST" | cut -f1)  来源=$WEB_DIST_SRC"
+fi
+
+if [ -d app/python ];     then cp -a app/python     "$STAGE/app/"; fi
+if [ -d app/bin ];        then cp -a app/bin        "$STAGE/app/"; fi
+if [ -f app/package.json ]; then cp app/package.json "$STAGE/app/"; fi
 # echo-web 是 dashboard 前端，有就打
-[ -d app/echo-web ]   && cp -a app/echo-web   "$STAGE/app/"
+if [ -d app/echo-web ];   then cp -a app/echo-web   "$STAGE/app/"; fi
 find "$STAGE/app" -name '*.log' -delete 2>/dev/null || true
+# 组包前最后一道：dashboard 静态产物必须在暂存区，否则又是打不开的包
+[ -f "$STAGE/app/hermes-src/hermes_cli/web_dist/index.html" ] \
+  || die "暂存区缺 hermes_cli/web_dist/index.html（dashboard 会打不开）"
+ok "web_dist 在包内"
 ok "app/     $(du -sh "$STAGE/app" | cut -f1)（fnpack 自行压成 app.tgz）"
 
 # 2) cmd/ —— 生命周期脚本，原样（目录名换成 fpk 要求的 cmd）
@@ -143,7 +219,9 @@ cat > "$STAGE/config/resource" <<EOF
 }
 EOF
 cp fpk-assets/privilege "$STAGE/config/privilege"
-[ -f fpk-assets/hermes-version.env ] && cp fpk-assets/hermes-version.env "$STAGE/config/bootstrap/"
+if [ -f fpk-assets/hermes-version.env ]; then
+  cp fpk-assets/hermes-version.env "$STAGE/config/bootstrap/"
+fi
 # prompts 用脱敏骨架，不用本机 data（本机 data 有 169 个含指纹的技能 + .env 真凭据）
 cp data-skeleton/SOUL.md      "$STAGE/config/prompts/SOUL.md"
 cp data-skeleton/AGENTS.md    "$STAGE/config/prompts/AGENTS.md"
@@ -162,7 +240,9 @@ ok "manifest version = $FPK_VER"
 
 # 5) 图标（两个尺寸，应用中心要 ICON_256.PNG）
 cp fpk-assets/ICON.PNG "$STAGE/"
-[ -f fpk-assets/ICON_256.PNG ] && cp fpk-assets/ICON_256.PNG "$STAGE/"
+if [ -f fpk-assets/ICON_256.PNG ]; then
+  cp fpk-assets/ICON_256.PNG "$STAGE/"
+fi
 ok "ICON.PNG + ICON_256.PNG"
 
 # 6) LICENSE + wizard
@@ -182,7 +262,7 @@ ok "暂存区无明文凭据"
 
 # ------------------------------------------------ 打包
 c '1;36' "== 打包 =="
-OUT="dist/hermes-agent_${FPK_VER}.fpk"
+OUT="dist/chates_${FPK_VER}.fpk"
 mkdir -p dist
 
 # fnpack 是飞牛专有工具，但**静态编译的 x86-64 单文件**（3.7MB，无动态依赖）。
@@ -209,9 +289,9 @@ else
   ( cd "$STAGE" && tar czf app.tgz app ) || die "压 app.tgz 失败"
   rm -rf "$STAGE/app"
   MEMBERS="app.tgz cmd config manifest ICON.PNG"
-  [ -f "$STAGE/ICON_256.PNG" ] && MEMBERS="$MEMBERS ICON_256.PNG"
-  [ -f "$STAGE/LICENSE" ] && MEMBERS="$MEMBERS LICENSE"
-  [ -d "$STAGE/wizard" ] && MEMBERS="$MEMBERS wizard"
+  if [ -f "$STAGE/ICON_256.PNG" ]; then MEMBERS="$MEMBERS ICON_256.PNG"; fi
+  if [ -f "$STAGE/LICENSE" ];      then MEMBERS="$MEMBERS LICENSE"; fi
+  if [ -d "$STAGE/wizard" ];       then MEMBERS="$MEMBERS wizard"; fi
   ( cd "$STAGE" && tar czf "$ROOT/$OUT" $MEMBERS ) || die "tar 打包失败"
 fi
 
@@ -229,21 +309,21 @@ done
 ok "结构完整（app.tgz / manifest / cmd/main / config/{privilege,resource}）"
 
 # 版本校验：manifest 里的版本和文件名一致
-MV=$(tar xzOf "$OUT" manifest 2>/dev/null | grep -oP '^version\s*=\s*\K\S+')
+MV=$( { tar xzOf "$OUT" manifest 2>/dev/null || true; } | { grep -oP '^version\s*=\s*\K\S+' || true; } )
 [ "$MV" = "$FPK_VER" ] || die "manifest 版本 $MV != $FPK_VER"
 ok "manifest 版本 = $MV"
 
 # 版本递增校验（2026-11-25 教训）
 # 应用中心按数字比大小判断能不能升级，打出来的包必须比已装版本大，
 # 否则装上去显示「回退」甚至被拒。实测踩过：装 0.21.149，包是 0.21.10。
-if [ -d /vol1/@appcenter/hermes-agent ]; then
+if [ -d /vol3/@appcenter/chates ] || [ -d /vol1/@appcenter/chates ]; then
   INSTALLED=$(fnos-cli --profile nas --allow-insecure-http app list 2>/dev/null \
     | python3 -c "
 import json,sys
 try:
     d=json.load(sys.stdin)
     for a in d.get('list',[]):
-        if a.get('appName')=='hermes-agent':
+        if a.get('appName')=='chates':
             print(a.get('version','')); break
 except Exception:
     pass

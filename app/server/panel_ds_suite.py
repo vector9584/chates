@@ -402,7 +402,7 @@ def probe_title(urls, secret, model):
     status, body, ms, headers = _talk(urls, secret, {
         'model': model, 'max_tokens': 400,
         'title': {'enabled': True},
-        'messages': [{'role': 'user', 'content': '我叫王瑞兵，在北京做地理信息相关工作，喜欢用 NAS 存电影。'}]})
+        'messages': [{'role': 'user', 'content': '我叫示例用户，在北京做地理信息相关工作，喜欢用 NAS 存电影。'}]})
     got, err = _answer(body, headers)
     if err:
         return _verdict(False, '标题参数不通', err, status, ms)

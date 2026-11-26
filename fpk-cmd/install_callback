@@ -146,6 +146,24 @@ ensure_node() {
         return 0
     fi
 
+    # 优先复用系统已装的 nodejs 应用（2026-11-26 加）：
+    # 应用中心装过 nodejs_v24/v22/v20 就有现成的 node，软链过来即可。
+    # 原来这段逻辑不存在，无论系统有没有都硬下 20MB，断网机器上必然白等一轮。
+    local _sys
+    for _sys in /var/apps/nodejs_v24/target/bin/node \
+                /vol1/@appcenter/nodejs_v24/bin/node \
+                /var/apps/nodejs_v22/target/bin/node \
+                /vol1/@appcenter/nodejs_v22/bin/node \
+                /var/apps/nodejs_v20/target/bin/node \
+                "$(command -v node 2>/dev/null || true)"; do
+        if [ -n "${_sys:-}" ] && [ -x "${_sys}" ]; then
+            mkdir -p "$(dirname "${NODE_BIN}")"
+            ln -sf "${_sys}" "${NODE_BIN}"
+            log_msg "复用系统 node: ${_sys} -> ${NODE_BIN} ($("${_sys}" --version 2>/dev/null || echo 'unknown'))"
+            return 0
+        fi
+    done
+
     # 架构映射
     local ARCH
     case "$(uname -m)" in
@@ -553,30 +571,30 @@ fi
 
 
 # —— 知识整合初始化：部署 knowledge/memories/skill/mirror + crontab（Hermes 方案） ——
-if [ -x "${TRIM_APPDEST:-/var/apps/hermes-agent}/init/init.sh" ]; then
+if [ -x "${TRIM_APPDEST:-/var/apps/chates}/init/init.sh" ]; then
     log_msg '>>> 运行知识整合初始化 (init.sh) ...'
-    "${TRIM_APPDEST:-/var/apps/hermes-agent}/init/init.sh" >> "${TRIM_PKGVAR}/info.log" 2>&1 || log_msg 'WARNING: init.sh 执行失败'
+    "${TRIM_APPDEST:-/var/apps/chates}/init/init.sh" >> "${TRIM_PKGVAR}/info.log" 2>&1 || log_msg 'WARNING: init.sh 执行失败'
 else
     log_msg 'init.sh 不存在'
 fi
 
-# —— sudoers 授权：hermes-agent 免密 cp/chown/psql（版本同步/覆盖/权限修复必需）——
-# monitor（hermes-agent 用户）需要 sudo -n cp/chown 覆盖应用文件 + sudo -u postgres psql 同步应用中心版本；
+# —— sudoers 授权：chates 免密 cp/chown/psql（版本同步/覆盖/权限修复必需）——
+# monitor（chates 用户）需要 sudo -n cp/chown 覆盖应用文件 + sudo -u postgres psql 同步应用中心版本；
 # 未配置时 auto-update 覆盖后应用中心版本不刷新（显示旧版本）。
 if [ -n "${TRIM_USERNAME:-}" ]; then
-    _SUDOERS_FILE="/etc/sudoers.d/hermes-appcenter"
+    _SUDOERS_FILE="/etc/sudoers.d/chates-appcenter"
     # 旧版 sudoers 可能只有 cp/psql（缺 chown）→ 内容不完整必须重写（含 chown 才算完整）
     if [ ! -f "${_SUDOERS_FILE}" ] || ! grep -q 'chown' "${_SUDOERS_FILE}" 2>/dev/null; then
         log_msg ">>> 写入 sudoers 授权（${_SUDOERS_FILE}）..."
-        printf 'hermes-agent ALL=(root) NOPASSWD: /bin/cp, /usr/bin/cp, /bin/chown, /usr/bin/chown, /usr/bin/sudo -u postgres /usr/bin/psql -d appcenter *\n' > /tmp/hermes-appcenter-sudoers
-        chmod 440 /tmp/hermes-appcenter-sudoers
-        if cp /tmp/hermes-appcenter-sudoers "${_SUDOERS_FILE}" 2>>"${TRIM_PKGVAR}/info.log"; then
+        printf 'chates ALL=(root) NOPASSWD: /bin/cp, /usr/bin/cp, /bin/chown, /usr/bin/chown, /usr/bin/sudo -u postgres /usr/bin/psql -d appcenter *\n' > /tmp/chates-appcenter-sudoers
+        chmod 440 /tmp/chates-appcenter-sudoers
+        if cp /tmp/chates-appcenter-sudoers "${_SUDOERS_FILE}" 2>>"${TRIM_PKGVAR}/info.log"; then
             chmod 440 "${_SUDOERS_FILE}" 2>/dev/null || true
             log_msg "sudoers 写入成功"
         else
-            log_msg "sudoers 写入失败（请手动配置 /etc/sudoers.d/hermes-appcenter）"
+            log_msg "sudoers 写入失败（请手动配置 /etc/sudoers.d/chates-appcenter）"
         fi
-        rm -f /tmp/hermes-appcenter-sudoers
+        rm -f /tmp/chates-appcenter-sudoers
     else
         log_msg "sudoers 已存在且完整，跳过"
     fi
