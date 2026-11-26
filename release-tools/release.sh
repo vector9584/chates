@@ -8,8 +8,8 @@
 #   3. 建 tag（如果还没有）/ 建 Release / 上传资产
 #
 # 用法：
-#   release-tools/release.sh --tag v0.20.0-win.9
-#   release-tools/release.sh --tag v0.20.0-win.9 --dry
+#   release-tools/release.sh --tag 1.20.8
+#   release-tools/release.sh --tag 1.20.8 --dry
 # ============================================================================
 set -euo pipefail
 

@@ -14,8 +14,8 @@
 # 本机只负责「触发 + 验收」，不参与打包内容。
 #
 # 用法：
-#   release-tools/publish.sh --tag v0.20.0-win.9          # 完整发布（fpk + exe）
-#   release-tools/publish.sh --tag v0.20.0-win.9 --dry    # 只校验，不上传
+#   release-tools/publish.sh --tag 1.20.8          # 完整发布（fpk + exe）
+#   release-tools/publish.sh --tag 1.20.8 --dry    # 只校验，不上传
 #   release-tools/publish.sh --tag ... --only fpk         # 只出 fpk
 #   release-tools/publish.sh --tag ... --local            # 本机构建（调试用，慢）
 # ============================================================================
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$TAG" ] || { echo "必须给 --tag（如 v0.20.0-win.9）" >&2; exit 2; }
+[ -n "$TAG" ] || { echo "必须给 --tag（如 1.20.8）" >&2; exit 2; }
 case "$ONLY" in all|fpk|exe) ;; *) echo "--only 只能是 all|fpk|exe" >&2; exit 2 ;; esac
 
 c() { printf '\033[%sm%s\033[0m\n' "$1" "$2"; }
@@ -59,7 +59,7 @@ ok "win/version.json      = $VER_JSON"
 ok "electron/package.json = $APP_VER"
 
 # tag 和 win/version.json 的关系：
-#   win/version.json = 0.20.0-win.9  →  tag = v0.20.0-win.9
+#   win/version.json = 0.20.0-win.9  →  tag = 1.20.8
 # 就是加个 v 前缀。之前用 sed 把 0.20.0-win.9 改写成 0.20.9 是错的——
 # 那是 electron-builder 的 semver（0.20.9），和应用内版本不是一回事。
 EXPECT_TAG="v$VER_JSON"

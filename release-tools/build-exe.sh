@@ -13,8 +13,8 @@
 #   data/     ← data-skeleton（脱敏，无 .env 真值、无技能指纹）
 #
 # 用法（Windows Git Bash 或 CI）：
-#   release-tools/build-exe.sh --tag v0.20.0-win.9
-#   release-tools/build-exe.sh --tag v0.20.0-win.9 --check-only
+#   release-tools/build-exe.sh --tag 1.20.8
+#   release-tools/build-exe.sh --tag 1.20.8 --check-only
 # ============================================================================
 set -euo pipefail
 
@@ -154,10 +154,12 @@ cp -a data-skeleton/. "$RES/data/"
 $PYEXE - "$TAG" <<'PY'
 import json, sys, re
 tag = sys.argv[1]
-m = re.match(r'v(\d+\.\d+\.\d+)-win\.(\d+)', tag)
+# 版本号就是 tag 本体：新写法 1.20.8 / 老写法 v1.20.8-win.3 都认。
+# 剥掉可选的 v 前缀，不带 -win.N 之后文件名、顶栏、version.json 全用同一个号。
+m = re.match(r'v?(\d+\.\d+\.\d+)$', tag)
 if not m:
-    print(f"tag 格式不符: {tag}", file=sys.stderr); sys.exit(1)
-ver = f"{m.group(1)}-win.{m.group(2)}"
+    print(f"tag 格式不符: {tag}（要 1.20.8 或 v1.20.8）", file=sys.stderr); sys.exit(1)
+ver = m.group(1)
 p = 'electron/resources/chates/app/version.json'
 try:
     d = json.load(open(p, encoding='utf-8'))

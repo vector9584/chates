@@ -14,8 +14,8 @@
 #   2. 没有 fnpack → 手工 tar（CI runner 上常见，行为等价，自己拼同样的结构）
 #
 # 用法：
-#   release-tools/build-fpk.sh --tag v0.20.0-win.9              # 构建
-#   release-tools/build-fpk.sh --tag v0.20.0-win.9 --check-only # 只预检，不产出
+#   release-tools/build-fpk.sh --tag 1.20.8              # 构建
+#   release-tools/build-fpk.sh --tag 1.20.8 --check-only # 只预检，不产出
 # ============================================================================
 set -euo pipefail
 
