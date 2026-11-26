@@ -123,7 +123,18 @@ rm -rf "$RES"; mkdir -p "$RES"/{app,runtime,data}
 for d in server ui; do
   [ -d "app/$d" ] && cp -a "app/$d" "$RES/app/"
 done
-[ -f app/version.json ] && cp app/version.json "$RES/app/"
+# 发布标记：Windows 侧顶栏与维护页也靠它显示 GitHub 版本号（与 fpk 同源）
+VER_PLAIN=$(python3 -c "import json;print(json.load(open('win/version.json'))['version'].split('-')[0])")
+cat > "$RES/app/version.json" <<JSON
+{
+  "name": "CHATES",
+  "tag": "$TAG",
+  "version": "$VER_PLAIN",
+  "date": "$(date -u +%Y-%m-%d)",
+  "repo": "https://github.com/vector9584/chates"
+}
+JSON
+ok "version.json  tag=$TAG"
 [ -d app/echo-web ] && cp -a app/echo-web "$RES/app/"
 # 内核：优先仓内，其次 electron 已组装产物
 if [ -d app/hermes-src ]; then
