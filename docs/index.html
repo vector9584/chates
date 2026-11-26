@@ -1232,7 +1232,7 @@ body{
               <div class="svc"><div class="sh"><span class="dot g"></span><span class="sn">Gateway</span><span class="st" id="gwSt">Port 8742 · 运行中</span><div class="tog on" id="gw7"></div></div><div class="mini" style="margin-top:7px">工具调用 / 会话 / 消息通道 / 模型请求的入口</div></div>
               <div class="svc"><div class="sh"><span class="dot g"></span><span class="sn">Dashboard</span><span class="st" id="dbSt">Port 9219 · 运行中</span><div class="tog on" id="db7"></div></div><div class="mini" style="margin-top:7px">面板本身 · Monitor 代理与 socket 自愈</div></div>
             </div>
-            <div class="sysinfo"><div><b>10 分钟</b><span>运行时长</span></div><div><b>1035 MB</b><span>内存</span></div><div><b>v0.20.x</b><span>Hermes 版本</span></div><div><b>0.21.x</b><span>应用版本</span></div></div>
+            <div class="sysinfo"><div><b>10 分钟</b><span>运行时长</span></div><div><b>1035 MB</b><span>内存</span></div><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.9</b><span>应用版本</span></div></div>
             <div class="sect-t" style="margin-top:12px">Monitor 日志</div>
             <div class="row" style="margin-bottom:7px"><span class="mini">级别</span><div class="chips" id="lv7"></div></div>
             <div class="row cp-row" style="margin-bottom:9px"><span class="mini">组件</span><div class="chips" id="cp7"></div><span class="spacer"></span><button class="btn sm" id="live7">开启刷新</button></div>
@@ -1279,15 +1279,15 @@ body{
       <span class="cm tl"></span><span class="cm tr"></span><span class="cm bl"></span><span class="cm br"></span></div>
     <div class="plate-txt"><div class="fk">10 · 下载</div>
       <div class="ft">封好的那一个</div>
-      <div class="fd">0.21.149，一个直接装进 fnOS 的包；校验值就摆在旁边。</div>
-      <div class="fb"><span>0.21.149 · 65 MB</span><span>GPL-3.0 · 11-17</span></div></div>
+      <div class="fd">1.20.9，一个直接装进 fnOS 的包；校验值就在 Release 页的 SHA256SUMS 里。</div>
+      <div class="fb"><span>1.20.9</span><span>GPL-3.0</span></div></div>
   </div>
   <div class="stage">
     <aside class="side rv" id="side9"><div class="no">10</div><h2>拿去装</h2><p class="one">包里没有密钥，装完自己配模型；和原来的实例并存，端口互不抢。</p>
       <div class="tags"><span>独立实例</span><span>包内无密钥</span><span>校验值</span></div><div class="hint"><i>↘</i> 下包 / 对校验 / 看入口</div></aside>
     <div class="rv" style="--d:90ms">
       <div class="spec">
-        <div class="spec-bar"><span class="nm">安装包 · v0.21.153</span><span class="st" id="st9">38.1 MB</span></div>
+        <div class="spec-bar"><span class="nm">安装包 · v1.20.9</span><span class="st" id="st9">38.1 MB</span></div>
         <div class="spec-body">
           <div class="chips dl-tabs" id="dlTabs"></div>
           <div id="dlPane"></div>
@@ -1740,7 +1740,7 @@ function drawUsage(){var u=[['deepseek-v4-flash',72,'128.4k'],['deepseek-v4-pro'
   document.getElementById('usage7').innerHTML='<div class="sect-t">用量统计 · 按模型 · 近 30 天</div><div class="usage">'+
     u.map(function(x){return '<div class="ubar"><span>'+x[0]+'</span><i style="--w:'+x[1]+'%"></i><b>'+x[2]+'</b></div>'}).join('')+'</div>'+
     '<div class="sysinfo" style="margin-top:13px"><div><b>101.2%</b><span>上下文占用</span></div><div><b>3 批</b><span>归档</span></div><div><b>38%</b><span>缓存命中</span></div><div><b>$0.00</b><span>本地推理</span></div></div>';}
-function drawVersion(){document.getElementById('usage7').innerHTML='<div class="sysinfo" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>v0.20.x</b><span>Hermes Agent</span></div><div><b>0.21.x</b><span>应用版本</span></div><div><b>8742 / 9219</b><span>Gateway / Dashboard</span></div><div><b>GPL-3.0</b><span>许可证</span></div></div><div class="tiny" style="margin-top:11px">部署脚本自动回写资源版本号；结构门禁会在改动破坏规矩时报错。</div>';}
+function drawVersion(){document.getElementById('usage7').innerHTML='<div class="sysinfo" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.9</b><span>应用版本</span></div><div><b>8742 / 9219</b><span>Gateway / Dashboard</span></div><div><b>GPL-3.0</b><span>许可证</span></div></div><div class="tiny" style="margin-top:11px">部署脚本自动回写资源版本号；结构门禁会在改动破坏规矩时报错。</div>';}
 function setSvc(id,on,el,name,port){el.textContent='Port '+port+' · '+(on?'运行中':'已停止');el.classList.toggle('stop',!on);
   document.getElementById(id).classList.toggle('on',on);
   logs.unshift(['17:19:0'+(logs.length%9),on?'INFO':'WARNING','MONITOR',name+' '+(on?'started':'stopped')+' by user',1]);drawLog();
@@ -1883,14 +1883,18 @@ document.getElementById('copy8').addEventListener('click',function(){
 })();
 
 (function(){
-  var DL_URL='https://github.com/vector9584/chates/releases/latest', HASH='42ac724b5ca9e6aed0310dc5cb4afa33cfd1bfe083e7c38898173d8860dbc634', CMD='sha256sum hermes-agent_0.21.153.fpk';
+  /* 校验值不写死：每次发版重新生成 SHA256SUMS.txt，页面写死一个旧值
+     等于发一版就错一版（上一版就是把旧包的哈希挂在新区块下面）。
+     这里只给指路，具体值去 Release 页拿。 */
+  var DL_URL='https://github.com/vector9584/chates/releases/latest',
+      HASH='见 Release 页 SHA256SUMS.txt', CMD='sha256sum chates_1.20.9.fpk';
   // ghproxy.net 在 Windows 实测 371 KB/s，直连 objects.githubusercontent.com 只有 20-68 KB/s
   var GH_PROXY='https://ghproxy.net/', PROXY_TESTED='2026-11-26 · Windows 实测 371 KB/s';
   var entries=[
-    ['网页面板','NAS-IP:5666','桌面图标进来落在 /app/hermes-agent/；和 8742 / 9219 / 8650 这几个端口错开。'],
-    ['面板直连','NAS-IP:18650','不经过应用中心时的入口，直接打开面板。'],
-    ['网关 API','NAS-IP:18742','模型与消息通道走这里；没配模型时端口空闲属正常。'],
-    ['仪表盘','NAS-IP:19219','上游 Hermes 自带的仪表盘，与面板不是同一个东西。']
+    ['网页面板','NAS-IP:5666','从飞牛桌面图标进来；地址栏是 /app/hermes-agent/，和下面几个端口互不相干。'],
+    ['面板直连','NAS-IP:8650','不经过应用中心时的入口，直接打开面板。桌面版也是这个端口。'],
+    ['网关 API','NAS-IP:8742','模型与消息通道走这里；没配模型时端口空闲属正常。'],
+    ['仪表盘','NAS-IP:9219','上游 Hermes 自带的仪表盘，与面板不是同一个东西。']
   ];
   var pane=document.getElementById('dlPane');
   function card(t,p){return '<div class="dl-card"><h3>'+t+'</h3><p>'+p+'</p></div>'}
@@ -1902,13 +1906,13 @@ document.getElementById('copy8').addEventListener('click',function(){
   function render(i){
     var h='';
     if(i===0){
-      h='<div class="dl-hero"><span class="dl-badge">v0.21.153 · 2026-11-26</span>'+
-        '<span class="dl-file">CHATES-Setup-0.20.10.exe ｜ hermes-agent_0.21.153.fpk</span>'+
+      h='<div class="dl-hero"><span class="dl-badge">v1.20.9</span>'+
+        '<span class="dl-file">CHATES-Setup-1.20.9.exe ｜ chates_1.20.9.fpk</span>'+
         '<a class="btn pri dl-down" href="'+DL_URL+'" download target="_blank" rel="noopener">打开 Release 页 ↓</a>'+
-        '<span class="dl-sub">Windows 151 MB · fnOS 38.1 MB · 包内不含任何 API Key</span></div>'+
+        '<span class="dl-sub">体积与校验值以 Release 页为准 · 包内不含任何 API Key</span></div>'+
         '<div class="dl-grid">'+
-        card('Windows · 下 exe','CHATES-Setup-0.20.10.exe，双击一路下一步。装完桌面就一个图标。升级只换程序本体，%APPDATA%\\CHATÈS 里的 .env、config.yaml、笔记、知识库一个字节不动。')+
-        card('fnOS · 下 fpk','hermes-agent_0.21.153.fpk 走应用中心右上角「手动安装」。中途它会问一次 nodejs_v24 依赖变更，点确认就行。')+
+        card('Windows · 下 exe','CHATES-Setup-1.20.9.exe，双击一路下一步。装完桌面就一个图标。升级只换程序本体，%APPDATA%\\CHATÈS 里的 .env、config.yaml、笔记、知识库一个字节不动。')+
+        card('fnOS · 下 fpk','chates_1.20.9.fpk 走应用中心右上角「手动安装」。中途它会问一次 nodejs_v24 依赖变更，点确认就行。')+
         card('下载慢就挂代理','直连 objects.githubusercontent.com 实测只有 20–68 KB/s。把原始下载链接前面拼上 https://ghproxy.net/ 再下，'+PROXY_TESTED+'。')+
         '</div>';
     }else if(i===1){
@@ -1923,7 +1927,7 @@ document.getElementById('copy8').addEventListener('click',function(){
         '<div class="dl-card" style="margin-top:10px"><h3 id="dlEH">网页面板</h3><p id="dlEP">'+entries[0][2]+'</p></div>';
     }
     pane.innerHTML=h;
-    document.getElementById('st9').textContent=['38.9 MB','SHA-256','4 个入口'][i];
+    document.getElementById('st9').textContent=['Release','SHA-256','4 个入口'][i];
     if(i===1){
       var b1=document.getElementById('dlHash'),b2=document.getElementById('dlCmd');
       b1.addEventListener('click',function(){cp(HASH,b1,'复制校验值 ⧉')});
