@@ -6,6 +6,29 @@ import json
 import os
 from contextlib import contextmanager
 from pathlib import Path
+# Windows 兼容：这些 os 接口只在 POSIX 上存在，缺了就静默跳过。
+# 权限位是尽力而为的语义，不该让整个保存流程崩掉。
+def _fchmod(fd, mode):
+    fn = getattr(os, 'fchmod', None)
+    if fn:
+        try:
+            fn(fd, mode)
+        except OSError:
+            pass
+
+
+def _fchown(fd, uid, gid):
+    fn = getattr(os, 'fchown', None)
+    if fn:
+        try:
+            fn(fd, uid, gid)
+        except OSError:
+            pass
+
+
+def _geteuid():
+    fn = getattr(os, 'geteuid', None)
+    return fn() if fn else 0
 
 _spec = importlib.util.spec_from_file_location('echo_panel_storage', Path(__file__).parents[1] / 'panel-echo.py')
 panel = importlib.util.module_from_spec(_spec)
@@ -33,7 +56,7 @@ def transaction(path, backups):
         target = backups / (hashlib.sha256(raw).hexdigest() + '.json')
         try:
             with target.open('xb') as handle:
-                os.fchmod(handle.fileno(), 0o600)
+                _fchmod(handle.fileno(), 0o600)
                 handle.write(raw)
                 handle.flush()
                 os.fsync(handle.fileno())

@@ -26,6 +26,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from panel_config_txn import config_lock
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+# Windows 兼容：这些 os 接口只在 POSIX 上存在，缺了就静默跳过。
+# 权限位是尽力而为的语义，不该让整个保存流程崩掉。
+def _fchmod(fd, mode):
+    fn = getattr(os, 'fchmod', None)
+    if fn:
+        try:
+            fn(fd, mode)
+        except OSError:
+            pass
+
+
+def _fchown(fd, uid, gid):
+    fn = getattr(os, 'fchown', None)
+    if fn:
+        try:
+            fn(fd, uid, gid)
+        except OSError:
+            pass
+
+
+def _geteuid():
+    fn = getattr(os, 'geteuid', None)
+    return fn() if fn else 0
 try:
   import sys as _sys_enc
   _sys_enc.stdout.reconfigure(encoding='utf-8')
@@ -673,14 +696,14 @@ def execute(request, path, lock_root=None):
         root.mkdir(parents=True, exist_ok=True)
         stamp = root / ('voice-' + str(time.time_ns()) + '-' + hashlib.sha256(raw).hexdigest()[:12] + '.yaml')
         with stamp.open('xb') as stream:
-            os.fchmod(stream.fileno(), 0o600)
+            _fchmod(stream.fileno(), 0o600)
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
         fd, temp = tempfile.mkstemp(prefix='.voice-', dir=path.parent)
         try:
             with os.fdopen(fd, 'wb') as stream:
-                os.fchmod(stream.fileno(), path.stat().st_mode & 0o777)
+                _fchmod(stream.fileno(), path.stat().st_mode & 0o777)
                 stream.write(encoded)
                 stream.flush()
                 os.fsync(stream.fileno())

@@ -16,6 +16,29 @@ from pathlib import Path
 
 from panel_config_txn import ConfigError, commit, load_yaml, plain, read_file
 from panel_model_catalog import credential_fields, entries
+# Windows 兼容：这些 os 接口只在 POSIX 上存在，缺了就静默跳过。
+# 权限位是尽力而为的语义，不该让整个保存流程崩掉。
+def _fchmod(fd, mode):
+    fn = getattr(os, 'fchmod', None)
+    if fn:
+        try:
+            fn(fd, mode)
+        except OSError:
+            pass
+
+
+def _fchown(fd, uid, gid):
+    fn = getattr(os, 'fchown', None)
+    if fn:
+        try:
+            fn(fd, uid, gid)
+        except OSError:
+            pass
+
+
+def _geteuid():
+    fn = getattr(os, 'geteuid', None)
+    return fn() if fn else 0
 
 ENV_NAME = re.compile(r'[A-Za-z_][A-Za-z0-9_]*\Z')
 
@@ -416,14 +439,14 @@ def save_key(data, path, body):
         backup_dir.mkdir(parents=True, exist_ok=True)
         stamp = backup_dir / ('env-' + str(time.time_ns()) + '-' + hashlib.sha256(original).hexdigest()[:12] + '.bak')
         with stamp.open('xb') as stream:
-            os.fchmod(stream.fileno(), 0o600)
+            _fchmod(stream.fileno(), 0o600)
             stream.write(original)
     except OSError:
         pass
     fd, temp = tempfile.mkstemp(prefix='.env-', dir=env_path.parent)
     try:
         with os.fdopen(fd, 'wb') as stream:
-            os.fchmod(stream.fileno(), 0o600)
+            _fchmod(stream.fileno(), 0o600)
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())

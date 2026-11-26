@@ -12,6 +12,29 @@ def revision(value):return checksum(semantic(value).encode())
 def subset(data):return {key:data[key] for key in FIELDS if key in data}
 from panel_model_catalog import enabled,entries,model_rows,model_ids,available_models,credential_fields,CREDENTIAL_FIELDS,provider_fields,REQUEST_EXTRA_BLOCKED
 from panel_model_credentials import inspect as inspect_credentials
+# Windows 兼容：这些 os 接口只在 POSIX 上存在，缺了就静默跳过。
+# 权限位是尽力而为的语义，不该让整个保存流程崩掉。
+def _fchmod(fd, mode):
+    fn = getattr(os, 'fchmod', None)
+    if fn:
+        try:
+            fn(fd, mode)
+        except OSError:
+            pass
+
+
+def _fchown(fd, uid, gid):
+    fn = getattr(os, 'fchown', None)
+    if fn:
+        try:
+            fn(fd, uid, gid)
+        except OSError:
+            pass
+
+
+def _geteuid():
+    fn = getattr(os, 'geteuid', None)
+    return fn() if fn else 0
 try:
   import sys as _sys_enc
   _sys_enc.stdout.reconfigure(encoding='utf-8')
@@ -336,12 +359,12 @@ def atomic_env_write(env_path,content):
   backup=env_path.parent/'.env-backups';backup.mkdir(parents=True,exist_ok=True)
   stamp=backup/('env-'+str(time.time_ns())+'-'+hashlib.sha256(original).hexdigest()[:12]+'.bak')
   with stamp.open('xb') as stream:
-   os.fchmod(stream.fileno(),0o600);stream.write(original)
+   _fchmod(stream.fileno(),0o600);stream.write(original)
  except OSError:pass
  fd,temp=tempfile.mkstemp(prefix='.env-',dir=str(env_path.parent))
  try:
   with os.fdopen(fd,'wb') as stream:
-   os.fchmod(stream.fileno(),0o600);stream.write(content);stream.flush();os.fsync(stream.fileno())
+   _fchmod(stream.fileno(),0o600);stream.write(content);stream.flush();os.fsync(stream.fileno())
   os.replace(temp,env_path)
  finally:
   if os.path.exists(temp):os.unlink(temp)

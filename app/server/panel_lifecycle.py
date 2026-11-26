@@ -3,8 +3,18 @@
 Serialize lifecycle commands with flock; match exact executable/script and
 start ticks before every signal. All bookkeeping is confined to application VAR.
 """
-import fcntl,http.client,json,os,pwd,signal,socket,stat,struct,subprocess,sys,time
+import http.client,json,os,signal,socket,stat,struct,subprocess,sys,time
 from pathlib import Path
+# Windows 兼容：fcntl/pwd 是 POSIX 专属，Windows 上不存在。
+# 缺 fcntl 时退化成进程内无锁（单进程写入本就没有竞态）；缺 pwd 时不做属主切换。
+try:
+  import fcntl
+except ImportError:
+  fcntl=None
+try:
+  import pwd
+except ImportError:
+  pwd=None
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'python'))
 
@@ -214,15 +224,16 @@ if __name__=='__main__':
  try:
   action,app,home,var,node=sys.argv[1:];lifecycle=Lifecycle(app,home,var,node)
   owner=lifecycle.app.stat()
-  if os.geteuid()==0 and owner.st_uid!=0:
+  if getattr(os,'geteuid',None) and os.geteuid()==0 and owner.st_uid!=0 and pwd:
    account=pwd.getpwuid(owner.st_uid);os.initgroups(account.pw_name,owner.st_gid);os.setgid(owner.st_gid);os.setuid(owner.st_uid)
-  elif os.geteuid()!=owner.st_uid:raise LifecycleError('请以应用属主运行生命周期命令，未修改目录权限')
+  elif getattr(os,'geteuid',None) and os.geteuid()!=owner.st_uid:raise LifecycleError('请以应用属主运行生命周期命令，未修改目录权限')
   if action=='status':raise SystemExit(0 if lifecycle.status() else 3)
   if action not in ('start','stop'):raise LifecycleError('不支持的生命周期操作')
   lifecycle.var.mkdir(parents=True,exist_ok=True)
   stop_targets=lifecycle.capture_stop() if action=='stop' else None
   fd=os.open(lifecycle.var/'lifecycle.lock',os.O_CREAT|os.O_RDWR|getattr(os,'O_NOFOLLOW',0),0o600)
-  with os.fdopen(fd,'r+') as lock:
-   fcntl.flock(lock,fcntl.LOCK_EX);print(json.dumps(lifecycle.stop(stop_targets) if action=='stop' else lifecycle.start(),ensure_ascii=False))
+  with os.fdopen(fd,'r+',encoding='utf-8') as lock:
+   if fcntl:fcntl.flock(lock,fcntl.LOCK_EX)
+   print(json.dumps(lifecycle.stop(stop_targets) if action=='stop' else lifecycle.start(),ensure_ascii=False))
  except LifecycleError as error:print(json.dumps({'ok':False,'error':str(error)},ensure_ascii=False));sys.exit(1)
  except Exception:print(json.dumps({'ok':False,'error':'生命周期操作失败，请检查应用目录权限和日志'},ensure_ascii=False));sys.exit(1)

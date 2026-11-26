@@ -10,6 +10,29 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+# Windows 兼容：这些 os 接口只在 POSIX 上存在，缺了就静默跳过。
+# 权限位是尽力而为的语义，不该让整个保存流程崩掉。
+def _fchmod(fd, mode):
+    fn = getattr(os, 'fchmod', None)
+    if fn:
+        try:
+            fn(fd, mode)
+        except OSError:
+            pass
+
+
+def _fchown(fd, uid, gid):
+    fn = getattr(os, 'fchown', None)
+    if fn:
+        try:
+            fn(fd, uid, gid)
+        except OSError:
+            pass
+
+
+def _geteuid():
+    fn = getattr(os, 'geteuid', None)
+    return fn() if fn else 0
 try:
   import sys as _sys_enc
   _sys_enc.stdout.reconfigure(encoding='utf-8')
@@ -83,7 +106,7 @@ def save(path, data):
         with os.fdopen(descriptor, 'wb') as handle:
             handle.write(payload)
             handle.flush()
-            os.fchmod(handle.fileno(), mode)
+            _fchmod(handle.fileno(), mode)
             os.fsync(handle.fileno())
         os.replace(temporary, path)
         directory = os.open(path.parent, os.O_RDONLY)
@@ -401,7 +424,7 @@ def execute(request, path, backups):
         backups.mkdir(parents=True, exist_ok=True)
         backup = backups / (str(time.time_ns()) + '-' + hashlib.sha256(original).hexdigest()[:12] + '.json')
         with backup.open('xb') as handle:
-            os.fchmod(handle.fileno(), 0o600)
+            _fchmod(handle.fileno(), 0o600)
             handle.write(original)
             handle.flush()
             os.fsync(handle.fileno())
