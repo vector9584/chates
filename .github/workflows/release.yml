@@ -200,8 +200,9 @@ jobs:
           name: exe
           path: |
             electron/dist/*.exe
-            electron/dist/*.yml
+            electron/dist/latest.yml
             electron/dist/*.blockmap
+            !electron/dist/builder-debug.yml
           if-no-files-found: error
 
   # 发布：两个产物 + latest.yml + SHA256SUMS 传同一个 Release
