@@ -1,7 +1,10 @@
 """Shared, conflict-aware YAML transaction for panel-owned config operations."""
 import copy
 import importlib.util
-import fcntl
+try:
+ import fcntl
+except ImportError:  # Windows 没有 fcntl，跨进程锁降级为进程内互斥
+ fcntl=None
 import hashlib
 import io
 import json
@@ -98,9 +101,10 @@ def config_lock(root,*,recover=True):
    try:yield
    finally:holder.depth-=1
    return
-  fd=os.open(root/'config-transaction.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+  fd=os.open(root/'config-transaction.lock',os.O_CREAT|os.O_RDWR|getattr(os,'O_NOFOLLOW',0),0o600)
   try:
-   fcntl.flock(fd,fcntl.LOCK_EX);holder.depth=1
+   if fcntl is not None:fcntl.flock(fd,fcntl.LOCK_EX)
+   holder.depth=1
    if recover:recover_bundle(root)
    yield
   finally:holder.depth=0;os.close(fd)
@@ -112,7 +116,7 @@ def read_file(path):
  for parent in [path,*path.parents]:
   if parent.is_symlink():raise ConfigError('配置路径包含链接，请先核对运行环境',403)
  for _ in range(4):
-  fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+  fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
   try:
    st=os.fstat(fd)
    if not __import__('stat').S_ISREG(st.st_mode) or st.st_nlink>1:raise ConfigError('配置不是独立普通文件',403)
@@ -145,24 +149,24 @@ def commit(path,root,raw,encoded,reason,details=None):
  metadata={'id':identifier,'file':str(path),'before':checksum(raw),'after':checksum(encoded),'reason':str(reason)[:160],'created_at':int(time.time()*1000),'details':details or {}}
  fd=os.open(directory/(identifier+'.json'),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
  with os.fdopen(fd,'w') as stream:json.dump(metadata,stream,ensure_ascii=False);stream.flush();os.fsync(stream.fileno())
- fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY)
+ fd=os.open(directory,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
  try:os.fsync(fd)
  finally:os.close(fd)
  fd,temp=tempfile.mkstemp(prefix='.panel-config-',dir=Path(path).parent)
  try:
   with os.fdopen(fd,'wb') as stream:
-   os.fchmod(stream.fileno(),stat.st_mode&0o777)
+   if hasattr(os,'fchmod'):os.fchmod(stream.fileno(),stat.st_mode&0o777)
    # fchown 只在有权限时执行（2026-11-11 修）：config.yaml 的 gid 是 AppUsers(901)，进程 gid 是
    # hermes-agent(885)，非 root 无法把临时文件 chown 到别的组；原先这里直接抛 PermissionError，
    # 导致模型/通讯/MCP/打字行为所有面板保存一律 500。属主相同、mode 644 全局可读，跳过组变更无副作用。
-   if stat.st_uid!=os.getuid() or stat.st_gid!=os.getgid():
+   if hasattr(os,'getuid') and (stat.st_uid!=os.getuid() or stat.st_gid!=os.getgid()):
     try:os.fchown(stream.fileno(),stat.st_uid,stat.st_gid)
-    except PermissionError:pass
+    except (PermissionError,AttributeError):pass
    stream.write(encoded);stream.flush();os.fsync(stream.fileno())
   latest,latest_stat=read_file(path)
   if latest!=raw or (latest_stat.st_dev,latest_stat.st_ino)!=(stat.st_dev,stat.st_ino):raise ConfigError('保存前配置发生变化，请重新读取',409)
   os.replace(temp,path)
-  fd=os.open(Path(path).parent,os.O_RDONLY|os.O_DIRECTORY)
+  fd=os.open(Path(path).parent,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
   try:os.fsync(fd)
   finally:os.close(fd)
  finally:

@@ -123,6 +123,9 @@ rm -rf "$RES"; mkdir -p "$RES"/{app,runtime,data}
 for d in server ui; do
   [ -d "app/$d" ] && cp -a "app/$d" "$RES/app/"
 done
+# panel/server 用 ESM（import ... from），Node 靠这个 package.json 的 type:module 才认；
+# 漏了它 Windows 侧 monitor.js 会以 CJS 解析而报 "Cannot use import statement outside a module"。
+[ -f app/package.json ] && cp -a app/package.json "$RES/app/" || die "缺 app/package.json（ESM 需要 type:module）"
 # 发布标记：Windows 侧顶栏与维护页也靠它显示 GitHub 版本号（与 fpk 同源）
 VER_PLAIN=$(python3 -c "import json;print(json.load(open('win/version.json'))['version'].split('-')[0])")
 cat > "$RES/app/version.json" <<JSON
@@ -191,12 +194,36 @@ elif command -v "$UV" >/dev/null 2>&1 || [ -f "$UV" ]; then
   [ -n "$PYBASE" ] || die "uv 没找到 python 3.11"
   mkdir -p "$RES/runtime/python"
   cp -a "$(dirname "$PYBASE")/." "$RES/runtime/python/"
-  # 装 Hermes 依赖
-  "$RES/runtime/python/python.exe" -m pip install -q -e "app/hermes-src[all]" 2>/dev/null || \
-    "$RES/runtime/python/python.exe" -m pip install -q pyyaml requests 2>/dev/null || true
   ok "python/    uv 建好"
 else
   die "既没有现成 python/，也没有 uv"
+fi
+
+# 依赖必须真的装进去，两个分支都要装（复用不等于依赖齐全）。
+# 2026-11-26 教训：uv 装的 python 带 PEP 668 标记，`pip install` 会以
+# "externally-managed-environment" 直接退出；原先这里用 `2>/dev/null || true`
+# 把错误吞了，发出去的 exe 里是个只有 pip/setuptools 的裸 python ——
+# panel-models.py 报 No module named 'ruamel'，gateway 报 No module named 'fcntl'，
+# 面板"连不上服务"、模型配置读不出来，全套后台功能失效。
+# 另外必须用非 editable 安装：CI 的 build 路径（D:\a\...）与安装后的
+# resources 路径不同，-e 生成的 .pth 会把用户机器指向一个不存在的目录。
+c '1;36' "== 安装 runtime python 依赖 =="
+"$RES/runtime/python/python.exe" -m pip install -q --break-system-packages --no-warn-script-location \
+  -e "app/hermes-src[all]" >/dev/null 2>&1 || true
+"$RES/runtime/python/python.exe" -m pip install -q --break-system-packages --no-warn-script-location \
+  "app/hermes-src[all]" || die "runtime python 依赖安装失败（hermes-src[all]）"
+"$RES/runtime/python/python.exe" -c "import fcntl, ruamel.yaml, aiohttp, dotenv" 2>/dev/null \
+  || "$RES/runtime/python/python.exe" -c "import ruamel.yaml, dotenv" || die "runtime python 依赖校验失败"
+ok "python/ 依赖就位"
+
+# Unix 专有模块垫片：Windows 没有 fcntl，cron/panel-echo 的 import 链会整条断掉。
+SHIM_DIR="release-tools/py-shims"
+if [ -f "$SHIM_DIR/fcntl.py" ]; then
+  # 之前可能被 -e 安装残留带进来过，先移除再放，保证是仓里那份
+  cp -f "$SHIM_DIR/fcntl.py" "$RES/runtime/python/Lib/site-packages/fcntl.py"
+  ok "shim/    fcntl.py"
+else
+  die "缺 $SHIM_DIR/fcntl.py（Windows 无 fcntl，cron 会 import 失败）"
 fi
 
 # 关键：绝不写 pyvenv.cfg（写了 python 会认成 venv，prefix 错到上一层）
