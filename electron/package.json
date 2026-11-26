@@ -36,14 +36,12 @@
     ],
     "extraResources": [
       {
-        "from": "resources/chates",
-        "to": "chates",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**",
-          "!**/*.pyc",
-          "!**/node_modules/.cache/**"
-        ]
+        "from": "resources/chates.tgz",
+        "to": "chates.tgz"
+      },
+      {
+        "from": "resources/stop-chates-children.ps1",
+        "to": "stop-chates-children.ps1"
       }
     ],
     "win": {

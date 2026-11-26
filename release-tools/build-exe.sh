@@ -255,6 +255,20 @@ else
   ok "node.exe   下载完成"
 fi
 
+# ------------------------------------------------ 打运行时 tar
+# 为什么打 tar：resources/chates 是 Python 运行时 + node + 内核源码，两万多
+# 个碎文件。electron-builder 把它们逐个塞进 NSIS，安装进度条按文件条目推进：
+# 解压阶段先走满一次，落盘阶段又从 60% 附近重新算，然后几分钟不动。用户
+# 2026-11-26 实际反馈"进度条走满又退回 60%，等好几分钟，我以为卡住了"。
+# 合成单文件后 NSIS 只搬一个条目，进度条单调递增。解开后的目录结构不变，
+# main.js 的 resolveRoots() 与 installer.nsh 的 customInstall 都按原布局取。
+c '1;36' "== 打运行时 tar =="
+TARF="$RES.tgz"
+rm -f "$TARF"
+( cd "$RES" && tar -czf "$TARF" . ) || die "打 tar 失败"
+ok "chates.tgz $(du -h "$TARF" | cut -f1)  $(tar -tzf "$TARF" | wc -l) 条目"
+rm -rf "$RES"
+
 # ------------------------------------------------ electron-builder
 c '1;36' "== electron-builder =="
 cd electron

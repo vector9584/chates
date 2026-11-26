@@ -221,4 +221,7 @@ PY
 say "layout:"
 du -sh "$OUT"/* | sed 's/^/  /'
 say "total: $(du -sh "$OUT" | cut -f1)"
+
 say "done: $OUT"
+# 注意：CI 实际走 release-tools/build-exe.sh 自己组装并打 tar，
+# 不调用本脚本。这里的 tar 逻辑留在 build-exe.sh，避免两处各写一份而漂移。

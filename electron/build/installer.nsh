@@ -33,6 +33,56 @@
   nsExec::Exec 'taskkill /F /T /FI "IMAGENAME eq CHAT?S.exe"'
   Pop $0
   Sleep 800
+
+  ; The shell spawns node.exe (panel/monitor) and python.exe (kernel). /T needs
+  ; a matching root PID; once the shell is gone those children get reparented,
+  ; survive, and keep handles open into $INSTDIR. That is the "installer sits
+  ; at 60% for minutes" symptom reported on 2026-11-26.
+  ;
+  ; Earlier attempts tried to kill those children by path. That needs a
+  ; PowerShell pipeline with three levels of quoting inside an NSIS string --
+  ; unreadable, and impossible to verify without a real installer run.
+  ;
+  ; The installer does not actually need the processes dead. It needs the
+  ; target directory free. Directory rename is an atomic check for exactly
+  ; that, and it does not care what the process is called:
+  ;   - renamed OK      -> nothing holds it, rename back, carry on
+  ;   - rename fails    -> something is still running; tell the user plainly
+  ;                        instead of letting the copy phase stall silently
+  ; First install: $INSTDIR does not exist yet, and Rename would "fail" for the
+  ; wrong reason -- that must not show the "still running" prompt.
+  IfFileExists "$INSTDIR\*.*" 0 chates_unlocked
+  ClearErrors
+  Rename "$INSTDIR" "$INSTDIR.lock"
+  IfErrors chates_locked
+    Rename "$INSTDIR.lock" "$INSTDIR"
+    Goto chates_unlocked
+  chates_locked:
+    ${ifNot} ${Silent}
+      MessageBox MB_ICONEXCLAMATION|MB_OK \
+        "CHATES is still running. Please quit it from the tray, then click OK to continue."
+    ${endIf}
+  chates_unlocked:
+  Sleep 1500
+!macroend
+
+; Expand the runtime tarball right after files land.
+; The payload ships as resources/chates.tgz (one entry) instead of ~20k loose
+; files. NSIS drives its progress bar per file entry, so the loose-file layout
+; made the bar fill once during decompress, reset near 60%, then sit still for
+; minutes while thousands of tiny files were written -- users read that as a
+; hang. One archive keeps the bar monotonic and honest.
+; Windows 10 1803+ ships bsdtar, and bsdtar accepts -xzf / -C, so this stays
+; portable without bundling anything.
+!macro customInstall
+  IfFileExists "$INSTDIR\resources\chates.tgz" 0 chates_no_tar
+    DetailPrint "Expanding runtime (this takes a minute)..."
+    nsExec::ExecToLog 'tar -xzf "$INSTDIR\resources\chates.tgz" -C "$INSTDIR\resources"'
+    Pop $0
+    ; 0 = success, 2 = partial. Anything else is worth surfacing in the log
+    ; but must not abort: main.js extracts again on first run as a fallback.
+    DetailPrint "runtime expand exit=$0"
+  chates_no_tar:
 !macroend
 
 !macro customUnInstall
