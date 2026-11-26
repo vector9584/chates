@@ -11,10 +11,8 @@
  * 编码：写盘统一 utf8（Windows 上不写 encoding 会按 cp936 写坏中文，
  * 这是本项目同一天踩过的第三个坑，见 knowledge/项目/hermes-windows/05）。
  */
-import { mkdirSync, appendFileSync, readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, appendFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
 
 /* 分类树：两级。键名固定，改动必须同步前端 ISSUE_TAXONOMY。
  * 只给稳定存在的版块，不追功能细枝——分太细用户点不到自己要报的地方。 */
@@ -85,114 +83,6 @@ function clean(v, max) {
     .slice(0, max);
 }
 
-/* ── GitHub Issue 同步（可选，2026-11-26 加）────────────────────
- * 站内收件箱默认只落本地，不依赖任何账号。若宿主要求把反馈同步成
- * GitHub Issue，在 <home>/.env 里写两行即可：
- *     GITHUB_ISSUE_TOKEN=ghp_xxx        # 必须有 issues:write 权限
- *     GITHUB_ISSUE_REPO=owner/repo      # 省略则用默认仓
- * 出厂 .env 不带这两项 → 完全跳过网络请求，绝不让没配置的人提不上。
- * 同步失败不影响提交：本地行照样写，失败原因记在 item.github.error。
- */
-const DEFAULT_ISSUE_REPO = 'vector9584/chates';
-
-function readSyncConfig(home) {
-  const env = { ...process.env };
-  try {
-    const f = join(home, '.env');
-    if (existsSync(f)) {
-      for (const line of readFileSync(f, 'utf8').split('\n')) {
-        const m = /^\s*([A-Za-z0-9_]+)\s*=\s*(.*)$/.exec(line);
-        if (!m) continue;
-        if (env[m[1]]) continue; // 真实环境变量优先，.env 只做补位
-        env[m[1]] = m[2].replace(/^["']|["']$/g, '').trim();
-      }
-    }
-  } catch { /* 读不到就当没配 */ }
-  return {
-    token: String(env.GITHUB_ISSUE_TOKEN || '').trim(),
-    repo: String(env.GITHUB_ISSUE_REPO || DEFAULT_ISSUE_REPO).trim(),
-  };
-}
-
-/* 发请求用 curl 子进程，不用 node 的 fetch。
- * 原因（2026-11-26 实测）：本机 Clash 是 TUN 模式，node 的 TLS 握手被中途
- * RST（ECONNRESET before secure TLS connection），而 curl/python 都正常。
- * 用 curl 还能吃掉系统代理设置，换个网络环境也不用改代码。
- * token 不过 argv（ps 可见），走 curl -K - 的 stdin 配置。 */
-function curlPostIssue(cfg, payload, timeoutMs = 10000) {
-  return new Promise((resolve) => {
-    const bodyFile = join(tmpdir(), `chates-issue-${process.pid}-${Date.now()}.json`);
-    try {
-      writeFileSync(bodyFile, JSON.stringify(payload), { encoding: 'utf8', mode: 0o600 });
-    } catch (e) {
-      return resolve({ enabled: true, synced: false, error: 'tmp_write_failed' });
-    }
-    const done = (r) => { try { rmSync(bodyFile, { force: true }); } catch { /* ignore */ } resolve(r); };
-    const esc = (v) => String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const conf = [
-      `url = "https://api.github.com/repos/${cfg.repo}/issues"`,
-      'request = "POST"',
-      'silent',
-      'show-error',
-      `max-time = ${Math.ceil(timeoutMs / 1000)}`,
-      `header = "Authorization: Bearer ${esc(cfg.token)}"`,
-      'header = "Accept: application/vnd.github+json"',
-      'header = "Content-Type: application/json"',
-      'header = "User-Agent: chates-panel"',
-      `data-binary = "@${bodyFile}"`,
-      'write-out = "\\n%{http_code}"',
-    ].join('\n') + '\n';
-
-    let out = '', errOut = '';
-    let proc;
-    try {
-      proc = spawn('curl', ['-sS', '-K', '-'], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
-    } catch (e) {
-      return done({ enabled: true, synced: false, error: 'curl_spawn_failed' });
-    }
-    const killer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* ignore */ } }, timeoutMs + 4000);
-    proc.stdout.on('data', (d) => { out += d; });
-    proc.stderr.on('data', (d) => { errOut += d; });
-    proc.on('error', (e) => {
-      clearTimeout(killer);
-      done({ enabled: true, synced: false, error: 'curl_error:' + (e && e.code ? e.code : 'unknown') });
-    });
-    proc.on('close', (code) => {
-      clearTimeout(killer);
-      const m = /\n(\d{3})\s*$/.exec(out);
-      const status = m ? Number(m[1]) : 0;
-      const body = m ? out.slice(0, m.index) : out;
-      if (code === 0 && status >= 200 && status < 300) {
-        let j = {};
-        try { j = JSON.parse(body || '{}'); } catch { /* 空体当成功但没号 */ }
-        return done({ enabled: true, synced: true, number: j.number ?? null, url: j.html_url || null });
-      }
-      let msg = (errOut || '').trim();
-      try { msg = JSON.parse(body).message || msg; } catch { /* keep stderr */ }
-      done({ enabled: true, synced: false, error: `HTTP ${status || '?'} ${msg}`.trim().slice(0, 200) });
-    });
-    try { proc.stdin.write(conf); proc.stdin.end(); } catch { /* error handler 会兜 */ }
-  });
-}
-
-async function pushToGitHub(item, cfg) {
-  if (!cfg.token) return { enabled: false, reason: 'no_token' };
-  const payload = {
-    title: `[${item.categoryLabel}] ${item.title}`,
-    body: [
-      item.detail,
-      '',
-      '---',
-      `- 提交人：${item.name}`,
-      `- 站内编号：${item.id}`,
-      `- 提交时间：${item.createdAt}`,
-      `- 客户端版本：${item.context.version || '-'}`,
-      `- 平台：${item.context.platform || '-'}`,
-    ].join('\n'),
-  };
-  return curlPostIssue(cfg, payload);
-}
-
 export function createIssueStore({ home }) {
   const dir = join(home, 'var', 'issues');
   const file = join(dir, 'issues.jsonl');
@@ -221,10 +111,8 @@ export function createIssueStore({ home }) {
     return { items, skipped };
   }
 
-  /* 提交。校验全部通过才落盘，任何一项不合格都不写。
-   * 异步：先尝试同步 GitHub（若已配 token），拿到结果再写本地行，
-   * 这样 list() 读到的就是最终状态，不用再追加"补丁行"。 */
-  async function submit(body) {
+  /* 提交。校验全部通过才落盘，任何一项不合格都不写。 */
+  function submit(body) {
     if (!body || typeof body !== 'object') return bad('提交内容为空');
 
     const name = clean(body.name, MAX_NAME);
@@ -261,9 +149,6 @@ export function createIssueStore({ home }) {
       },
     };
 
-    /* 同步 GitHub（未配置 token 时立即返回 enabled:false，不发请求） */
-    item.github = await pushToGitHub(item, readSyncConfig(home));
-
     ensureDir();
     appendFileSync(file, JSON.stringify(item) + '\n', 'utf8');
     return { ok: true, item };
@@ -291,4 +176,32 @@ export function createIssueStore({ home }) {
   }
 
   return { submit, list, summary, taxonomy: ISSUE_TAXONOMY, file };
+}
+
+/* HTTP 层：把 store 挂成 /api/issue* 三条路由。
+ * 与 panel-maintenance.js 同风格——命中返回 Response，不命中返回 null 交还上层。
+ * 必须校验 token：收件箱里是别人提交的原文，不能匿名读。 */
+export function createIssueHandler({store, checkToken}) {
+  const reply = (body, status = 200) => new Response(JSON.stringify(body), {status,
+    headers: {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
+
+  return async function handleIssue(req, path) {
+    if (!path.startsWith('/api/issue')) return null;
+    if (!checkToken(req)) return reply({ok:false, error:'请重新登录后再提交'}, 401);
+
+    if (path === '/api/issue/taxonomy' && req.method === 'GET') {
+      return reply({ok:true, taxonomy: store.taxonomy});
+    }
+    if (path === '/api/issue/summary' && req.method === 'GET') {
+      const s = store.summary();
+      return reply({ok:true, total:s.total, skipped:s.skipped, groups:s.groups, recent:s.recent});
+    }
+    if (path === '/api/issue' && req.method === 'POST') {
+      let body = null;
+      try { body = await req.json(); } catch (_) { body = null; }
+      const r = store.submit(body);
+      return reply(r, r.status || 200);
+    }
+    return null;
+  };
 }

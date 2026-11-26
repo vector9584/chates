@@ -46,6 +46,7 @@ import { createConnectorToolsHandler } from "./panel-connector-tools.js";
 import { ConnectorStore, createConnectorHandler } from "./panel-connectors.js";
 import { createConnectorProbeHandler } from "./panel-connector-probe.js";
 import { createMaintenanceHandler } from "./panel-maintenance.js";
+import { createIssueStore, createIssueHandler } from "./panel-issues.js";
 import { createEchoHandler } from "./panel-echo.js";
 import { PanelAuth, panelPath } from "./panel-auth.js";
 import {dispatchPanel,authorizePanelUpgrade} from "./panel-http.js";
@@ -4378,6 +4379,10 @@ const handleCronUpdate = createCronUpdateHandler({
   getHome: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile)) : DATA_DIR; },
 });
 
+/* 站内问题反馈：落 <DATA_DIR>/var/issues/issues.jsonl，不依赖 GitHub 账号。 */
+const issueStore = createIssueStore({ home: DATA_DIR });
+const handleIssue = createIssueHandler({ store: issueStore, checkToken });
+
 async function handleFetch(req) {
   const configRW=configReaderWriter({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getFile:()=>_runtimeConfigPath(),reason:'面板服务配置'});
   const envRW=envReaderWriter({python:join(VENV_BIN,PY_BIN),serverRoot:join(APP_DIR,'server'),state:join(VAR_DIR,'panel-state'),getFile:()=>HERMES_ENV});
@@ -4398,6 +4403,8 @@ async function handleFetch(req) {
   if(path==='/api/mcp-servers'||path.startsWith('/api/mcp-servers/'))return new Response(JSON.stringify({ok:false,error:'请刷新面板后使用工具服务管理'}),{status:410,headers:{'Content-Type':'application/json'}});
   const maintenanceResponse = await handleMaintenance(req, path);
   if (maintenanceResponse) return maintenanceResponse;
+  const issueResponse = await handleIssue(req, path);
+  if (issueResponse) return issueResponse;
   const modelChecksResponse = await handleModelChecks(req, path);
   if (modelChecksResponse) return modelChecksResponse;
   const auxiliaryResponse = await handleAuxiliary(req, path);

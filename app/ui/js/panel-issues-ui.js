@@ -36,9 +36,12 @@
   }
 
   function version() {
+    /* 顶栏只挂 GitHub 发布版号；取不到再退到 package 自带版本 */
     try {
-      var el = document.getElementById('brandVer');
-      return el ? String(el.textContent || '').replace(/^v/i, '').trim() : '';
+      var el = document.getElementById('brandVerGh');
+      var t = el ? String(el.textContent || '').replace(/^v/i, '').trim() : '';
+      if (!t) { try { t = String(window.__APP_VER__ || '').trim(); } catch (e2) {} }
+      return t;
     } catch (e) { return ''; }
   }
 
@@ -190,15 +193,7 @@
         renderGroups(card);
         card.querySelector('#pwIssueLeaves').innerHTML = '';
         updatePicked(card);
-        var _it = body.item || {};
-        var _gh = _it.github || {};
-        var _tip = '已收到，编号 ' + (_it.id ? _it.id : '—');
-        if (_gh.synced) {
-          _tip += '，已同步 GitHub Issue #' + _gh.number;
-        } else if (_gh.enabled) {
-          _tip += '，但 GitHub 同步失败（' + (_gh.error || '未知原因') + '），本地已留存';
-        }
-        showMsg(card, _tip, 'ok');
+        showMsg(card, '已收到，编号 ' + (body.item && body.item.id ? body.item.id : '—'), 'ok');
         /* 让汇总视图下次打开重新拉 */
         try { window._issueSummaryDirty = true; } catch (e) {}
       } else {

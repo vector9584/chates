@@ -370,6 +370,6 @@ function mdToHtml(s){
 
 /* ============================ 顶部按钮 ============================ */
 function openNewWindow(){ window.open(window.location.href, '_blank'); }
-function openGitHub(){ window.open('https://github.com/vector9584/fnos-hermes-panel','_blank'); }
+function openGitHub(){ window.open('https://github.com/vector9584/chates','_blank'); }
 /* 全局搜索入口：侧栏那条搜索框删掉后，改由聊天区右上角放大镜调起同一个搜索面板 */
 function openGlobalSearch(){ if(window.pwSearch) window.pwSearch(''); }

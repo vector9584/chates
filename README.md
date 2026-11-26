@@ -12,7 +12,7 @@
 
 <p align="center">
   <img alt="kernel" src="https://img.shields.io/badge/kernel-0.20.0-71dbc0">
-  <img alt="panel" src="https://img.shields.io/badge/panel-1.20.3-5e64f3">
+  <img alt="panel" src="https://img.shields.io/badge/panel-1.20.4-5e64f3">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20fnOS-2f3a46">
   <img alt="pages" src="https://img.shields.io/badge/panel-8%20%E6%9D%BF%E5%9D%97%2021%20%E9%A1%B5-71dbc0">
   <img alt="skills" src="https://img.shields.io/badge/skills-397-5e64f3">
