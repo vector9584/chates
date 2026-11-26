@@ -68,12 +68,19 @@ else setTimeout(loadGitHubVersion,1100);
 
 function applyPanelVer(d){
   var el=document.getElementById('brandVer'); if(!el) return;
-  el.textContent=(d.sha||'--')+(d.changes?'*':'');
-  var full='面板源码仓库 '+(d.full||d.sha||'');
-  if(d.changes) full+='（'+d.changes+' 处未提交改动，未算进这版）';
+  /* 顶栏两个标各管一件事，别让它们显示同一个数：
+     本地标 = 代码提交（sha），GitHub 标 = 发布版本号。
+     两边都显示版本号时会出现"两个 1.20.8"，看着就像坏了。 */
+  var label=(d.sha||'--')+(d.changes?'*':'');
+  el.textContent=label;
+  var full='本地代码提交 '+(d.full||d.sha||'');
+  if(d.version) full+='\n仓库声明版本 v'+d.version;
+  if(d.full) full+='\n提交 '+(d.sha||'')+' '+(d.full||'');
+  if(d.changes) full+='\n（'+d.changes+' 处未提交改动，未算进这版）';
   if(d.date) full+='\n'+String(d.date).replace('T',' ').slice(0,16)+' · '+(d.subject||'');
   if(window.__APP_VER__) full+='\nfnOS 包 v'+window.__APP_VER__;
   el.title=full;
+  el.style.display='';
   el.onclick=function(){
     var txt=d.full||d.sha||'';
     if(!txt) return;
@@ -89,8 +96,16 @@ function loadPanelVersion(){
   }).then(function(j){
     var repo=((j&&j.repositories)||[]).filter(function(x){return x.id==='panel';})[0];
     if(!repo||!repo.available||!repo.head) throw new Error('no head');
-    var d={sha:repo.head.slice(0,7),full:repo.head,changes:repo.changes||0,date:'',subject:''};
+    var d={sha:repo.head.slice(0,7),full:repo.head,changes:repo.changes||0,date:'',subject:'',version:''};
     applyPanelVer(d);
+    /* 版本号从仓库里的 win/version.json 读（releases 接口给），
+       拿不到就只显示 sha，不编造。 */
+    fetch('api/maintenance/releases',{cache:'no-store'}).then(function(r){
+      return r.ok?r.json():null;
+    }).then(function(rel){
+      var local=rel&&rel.localVersion;
+      if(local){ d.version=local; applyPanelVer(d); }
+    }).catch(function(){});
     return fetch('api/maintenance/history?repo=panel',{cache:'no-store'}).then(function(r){
       return r.ok?r.json():null;
     }).then(function(h){

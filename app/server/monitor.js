@@ -81,6 +81,11 @@ const { WebSocketServer, WebSocket } = wsLib;
 const APP_DIR        = process.env.APP_DIR       || process.env.TRIM_APPDEST || dirname(dirname(fileURLToPath(import.meta.url)));
 const APP_NAME       = basename(APP_DIR);
 const DATA_DIR       = process.env.DATA_DIR      || `${APP_DIR}/home/data`;
+/* Gitea 仓库实体目录：本机 Gitea(8418) 的真源，gitea:AppUsers 755，hermes-agent 只读可进。
+   维护页与 PanelRuntime 都读这里。必须声明在 DATA_DIR 之后、任何使用者之前——
+   放到后面会形成 TDZ，monitor 启动即抛 ReferenceError 直接退出。 */
+const GITEA_REPO_DIR = process.env.GITEA_REPO_DIR
+  || '/vol1/@appdata/Gitea/data/gitea-repositories/hermes-study/fnos-hermes-agent.git';
 const VAR_DIR        = process.env.VAR_DIR       || `${APP_DIR}/var`;
 const LOG_FILE       = `${VAR_DIR}/hermes.log`;
 const panelLogClear=new LogClearStore({varDir:VAR_DIR,dataDir:DATA_DIR});
@@ -2959,7 +2964,7 @@ function sessionActivity(){
  actCache={at:now,value};
  return value;
 }
-const panelRuntime=new PanelRuntime({receipt:createRestartReceipt({python:join(VENV_BIN,PY_BIN),app:APP_DIR,home:DATA_DIR,varDir:VAR_DIR}),drain:panelDrain,prepare:()=>serviceHealth.refresh(),observation:()=>serviceHealth.snapshot(),activity:sessionActivity,quietSeconds:90,recovery:()=>panelConfigRecovery.status(),root:join(VAR_DIR,'panel-state'),source:join(DATA_DIR,'workspace/fnos-hermes-agent-src'),started:START_TIME,available:()=>{const s=serviceHealth.snapshot();return s.gateway.healthy&&s.dashboard.healthy;},busy:()=>serviceHealth.snapshot().gateway.busy===true||activeChatStreams.size>0||panelChatQueue.workers.size>0||panelLibraryReviews.workers.size>0||panelModelChecks.workers.size>0});
+const panelRuntime=new PanelRuntime({receipt:createRestartReceipt({python:join(VENV_BIN,PY_BIN),app:APP_DIR,home:DATA_DIR,varDir:VAR_DIR}),drain:panelDrain,prepare:()=>serviceHealth.refresh(),observation:()=>serviceHealth.snapshot(),activity:sessionActivity,quietSeconds:90,recovery:()=>panelConfigRecovery.status(),root:join(VAR_DIR,'panel-state'),source:GITEA_REPO_DIR,started:START_TIME,available:()=>{const s=serviceHealth.snapshot();return s.gateway.healthy&&s.dashboard.healthy;},busy:()=>serviceHealth.snapshot().gateway.busy===true||activeChatStreams.size>0||panelChatQueue.workers.size>0||panelLibraryReviews.workers.size>0||panelModelChecks.workers.size>0});
 const handlePanelRuntime=createRuntimeHandler({runtime:panelRuntime,checkToken});
 const handleRestartIngress=createRestartIngress({runtime:panelRuntime,checkToken});
 const observePanelChannels=createChannelRuntime({home:DATA_DIR,gatewayPid:()=>readPid(PID_GATEWAY),hermesBin:HERMES_BIN});
@@ -4359,11 +4364,22 @@ const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/pytho
 const handleConnectorTools = createConnectorToolsHandler({getConnector, readState: () => panelConnectorStore.all(), checkToken, call: callConnectorTool});
 const handleConnectorConfig = createConnectorHandler({catalog: CONNECTOR_CATALOG, store: panelConnectorStore, checkToken, probe: probeConnector});
 const handleMaintenance = createMaintenanceHandler({checkToken, repositories: [
-  {id: 'panel', name: 'CHATÈS 全量源码仓', path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src')},
+  {id: 'panel', name: 'CHATÈS 全量源码仓', path: GITEA_REPO_DIR},
 ], releases: {
-  /* Gitea 全量仓：只有拿得到内网的人才有这个目录，没有就自动退化成只显示 GitHub。 */
-  gitea: {path: join(DATA_DIR, 'workspace/fnos-hermes-agent-src'),
-    versionFile: join(DATA_DIR, 'workspace/fnos-hermes-agent-src/win/version.json')},
+  /* 直接读 Gitea 自己的仓库目录（本机 8418 那套 Gitea 的实体，gitea:AppUsers 755 只读可进）。
+     不绕工作副本：工作副本在 /vol3 上，要穿软链，权限链一断维护页就哑。
+     这里是真源，历史完整，路径稳定。 */
+  gitea: {path: GITEA_REPO_DIR,
+    versionFile: '', versionRef: 'main:win/version.json',
+    /* 只读查分支 head 用；token 从环境变量拿，不写进代码。
+       没有 token 时 ls-remote 那条本来就会失败，此时退化成"未确认"而不是报错。 */
+    api: (process.env.GITEA_URL || '').replace(/\/+$/, ''),
+    owner: 'hermes-study', repo: 'fnos-hermes-agent', branch: 'main',
+    token: process.env.GITEA_TOKEN || '',
+    envFile: join(DATA_DIR, '.env'),
+    /* 点开跳 Gitea 提交页。这里只填相对段，giteaRelease() 会用 .env 里的
+       GITEA_URL 兜底拼成绝对地址；两边都拿不到就不给链接，别给个 404。 */
+    webUrlPath: '/hermes-study/fnos-hermes-agent/commits/main'},
   github: {owner: 'vector9584', repo: 'chates'},
 }});
 const handleUsage = createUsageHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});

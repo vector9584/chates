@@ -402,3 +402,12 @@ body.theme-dark .expert-library-card .expert-library-actions .btn.primary:active
   .maint-cell{aspect-ratio:auto}
   .maint-types{grid-template-columns:1fr}
 }
+
+/* 版本卡现在就是内容区的切换入口：点哪张，下面的热力图和提交记录就跟哪边。
+   选中态要一眼看出来，否则用户不知道自己在看哪一边。 */
+.maintenance-release.is-selectable{cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
+.maintenance-release.is-selectable:hover{border-color:var(--accent)}
+.maintenance-release.is-selectable:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.maintenance-release.is-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.maintenance-release.is-github.is-active{border-color:#6e40c9;box-shadow:0 0 0 1px #6e40c9 inset}
+.maintenance-release.is-active .maintenance-release-kind{color:var(--text1)}

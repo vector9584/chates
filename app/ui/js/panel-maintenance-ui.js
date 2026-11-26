@@ -1,6 +1,9 @@
 (function(){
   'use strict';
   var selected='',ref='',next=null,busy=false,generation=0,activity=null,pickedDay='',actSeq=0;
+  /* 下面整块（热力图 + 提交记录）跟哪一边走：'panel'=Gitea 全量仓，'github'=GitHub 发布版。
+     由上面两张版本卡点击切换，不是死数据。 */
+  var source='panel';
   var TYPE_LABEL={feat:'新功能',fix:'修问题',refactor:'重构',docs:'文档',test:'测试',audit:'审计',chore:'杂务',style:'样式',perf:'性能',build:'构建',ci:'流水线',revert:'回滚','其他':'其他'};
   function el(tag,text,cls){var node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
   function pad(n){return n<10?'0'+n:''+n;}
@@ -14,7 +17,10 @@
     var list=document.getElementById('maintenanceHistory'),more=document.getElementById('maintenanceMore');
     if(!append){list.replaceChildren();ref='';next=null;more.hidden=true;}feedback('正在读取提交记录…');
     try{
-      var data=await request('/api/maintenance/history?repo='+encodeURIComponent(selected)+(append?'&ref='+ref+'&offset='+next:''));
+      var qs=source==='github'
+        ? '/api/maintenance/history?source=github'+(append&&next?'&offset='+next:'')
+        : '/api/maintenance/history?repo='+encodeURIComponent(selected)+(append?'&ref='+ref+'&offset='+next:'');
+      var data=await request(qs);
       if(ticket!==generation)return;ref=data.ref;next=data.next;
       data.commits.forEach(function(commit){
         var item=el('article',undefined,'maintenance-commit');item.append(el('h2',commit.subject));
@@ -246,7 +252,9 @@
     var ticket=++actSeq,root=document.getElementById('maintenanceActivity');
     try{
       /* days 放到后端上限 1095：仓库历史多长就画多长，别让前端卡一年。 */
-      var data=await request('/api/maintenance/activity?days=1095&repo='+encodeURIComponent(selected));
+      var data=await request(source==='github'
+        ? '/api/maintenance/activity?days=1095&source=github'
+        : '/api/maintenance/activity?days=1095&repo='+encodeURIComponent(selected));
       if(ticket!==actSeq)return;
       activity=data;pickedDay='';renderActivity();
     }catch(error){
@@ -365,11 +373,13 @@
     card.append(head);
     var body=el('div',undefined,'maintenance-release-body');
     if(isGitea){
-      body.append(el('strong',data.version||'未标记版本','maintenance-release-version'));
+      /* Gitea 没有版本号，只有提交。这里原来显示"1.20.8"，那是仓库里
+         win/version.json 的内容（GitHub 发布版的号），搬到 Gitea 卡上
+         等于给 Gitea 编了个版本号。现在只讲提交：短 SHA + 时间 + 同步状态。 */
       var meta=el('div',undefined,'maintenance-release-meta');
       if(data.head)meta.append(el('code',String(data.head).slice(0,12)));
       if(data.date)meta.append(el('span',dayText(data.date)+' 提交'));
-      if(data.head)meta.append(el('em',data.synced?'已同步到 Gitea':'本地领先于 Gitea',
+      if(data.head)meta.append(el('em',data.synced?'已同步':'远端未对齐',
         'maintenance-release-sync'+(data.synced?' is-ok':' is-warn')));
       body.append(meta);
     }else{
@@ -394,37 +404,68 @@
     card.append(body);
     return card;
   }
+  /* 上面两张卡就是下方内容区的切换入口：点 Gitea 看全量仓，点 GitHub 看发布版。
+     以前它们是纯展示，下面另有"仓库选择条"驱动，结果同一个仓库上下各一张卡、还点不动。 */
   async function renderReleases(){
     var box=document.getElementById('maintenanceReleases');
     if(!box)return;
     try{
       var data=await request('/api/maintenance/releases'),cards=[];
-      if(data.gitea&&data.gitea.available)cards.push(releaseCard(data.gitea));
-      if(data.github&&data.github.available)cards.push(releaseCard(data.github));
+      [['panel',data.gitea],['github',data.github]].forEach(function(pair){
+        var key=pair[0],item=pair[1];
+        if(!item||!item.available)return;
+        var card=releaseCard(item);
+        card.dataset.source=key;
+        card.setAttribute('role','button');
+        card.setAttribute('tabindex','0');
+        card.setAttribute('aria-pressed',String(key===source));
+        card.classList.add('is-selectable');
+        if(key===source)card.classList.add('is-active');
+        var pick=function(){
+          if(busy)return;
+          if(source===key)return;
+          source=key;
+          try{localStorage.setItem('panel-maintenance-source',source);}catch(_){}
+          box.querySelectorAll('[data-source]').forEach(function(node){
+            var on=node.dataset.source===source;
+            node.setAttribute('aria-pressed',String(on));
+            node.classList.toggle('is-active',on);
+          });
+          ref='';next=null;
+          history(false);loadActivity();
+        };
+        card.addEventListener('click',pick);
+        card.addEventListener('keydown',function(ev){
+          if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();pick();}
+        });
+        cards.push(card);
+      });
       box.replaceChildren();
       cards.forEach(function(card){box.append(card);});
       box.hidden=!cards.length;
+      /* 选中的那一边拿不到了（比如 Gitea 挂了）就退回另一边，别留一块空内容。 */
+      if(cards.length&&!cards.some(function(c){return c.dataset.source===source;})){
+        source=cards[0].dataset.source;
+        cards[0].classList.add('is-active');
+        cards[0].setAttribute('aria-pressed','true');
+      }
     }catch(_){box.hidden=true;}
   }
 
   window.renderMaintenancePage=async function(){
-    renderReleases();
-    if(busy)return;busy=true;controls();feedback('正在读取本地仓库状态…');
-    try{
-      var data=await request('/api/maintenance/repositories'),tabs=document.getElementById('maintenanceRepositories');tabs.replaceChildren();
-      if(!data.repositories.some(function(repo){return repo.id===selected&&repo.available;}))selected=(data.repositories.find(function(repo){return repo.available;})||{}).id||'';
-      data.repositories.forEach(function(repo){
-        var card=el('button',undefined,'maintenance-repository');card.type='button';card.disabled=!repo.available;card.setAttribute('aria-pressed',String(repo.id===selected));
-        card.append(el('strong',repo.name),el('span',repo.available?(repo.changes?repo.changes+' 项未提交变更':'工作区无未提交变更'):repo.error));
-        if(repo.available)card.append(el('code',repo.head.slice(0,12)));
-        card.onclick=function(){if(busy)return;selected=repo.id;try{localStorage.setItem('panel-maintenance-repository',selected);}catch(_){}tabs.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button===card));});history(false);loadActivity();};tabs.append(card);
-      });
-      if(!selected){document.getElementById('maintenanceHistory').replaceChildren();document.getElementById('maintenanceMore').hidden=true;feedback('未能读取代码仓库，请检查上方状态后重试。');}
-    }catch(error){feedback(error.message);selected='';}
-    finally{busy=false;controls();}
-    if(selected){await history(false);await loadActivity();}
+    /* 不再渲染"仓库选择条"：那一块和上面的 Gitea 版本卡是同一个仓库，
+       上下各一张纯重复，而且真正能点的藏在下面。切换入口统一放在上面两张卡。 */
+    await renderReleases();
+    var tabs=document.getElementById('maintenanceRepositories');
+    if(tabs)tabs.replaceChildren();
+    if(!selected&&source!=='github')selected='panel';
+    await history(false);
+    await loadActivity();
   };
-  try{selected=localStorage.getItem('panel-maintenance-repository')||'';}catch(_){}
+  try{
+    source=localStorage.getItem('panel-maintenance-source')||'panel';
+  }catch(_){source='panel';}
+  selected='panel';
   document.getElementById('maintenanceRefresh').onclick=window.renderMaintenancePage;
   document.getElementById('maintenanceMore').onclick=function(){history(true);};
   bindHeat();
