@@ -38,7 +38,7 @@ function verParts(v) {
 function readInstalledVersion() {
   const roots = [
     process.env.CHATES_APP_ROOT,
-    join(fileURLToPath(new URL('..', import.meta.url)), '..'),
+    fileURLToPath(new URL('..', import.meta.url)),
   ].filter(Boolean);
   for (const root of roots) {
     for (const name of ['version.json', 'app/version.json']) {
