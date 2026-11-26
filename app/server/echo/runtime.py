@@ -12,7 +12,7 @@ from pathlib import Path
 from .store import owner_alive, panel, process_identity, read, transaction
 
 CURRENT = contextvars.ContextVar('panel_echo_run', default=None)
-DATA = Path('/vol1/@apphome/hermes-agent/data')
+DATA = Path('/vol3/@apphome/chates/data')
 QUEUE = Path('/vol1/1000/飞牛文件/html/.acl/tasks/tasks.json')
 BACKUPS = Path('/vol1/@appdata/hermes-agent/panel-state/echo-backups')
 LEGACY = str(DATA / 'scripts/taskq.py')

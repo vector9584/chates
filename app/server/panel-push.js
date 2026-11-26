@@ -86,7 +86,7 @@ export function createPushHub({ stateDir, sessionsDir, log = () => {} }) {
     const payload = b64u(JSON.stringify({
       aud: new URL(endpoint).origin,
       exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-      sub: "mailto:hermes@ruibing.wang",
+      sub: process.env.VAPID_SUB || "mailto:noreply@example.com",
     }));
     const data = `${header}.${payload}`;
     const privateKey = createPrivateKey(k.private_pem);

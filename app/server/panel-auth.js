@@ -94,7 +94,7 @@ export class PanelAuth{
  // cookie 名不能依赖请求路径：旧逻辑按「路径是否以 basePath/ 开头」决定要不要 _fnos 后缀，
  // 于是 /app/hermes-agent（无尾斜杠）和 /app/hermes-agent/（有尾斜杠）算出两个不同的 cookie 名，
  // pair 时写一个、reload 后读另一个，用户在这两个 URL 间跳一次就永久 401。
- // 2026-11-17 ai.ruibing.wang 实测：pair 成功建了设备（auth.json 里查得到），
+ // 2026-11-17 example.com 实测：pair 成功建了设备（auth.json 里查得到），
  // 日志里 cookie 也确实发了，却一直判 no-device —— 就是名字对不上。
  // 只要配置了 basePath 就固定用带后缀的名字。
  cookieName(req){return COOKIE+(this.basePath?'_fnos':'');}
@@ -119,7 +119,7 @@ export class PanelAuth{
  // Path 不能带尾斜杠：RFC 6265 里 Path=/app/hermes-agent/ 不匹配请求路径 /app/hermes-agent，
  // 用户少打一个斜杠浏览器就不发这个 cookie（2026-11-17 实测：带斜杠是主面板，去掉斜杠立刻回授权墙）。
  // 用不带尾斜杠的 basePath，/app/hermes-agent、/app/hermes-agent/、/app/hermes-agent/api/x 三者都匹配。
- // 统一 Path=/：根路径直连（https://ai.ruibing.wang/）和子路径入口（/app/hermes-agent/）
+ // 统一 Path=/：根路径直连（https://example.com/）和子路径入口（/app/hermes-agent/）
  // 都要能读到同一个 cookie。按 basePath 设 Path 会让根路径场景永远读不到刚下发的 cookie
  // —— 用户输完授权码 reload 回 / 就又掉回授权墙（2026-11-17 实测）。
  // cookie 名带 _fnos 后缀已经足够独特，不会和同域其它应用撞。

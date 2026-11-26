@@ -12,7 +12,7 @@ import {expertCatalog,getExpert,saveExpert,undoExpert} from './panel-experts.js'
 import {execFile} from 'child_process';
 import {promisify} from 'util';
 const run=promisify(execFile);
-const DATA=process.env.DATA_DIR||'/vol1/@apphome/hermes-agent/data';
+const DATA=process.env.DATA_DIR||'/vol3/@apphome/chates/data';
 const VAR=process.env.VAR_DIR||'/vol1/@appdata/hermes-agent';
 const APP=process.env.APP_DIR||'/vol1/@appcenter/hermes-agent';
 const PYTHON=process.env.PANEL_PYTHON||join(DATA,'venv/bin/python3');

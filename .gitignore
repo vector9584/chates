@@ -30,3 +30,6 @@ __pycache__/
 *.bak-*
 *.orig
 *.rej
+
+# 版本号水位（version.py 本地计数，每台构建机各自维护）
+.version-state.json

@@ -19,7 +19,7 @@ def _samefile(a,b):
 
 class Lifecycle:
  def __init__(self,app,home,var,node):
-  self.app=Path(app).resolve();self.home=Path(home).resolve();self.var=Path(var).resolve();self.node=str(Path(node).resolve());self.script=str(self.app/'server/monitor.js');self.pidfile=self.var/'app.pid';self.sock=self.app/'hermes-agent.sock'
+  self.app=Path(app).resolve();self.home=Path(home).resolve();self.var=Path(var).resolve();self.node=str(Path(node).resolve());self.script=str(self.app/'server/monitor.js');self.pidfile=self.var/'app.pid';self.sock=self.app/'chates.sock'
  def identity(self,pid,kind='monitor'):
   try:
    if not isinstance(pid,int) or pid<=0:return None
@@ -123,7 +123,7 @@ class Lifecycle:
   if adopted:return adopted
   if self.connected_socket():raise LifecycleError('应用套接字已被其他进程占用，未接管')
   if self.sock.exists():self.sock.unlink()
-  env={**os.environ,'HOME':str(self.home),'HERMES_HOME':str(self.home),'APP_DIR':str(self.app),'DATA_DIR':str(self.home),'VAR_DIR':str(self.var),'MONITOR_SOCKET_PATH':str(self.sock),'BASE_PATH':'/app/hermes-agent','PATH':str(self.home/'venv/bin')+':'+os.environ.get('PATH','')}
+  env={**os.environ,'HOME':str(self.home),'HERMES_HOME':str(self.home),'APP_DIR':str(self.app),'DATA_DIR':str(self.home),'VAR_DIR':str(self.var),'MONITOR_SOCKET_PATH':str(self.sock),'BASE_PATH':'/app/chates','PATH':str(self.home/'venv/bin')+':'+os.environ.get('PATH','')}
   fd=os.open(self.var/'info.log',os.O_WRONLY|os.O_APPEND|os.O_CREAT|os.O_NOFOLLOW,0o600)
   try:child=subprocess.Popen([self.node,self.script],env=env,stdin=subprocess.DEVNULL,stdout=fd,stderr=fd,start_new_session=True,close_fds=True)
   finally:os.close(fd)

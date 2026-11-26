@@ -56,6 +56,14 @@ jobs:
           [ "$BAD" -eq 0 ] || { echo "::error::骨架里有 $BAD 行明文凭据"; exit 1; }
           echo "凭据闸通过"
 
+      # 出厂数据按"值"反搜：姓名/学校/本机路径/密钥/Bearer/手机号/身份证/openid
+      # 以及 config.yaml 的 providers/mcp_servers/platforms 必须为空
+      - name: 出厂数据敏感审计
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 release-tools/audit_data_skeleton.py
+
   # fpk：在 Linux 上打 fnOS 包
   fpk:
     needs: gate

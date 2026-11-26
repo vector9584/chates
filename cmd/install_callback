@@ -597,33 +597,49 @@ fi
 
 
 # —— 知识整合初始化：部署 knowledge/memories/skill/mirror + crontab（Hermes 方案） ——
-if [ -x "${TRIM_APPDEST:-/var/apps/chates}/init/init.sh" ]; then
-    log_msg '>>> 运行知识整合初始化 (init.sh) ...'
-    "${TRIM_APPDEST:-/var/apps/chates}/init/init.sh" >> "${TRIM_PKGVAR}/info.log" 2>&1 || log_msg 'WARNING: init.sh 执行失败'
+# 路径要跟着实际落位走：config/ 类资源由 fnOS 装到 <TRIM_APPDEST>/config/ 下，
+# 原来只找 <TRIM_APPDEST>/init/init.sh，包里根本没有那个路径，于是每次都报「init.sh 不存在」。
+_INIT_SH=""
+for _cand in "${TRIM_APPDEST:-/var/apps/chates}/config/init/init.sh" "${TRIM_APPDEST:-/var/apps/chates}/init/init.sh"; do
+    if [ -x "${_cand}" ]; then _INIT_SH="${_cand}"; break; fi
+done
+if [ -n "${_INIT_SH}" ]; then
+    log_msg ">>> 运行知识整合初始化 (${_INIT_SH}) ..."
+    "${_INIT_SH}" >> "${TRIM_PKGVAR}/info.log" 2>&1 || log_msg 'WARNING: init.sh 执行失败'
 else
-    log_msg 'init.sh 不存在'
+    log_msg 'init.sh 不存在（已查找 config/init 与 init 两处）'
 fi
 
 # —— sudoers 授权：chates 免密 cp/chown/psql（版本同步/覆盖/权限修复必需）——
 # monitor（chates 用户）需要 sudo -n cp/chown 覆盖应用文件 + sudo -u postgres psql 同步应用中心版本；
 # 未配置时 auto-update 覆盖后应用中心版本不刷新（显示旧版本）。
-if [ -n "${TRIM_USERNAME:-}" ]; then
-    _SUDOERS_FILE="/etc/sudoers.d/chates-appcenter"
-    # 旧版 sudoers 可能只有 cp/psql（缺 chown）→ 内容不完整必须重写（含 chown 才算完整）
-    if [ ! -f "${_SUDOERS_FILE}" ] || ! grep -q 'chown' "${_SUDOERS_FILE}" 2>/dev/null; then
-        log_msg ">>> 写入 sudoers 授权（${_SUDOERS_FILE}）..."
-        printf 'chates ALL=(root) NOPASSWD: /bin/cp, /usr/bin/cp, /bin/chown, /usr/bin/chown, /usr/bin/sudo -u postgres /usr/bin/psql -d appcenter *\n' > /tmp/chates-appcenter-sudoers
-        chmod 440 /tmp/chates-appcenter-sudoers
-        if cp /tmp/chates-appcenter-sudoers "${_SUDOERS_FILE}" 2>>"${TRIM_PKGVAR}/info.log"; then
-            chmod 440 "${_SUDOERS_FILE}" 2>/dev/null || true
+#
+# 两个硬约束（2026-11-26 实测）：
+# 1) install_callback 以应用用户（chates）运行，不是 root，写 /etc/sudoers.d 会 Permission denied。
+#    这里只在确实有 root 时写；否则打印一条手动命令，不让安装流程报错。
+# 2) 落盘前必须 visudo -cf 校验：sudoers 写坏会让整机 sudo 全部失效（连已有规则一起报错）。
+_SUDOERS_FILE="/etc/sudoers.d/chates-appcenter"
+_SUDOERS_LINE='chates ALL=(root) NOPASSWD: /bin/cp, /usr/bin/cp, /bin/chown, /usr/bin/chown, /usr/bin/sudo -u postgres /usr/bin/psql -d appcenter *'
+if [ -f "${_SUDOERS_FILE}" ] && grep -q 'chown' "${_SUDOERS_FILE}" 2>/dev/null; then
+    log_msg "sudoers 已存在且完整，跳过"
+elif [ "$(id -u)" = "0" ]; then
+    log_msg ">>> 写入 sudoers 授权（${_SUDOERS_FILE}）..."
+    _tmp_sudoers="/tmp/chates-appcenter-sudoers.$$"
+    printf '%s\n' "${_SUDOERS_LINE}" > "${_tmp_sudoers}"
+    if visudo -cf "${_tmp_sudoers}" >/dev/null 2>&1; then
+        if install -m 440 -o root -g root "${_tmp_sudoers}" "${_SUDOERS_FILE}" 2>>"${TRIM_PKGVAR}/info.log"; then
             log_msg "sudoers 写入成功"
         else
-            log_msg "sudoers 写入失败（请手动配置 /etc/sudoers.d/chates-appcenter）"
+            log_msg "sudoers 写入失败（install 失败，权限不足）"
         fi
-        rm -f /tmp/chates-appcenter-sudoers
     else
-        log_msg "sudoers 已存在且完整，跳过"
+        log_msg "sudoers 语法校验未通过，已放弃写入（避免破坏整机 sudo）"
     fi
+    rm -f "${_tmp_sudoers}"
+else
+    log_msg "sudoers 未配置（当前非 root，无法写 ${_SUDOERS_FILE}）"
+    log_msg "  如需自动更新后同步应用中心版本，请以 root 执行："
+    log_msg "  echo '${_SUDOERS_LINE}' > ${_SUDOERS_FILE} && chmod 440 ${_SUDOERS_FILE} && visudo -c"
 fi
 
 trap - ERR

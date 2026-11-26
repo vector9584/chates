@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <base href="/app/hermes-agent/">
+  <!-- 2026-11-26：这里原先是写死的 /app/hermes-agent/。打包成独立应用（chates）后，
+       前端所有相对请求都落到别人的前缀上（实测 /app/hermes-agent/api/status → 404），
+       页面永远停在「连接中」。默认给根路径，monitor.js serve 时按运行时 BASE_PATH 改写。 -->
+  <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes</title>

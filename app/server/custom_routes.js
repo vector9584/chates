@@ -11,7 +11,8 @@ import {
   writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, readdirSync, copyFileSync, appendFileSync,
 } from "fs";
 import { randomBytes } from "crypto";
-import { resolve as resolvePath } from "path";
+import { resolve as resolvePath, dirname as pathDirname, basename as pathBasename } from "path";
+import { fileURLToPath } from "url";
 import { Readable } from "stream";
 import {configReaderWriter,configRequestContext} from "./panel-config-txn.js";
 import {envReaderWriter,channelConfigWriter} from "./panel-env-txn.js";
@@ -21,7 +22,9 @@ import { skillInstallName } from "./panel-skill-path.js";
 import { createIssueStore, ISSUE_TAXONOMY } from "./panel-issues.js";
 
 // ─── 路径常量（与上游 monitor.js 保持一致） ───────────────────────────────
-const APP_DIR        = process.env.APP_DIR       || "/var/apps/hermes-agent";
+// 默认值不能写死成兄弟应用：并行安装时会读到别人的 manifest（2026-11-26 实测）。
+const APP_DIR        = process.env.APP_DIR       || process.env.TRIM_APPDEST || pathDirname(pathDirname(fileURLToPath(import.meta.url)));
+const APP_NAME       = pathBasename(APP_DIR);
 const DATA_DIR       = process.env.DATA_DIR      || `${APP_DIR}/home/data`;
 const VAR_DIR        = process.env.VAR_DIR       || `${APP_DIR}/var`;
 const VENV_BIN       = `${DATA_DIR}/venv/bin`;
@@ -385,7 +388,7 @@ async function runRoomMember(rid, member, text, system, model, provider, session
 
 // ─── 应用包版本（manifest） ────────────────────────────────────────────
 function readAppVersion() {
-  const candidates = [process.env.APP_VERSION, `${APP_DIR}/manifest`, "/var/apps/hermes-agent/manifest"];
+  const candidates = [process.env.APP_VERSION, `${APP_DIR}/manifest`, `/var/apps/${APP_NAME}/manifest`];
   for (const c of candidates) {
     if (!c) continue;
     try {
@@ -1364,7 +1367,7 @@ async function handleCustomRouteScoped(req) {
   if (path === "/api/issue" && method === "POST") {
     try {
       const body = await req.json();
-      const r = ISSUE_STORE.submit(body);
+      const r = await ISSUE_STORE.submit(body);
       if (!r.ok) return new Response(JSON.stringify(r), { status: 400, headers: jsonHeaders() });
       return new Response(JSON.stringify(r), { headers: jsonHeaders() });
     } catch (e) {

@@ -17,7 +17,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 const DATA   = '/vol1/1000/飞牛文件/html/.acl/tasks/tasks.json';
-const USAGEDB = '/vol1/@apphome/hermes-agent/data/state.db';
+const USAGEDB = '/vol3/@apphome/chates/data/state.db';
 const BALANCE = '/vol1/1000/飞牛文件/html/.acl/tasks/balance.json';
 const TYPES  = ['开发', '研究', '运维', '内容', '生活', '其他'];
 const STATUSES = ['staged', 'pending', 'doing', 'review', 'done', 'failed', 'dropped'];

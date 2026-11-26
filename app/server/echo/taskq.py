@@ -42,7 +42,7 @@ else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from echo.store import panel, transaction, read
 
-DATA = Path(os.environ.get("ECHO_DATA_ROOT", "/vol1/@apphome/hermes-agent/data"))
+DATA = Path(os.environ.get("ECHO_DATA_ROOT", "/vol3/@apphome/chates/data"))
 # 队列文件放在站点 .acl 下：页面（PHP/www-data）与 cron（hermes-agent）共用同一份，
 # 目录 1777、文件 666，两边都能原子替换
 BASE = Path(os.environ.get("ECHO_QUEUE_ROOT", "/vol1/1000/飞牛文件/html/.acl/tasks"))
@@ -1221,7 +1221,7 @@ def cmd_sediment(a) -> int:
         print(f"   归档时间：{sd.get('at', '')}\n")
     print("一张卡一篇，不要合并。每篇写：要它干什么、后台怎么干的（读了哪些文件/跑了什么命令）、"
           "结论与数字、产出文件路径。")
-    print("落到 /vol1/@apphome/hermes-agent/data/knowledge/对话沉淀/YYYY-MM-DD-任务N-标题.md")
+    print("落到 /vol3/@apphome/chates/data/knowledge/对话沉淀/YYYY-MM-DD-任务N-标题.md")
     print("写完一张就跑：python3 /vol1/@appcenter/hermes-agent/server/echo/taskq.py sediment <ID> --file <笔记路径>")
     print("")
     print(WAKE_YES)

@@ -36,27 +36,28 @@ c() { printf '\033[%sm%s\033[0m\n' "$1" "$2"; }
 ok() { c '32' "  OK   $*"; }
 die() { c '31' "  FAIL $*"; exit 1; }
 
-# 版本号：fpk 的 manifest.version 用三段纯数字（0.21.149 这种），
-# 不能带 win.9 后缀——fnOS 应用中心按数字比对版本做升级判断。
+# 版本号：<代号>.<内核次版本>.<自建序号>，唯一真源 release-tools/version.py
+# fnpack 只接受三段整数，四段会被拒（实测 Invalid version "0.20.0.1"）。
+# 内核版本从 app/hermes-src/pyproject.toml 读，代号 = 内核 major + 1，
+# 避免跟上游 0.20.x 撞车：内核 0.20.0 → 1.20.N，内核 0.21.0 → 1.21.N。
 #
 # 来源优先级：
-#   1. FPK_VERSION 环境变量（显式覆盖）
-#   2. --tag 里的数字部分（v0.21.157 → 0.21.157；v0.20.0-win.9 → 0.21.0 由 minor+1 得）
-#   3. electron/package.json 推导（semver 通道 → fpk 通道 minor+1）
+#   1. FPK_VERSION 环境变量（CI/临时覆盖）
+#   2. --tag 里的三段数字（v1.20.1 → 1.20.1）
+#   3. .version-state.json 当前水位（version.py）
 FPK_VER="${FPK_VERSION:-}"
 if [ -z "$FPK_VER" ]; then
   m=$(printf '%s' "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   if [ -n "$m" ]; then
     FPK_VER="$m"
   else
-    FPK_VER=$(python3 -c "
-import json
-d=json.load(open('electron/package.json', encoding='utf-8'))
-maj,minor,patch=d['version'].split('.')
-print(f'{maj}.{int(minor)+1}.{patch}')
-")
+    FPK_VER=$(python3 release-tools/version.py) || die "版本号读取失败"
   fi
 fi
+case "$FPK_VER" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) die "版本号必须是三段纯数字 X.Y.Z（fnpack 不接受四段），得到: $FPK_VER" ;;
+esac
 
 # ------------------------------------------------ 预检
 c '1;36' "== fpk 预检 =="
@@ -104,13 +105,13 @@ ok "双副本已同步（真源 app/，覆盖 hermes-src/server/ui）"
 # 必须用 { grep ... || true; } | wc -l 兜住（和上面 data-skeleton 凭据闸同一个坑）。
 LEAK_HITS=""
 SCAN_DIRS="app electron/resources/chates/app data-skeleton config/init"
-for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D'; do
+for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D' 'ruibing.wang' '192.168.3.110'; do
   n=$( { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | wc -l )
   if [ "${n:-0}" -gt 0 ]; then LEAK_HITS="$LEAK_HITS $kw($n)"; fi
 done
 if [ -n "$LEAK_HITS" ]; then
   c '31' "  脱敏闸命中:$LEAK_HITS"
-  for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D'; do
+  for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D' 'ruibing.wang' '192.168.3.110'; do
     { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | sed 's/^/    /'
   done
   die "仍有真实身份痕迹（app/、electron 副本、data-skeleton、config/init），先脱敏再打包"
@@ -200,6 +201,14 @@ if [ -f app/package.json ]; then cp app/package.json "$STAGE/app/"; fi
 # echo-web 是 dashboard 前端，有就打
 if [ -d app/echo-web ];   then cp -a app/echo-web   "$STAGE/app/"; fi
 find "$STAGE/app" -name '*.log' -delete 2>/dev/null || true
+# init/ —— 首次安装初始化脚本与模板。install_callback 以 <TRIM_APPDEST>/init/init.sh 调用，
+# 而 <TRIM_APPDEST> 是 @appcenter/<appname>（app.tgz 的解压目标），所以必须放进 app/ 下。
+# 不能放 config/init：fnOS 对 config/ 只挑 privilege/resource/bootstrap/prompts 分发，
+# 其余条目在 @appcenter 侧根本不存在（2026-11-26 实测：日志一直报「init.sh 不存在」）。
+if [ -d config/init ]; then
+  cp -a config/init "$STAGE/app/init"
+  ok "init/    首次安装初始化（$(ls config/init | wc -l) 项）"
+fi
 # 组包前最后一道：dashboard 静态产物必须在暂存区，否则又是打不开的包
 [ -f "$STAGE/app/hermes-src/hermes_cli/web_dist/index.html" ] \
   || die "暂存区缺 hermes_cli/web_dist/index.html（dashboard 会打不开）"

@@ -190,7 +190,15 @@
         renderGroups(card);
         card.querySelector('#pwIssueLeaves').innerHTML = '';
         updatePicked(card);
-        showMsg(card, '已收到，编号 ' + (body.item && body.item.id ? body.item.id : '—'), 'ok');
+        var _it = body.item || {};
+        var _gh = _it.github || {};
+        var _tip = '已收到，编号 ' + (_it.id ? _it.id : '—');
+        if (_gh.synced) {
+          _tip += '，已同步 GitHub Issue #' + _gh.number;
+        } else if (_gh.enabled) {
+          _tip += '，但 GitHub 同步失败（' + (_gh.error || '未知原因') + '），本地已留存';
+        }
+        showMsg(card, _tip, 'ok');
         /* 让汇总视图下次打开重新拉 */
         try { window._issueSummaryDirty = true; } catch (e) {}
       } else {

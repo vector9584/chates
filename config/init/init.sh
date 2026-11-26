@@ -4,10 +4,20 @@
 # 作者：Hermes Agent 方案（2026-08-07），千问整合进 fpk
 
 set -u
-# 路径环境变量：fnOS 标准回调传入 TRIM_PKGHOME/TRIM_APPDEST/TRIM_PKGVAR
-DATA_DIR="${TRIM_PKGHOME:-/vol3/@apphome/chates}/data"
-INIT_DIR="${TRIM_APPDEST:-/var/apps/hermes-agent/target}/init"
-LOG_FILE="${TRIM_PKGVAR:-/var/apps/hermes-agent/var}/info.log"
+# 路径环境变量：优先用 fnOS 标准回调传入的 TRIM_PKGHOME/TRIM_APPDEST/TRIM_PKGVAR。
+# 没传时从本脚本位置推导（<APP_DIR>/config/init/init.sh），不写死某个应用的绝对路径——
+# 原来默认值是 /vol3/@apphome/chates 和 /var/apps/hermes-agent/target，换个应用名或卷就全错。
+_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 兼容两种落位：安装后 <APP_DIR>/init（build-fpk 打进 app/init），
+# 开发仓里 <APP_DIR>/config/init。按父目录名判断，两种情况都能推出 APP_DIR。
+if [ "$(basename "$(dirname "${_SELF_DIR}")")" = "config" ]; then
+    _APP_DIR_DERIVED="$(cd "${_SELF_DIR}/../.." && pwd)"   # <APP_DIR>/config/init
+else
+    _APP_DIR_DERIVED="$(cd "${_SELF_DIR}/.." && pwd)"      # <APP_DIR>/init
+fi
+INIT_DIR="${_SELF_DIR}"
+DATA_DIR="${TRIM_PKGHOME:-${_APP_DIR_DERIVED}/home}/data"
+LOG_FILE="${TRIM_PKGVAR:-${_APP_DIR_DERIVED}/var}/info.log"
 
 log_msg() {
     local msg="$(date '+%Y-%m-%d %H:%M:%S') - [init] $1"
@@ -49,7 +59,7 @@ copy_if_new "$INIT_DIR/skills/knowledge-sync/SKILL.md" \
 
 # 5. 注册 crontab（每 30 分钟镜像 memories → knowledge），以 hermes-agent 用户写入
 CRON_LINE="*/30 * * * * HERMES_DATA_DIR=$DATA_DIR python3 $DATA_DIR/scripts/knowledge-sync/mirror.py >> $DATA_DIR/logs/knowledge-mirror.log 2>&1"
-APP_USER="${TRIM_USERNAME:-hermes-agent}"
+APP_USER="${TRIM_USERNAME:-$(basename "${_APP_DIR_DERIVED}")}"
 if crontab -u "$APP_USER" -l 2>/dev/null | grep -qF "knowledge-sync/mirror.py"; then
     log_msg "crontab 镜像任务已存在，跳过"
 else

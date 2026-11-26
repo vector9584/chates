@@ -1,14 +1,14 @@
 {
     ".url": {
-        "hermes-agent.Application": {
-            "title": "Hermes Agent",
+        "chates.Application": {
+            "title": "CHATÈS",
             "icon": "images/{0}.png",
             "type": "iframe",
             "protocol": "http",
-            "gatewaySocket": "hermes-agent.sock",
-            "gatewayPrefix": "/app/hermes-agent",
+            "gatewaySocket": "chates.sock",
+            "gatewayPrefix": "/app/chates",
             "port": "",
-            "url": "/app/hermes-agent",
+            "url": "/app/chates",
             "allUsers": false,
             "control": {
                 "accessPerm": "readonly"

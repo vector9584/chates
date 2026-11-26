@@ -406,7 +406,7 @@ SUMMARY_PREFIX = (
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--session", required=True)
-    ap.add_argument("--home", default=os.environ.get("HERMES_DATA_DIR") or "/vol1/@apphome/hermes-agent/data")
+    ap.add_argument("--home", default=os.environ.get("HERMES_DATA_DIR") or "/vol3/@apphome/chates/data")
     ap.add_argument("--chat-dir", default="")
     ap.add_argument("--config", default="")
     ap.add_argument("--keep-last", type=int, default=0)
@@ -425,7 +425,7 @@ def main(argv=None):
 
     home = a.home.rstrip("/")
     chat_dir = a.chat_dir or os.path.join(os.path.dirname(home), "..", "chat")
-    # VAR_DIR 与 DATA_DIR 是兄弟目录：/vol1/@appdata/hermes-agent 与 /vol1/@apphome/hermes-agent/data
+    # VAR_DIR 与 DATA_DIR 是兄弟目录：/vol1/@appdata/hermes-agent 与 /vol3/@apphome/chates/data
     if not os.path.isdir(chat_dir):
         alt = "/vol1/@appdata/hermes-agent/chat"
         if os.path.isdir(alt):

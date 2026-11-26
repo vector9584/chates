@@ -1,15 +1,19 @@
 #!/bin/bash
 set -e
 
-HERMES_VENV_BIN="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data/venv/bin/hermes"
+# 路径从脚本自身位置推导（<APP_DIR>/bin/hermes），不写死兄弟应用。
+APP_DIR_DEFAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TRIM_PKGHOME="${TRIM_PKGHOME:-$APP_DIR_DEFAULT/home}"
+HERMES_HOME_DIR="$TRIM_PKGHOME/data"
+HERMES_VENV_BIN="$HERMES_HOME_DIR/venv/bin/hermes"
 
 if [ ! -x "$HERMES_VENV_BIN" ]; then
     echo "hermes-agent not installed in venv. Please reinstall the app." >&2
     exit 1
 fi
 
-export PATH="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data/venv/bin:$PATH"
-export HOME="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data"
-export HERMES_HOME="${HOME}"
+export PATH="$HERMES_HOME_DIR/venv/bin:$PATH"
+export HOME="$HERMES_HOME_DIR"
+export HERMES_HOME="$HOME"
 
 exec "$HERMES_VENV_BIN" "$@"

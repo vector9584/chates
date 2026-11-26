@@ -15,8 +15,13 @@
 
 set -e
 
-SOCKET="${TRIM_APPDEST:-/var/apps/hermes-agent}/hermes-agent.sock"
-TOKEN_FILE="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data/.monitor_token"
+# 路径从脚本自身位置推导（<APP_DIR>/bin/monitor-api），不写死兄弟应用。
+# socket 名必须跟本应用一致：monitor.js 用的是 ${appname}.sock，
+# 原来写死 hermes-agent.sock，在 CHATÈS 里会永远找不到 socket。
+APP_DIR_DEFAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_NAME_DEFAULT="$(basename "$APP_DIR_DEFAULT")"
+SOCKET="${TRIM_APPDEST:-$APP_DIR_DEFAULT}/${APP_NAME_DEFAULT}.sock"
+TOKEN_FILE="${TRIM_PKGHOME:-$APP_DIR_DEFAULT/home}/data/.monitor_token"
 
 if [ ! -S "$SOCKET" ]; then
     echo "Error: Monitor socket not found at $SOCKET" >&2

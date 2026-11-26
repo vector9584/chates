@@ -13,7 +13,7 @@ import { Readable } from "stream";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync, renameSync } from "fs";
 import { randomBytes, createHash } from "crypto";
 import { networkInterfaces } from "os";
-import { resolve as resolvePath, dirname, join } from "path";
+import { resolve as resolvePath, dirname, join, basename } from "path";
 import { fileURLToPath } from "url";
 import { handleCustomRoute } from "./custom_routes.js";
 import { skillInstallName } from "./panel-skill-path.js";
@@ -72,7 +72,13 @@ const _require = createRequire(import.meta.url);
 const wsLib = _require("./_vendor/ws/index.js");
 const { WebSocketServer, WebSocket } = wsLib;
 
-const APP_DIR        = process.env.APP_DIR       || "/var/apps/hermes-agent";
+// APP_DIR 的默认值不能写死成兄弟应用（/var/apps/hermes-agent）：
+// 并行安装时它会去读那个应用的 manifest 和数据库记录，把别人的版本号
+// 显示成自己的，甚至改写别人的 manifest（2026-11-26 实测：CHATÈS 装上
+// 后版本号显示 0.21.149，正是同机 hermes-agent 的版本）。
+// 优先环境变量，其次 TRIM_APPDEST，最后从本文件位置（<APP_DIR>/server/monitor.js）推导。
+const APP_DIR        = process.env.APP_DIR       || process.env.TRIM_APPDEST || dirname(dirname(fileURLToPath(import.meta.url)));
+const APP_NAME       = basename(APP_DIR);
 const DATA_DIR       = process.env.DATA_DIR      || `${APP_DIR}/home/data`;
 const VAR_DIR        = process.env.VAR_DIR       || `${APP_DIR}/var`;
 const LOG_FILE       = `${VAR_DIR}/hermes.log`;
@@ -136,7 +142,10 @@ function readAppVersion() {
   const candidates = [
     VERSION_OVERRIDE_FILE,
     MANIFEST_FILE,
-    "/var/apps/hermes-agent/manifest",
+    // fnOS 把安装包 manifest 放在 /var/apps/<appname>/manifest，而 APP_DIR 可能
+    // 指向安装卷（/volN/@appcenter/<appname>）。按本应用名推导，绝不写死兄弟应用。
+    `/var/apps/${APP_NAME}/manifest`,
+    `/var/apps/${APP_NAME}/target/manifest`,
     `${process.cwd()}/manifest`,
   ];
   // 尝试从 monitor.js 位置向上推导（兼容 ESM 与不同安装路径）
@@ -270,8 +279,11 @@ function _simpleMergeExternalDirs(content, dirs){
 _reconcileMarketSkills();
 
 // 同步 fnOS 应用中心运行状态（app 表 status='running'）——monitor 实际运行中，防应用中心 UI 误显示未启动
+// 必须只更新自己的记录：写死 'hermes-agent' 会在并行安装时把兄弟应用标成 running，
+// 让应用中心显示它「运行中」而实际没跑（2026-11-26 实测隐患）。
 try {
-  execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET status='running' WHERE app_name='hermes-agent'" 2>&1`, { timeout: 10000 });
+  const _safeName = String(APP_NAME).replace(/[^a-zA-Z0-9_-]/g, "");
+  execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET status='running' WHERE app_name='${_safeName}'" 2>&1`, { timeout: 10000 });
 } catch (e) {}
 
 // 知识库/记忆种子：首次启动时写入基础内容（仅文件不存在时），让知识库与记忆页不空
@@ -353,7 +365,9 @@ function reloadAppVersion() {
 // 全部失败则写版本覆盖文件；最后刷新当前进程的 APP_VERSION。
 function writeAppVersion(version) {
   let wrote = false;
-  const targets = [MANIFEST_FILE, "/var/apps/hermes-agent/manifest", `${process.cwd()}/manifest`];
+  // 只写自己的 manifest。原来含 /var/apps/hermes-agent/manifest，
+  // 并行安装时会把别人的版本号覆盖掉（2026-11-26 实测定为禁止）。
+  const targets = [MANIFEST_FILE, `/var/apps/${APP_NAME}/manifest`, `${process.cwd()}/manifest`];
   try {
     const here = dirname(fileURLToPath(import.meta.url));
     targets.push(join(here, "../../manifest"), join(here, "../manifest"));
@@ -4726,7 +4740,7 @@ async function handleFetch(req) {
   }
 
   // ── 应用包更新（GitHub Releases / Actions）────────────────────────────────
-  const GITHUB_REPO = process.env.GITHUB_REPO || "veenyi/fnos-hermes-agent";
+  const GITHUB_REPO = process.env.GITHUB_REPO || "vector9584/chates";
   const GITHUB_PAT_FILE = `${VAR_DIR}/github_pat`;
 
   function getGitHubPAT() {
@@ -4855,7 +4869,7 @@ async function handleFetch(req) {
         if (source === "github") throw new Error("GitHub 通道下载失败：请检查网络/代理后重试，或改用 WebDAV 通道");
         throw new Error("安装包为空");
       }
-      const fpkPath = `/tmp/hermes-agent-update.fpk`;
+      const fpkPath = `/tmp/${APP_NAME}-update.fpk`;
       writeFileSync(fpkPath, buf);
       log(`[app-update] FPK 已下载: ${(buf.length / 1048576).toFixed(1)}MB → ${fpkPath}`);
       // 校验：确认是合法 fpk（gzip tar 头）
@@ -4874,8 +4888,9 @@ async function handleFetch(req) {
         execSync(`cd ${stage} && tar xzf app.tgz`, { timeout: 600000, encoding: "utf8" });
         // 覆盖应用目录（bin/server/ui/hermes-src/package.json 等；config 为 fnOS 只读模板不覆盖）
         execSync(`cp -rf ${stage}/bin ${stage}/server ${stage}/ui ${stage}/hermes-src ${stage}/package.json ${APP_DIR}/ 2>/dev/null; true`, { timeout: 600000, encoding: "utf8" });
-        // 更新 fnOS 应用壳 manifest（sudo cp 免密白名单已配置）
-        try { execSync(`sudo -n cp ${stage}/manifest /var/apps/hermes-agent/manifest && sudo -n chown root:root /var/apps/hermes-agent/manifest 2>/dev/null; true`, { timeout: 15000 }); } catch {}
+        // 更新 fnOS 应用壳 manifest —— 只能写自己的（/var/apps/${APP_NAME}/manifest）。
+        // 原来写死 hermes-agent，并行安装时更新 CHATÈS 会把兄弟应用的版本号覆盖掉。
+        try { execSync(`sudo -n cp ${stage}/manifest /var/apps/${APP_NAME}/manifest && sudo -n chown root:root /var/apps/${APP_NAME}/manifest 2>/dev/null; true`, { timeout: 15000 }); } catch {}
         execSync(`rm -rf ${stage}`, { timeout: 30000 });
       } catch (e) {
         try { execSync(`rm -rf ${stage}`, { timeout: 30000 }); } catch {}
@@ -4886,16 +4901,17 @@ async function handleFetch(req) {
       try { HERMES_VERSION = "unknown"; } catch {}
       try { APP_VERSION = readAppVersion(); } catch {}
       // 同步 fnOS 应用中心版本记录（postgres appcenter.app 表）——应用中心 UI 显示版本与 manifest 一致
-      const _appVer = String(version || "").replace(/^fnos-hermes-agent_v|^v/, "");
+      const _appVer = String(version || "").replace(/^(fnos-hermes-agent|chates)_v|^v/, "");
       if (_appVer) {
         try {
-          execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET version='${_appVer}' WHERE app_name='hermes-agent'" 2>&1`, { timeout: 15000 });
+          const _safeName2 = String(APP_NAME).replace(/[^a-zA-Z0-9_-]/g, "");
+          execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET version='${_appVer}' WHERE app_name='${_safeName2}'" 2>&1`, { timeout: 15000 });
           log(`[app-update] fnOS 应用中心版本已同步: ${_appVer}`);
         } catch (e2) {
           log(`[app-update] 应用中心版本同步失败: ${e2.message}`);
-          // fallback：直接改写 /var/apps/hermes-agent/manifest 的 version（尽力同步显示）
+          // fallback：直接改写自己的 manifest 的 version（尽力同步显示），不碰兄弟应用
           try {
-            const _mf = "/var/apps/hermes-agent/manifest";
+            const _mf = `/var/apps/${APP_NAME}/manifest`;
             if (existsSync(_mf)) {
               const _mt = readFileSync(_mf, "utf8").replace(/^version\s*=.*$/m, `version               = ${_appVer}`);
               writeFileSync(_mf, _mt);
@@ -4924,7 +4940,7 @@ async function handleFetch(req) {
         const _sm = `${VAR_DIR}/start-monitor.sh`;
         const _rs = existsSync(_sm)
           ? `sleep 3; ${_sm}`
-          : `sleep 3; env TRIM_APPDEST=${APP_DIR} TRIM_PKGHOME=${DATA_DIR.replace(/\/data$/, "")} TRIM_PKGVAR=${VAR_DIR} bash /var/apps/hermes-agent/cmd/main start`;
+          : `sleep 3; env TRIM_APPDEST=${APP_DIR} TRIM_PKGHOME=${DATA_DIR.replace(/\/data$/, "")} TRIM_PKGVAR=${VAR_DIR} bash ${APP_DIR}/cmd/main start`;
         spawn("/bin/sh", ["-c", _rs], { detached: true, stdio: "ignore" }).unref();
         log(`[app-update] 已安排 monitor 自重启（${existsSync(_sm) ? "start-monitor.sh" : "cmd/main start"}）`);
       } catch (e) { log(`[app-update] 自重启安排失败: ${e.message}`); }
@@ -9402,6 +9418,24 @@ function _saveChannelChanges(id, body){
 
   // 静态 UI — 根路径返回 index.html
   if (path === "/") {
+    // 2026-11-26：index.html 里的 <base href> 是打包时写死的。装成 chates 之后它仍指向
+    // /app/hermes-agent/，前端所有相对请求（js/、api/）全部落到别人的前缀上 → 404 →
+    // 页面永远停在「连接中」「服务状态已停止」。1.20.2 实测：/app/hermes-agent/api/status
+    // 返回 404，而 /app/chates/api/status 与 /api/status 都是 200。
+    // 这里按运行时 BASE_PATH 改写 base，兼容两种入口：
+    //   经 fnOS gateway 访问 → BASE_PATH=/app/chates → base=/app/chates/
+    //   直连 8660          → 同一 base 也能命中（handleFetch 会剥前缀）
+    try {
+      const _baseHref = BASE_PATH ? BASE_PATH + "/" : "/";
+      const _html = readFileSync(`${STATIC_DIR}/index.html`, "utf8")
+        .replace(/<base\s+href="[^"]*"\s*\/?>/i, `<base href="${_baseHref}">`);
+      return new Response(_html, {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" },
+      });
+    } catch {
+      // 读不到或不含 base 标签就退回原样，不要因为这一行把面板整个打挂
+    }
     return serveFile(`${STATIC_DIR}/index.html`, "text/html; charset=utf-8", { req, cacheable: false });
   }
 

@@ -62,7 +62,7 @@ def config_path(path):
  # Restrict this application patch to its home/profiles. A skill may call the
  # generic YAML helper for an unrelated project's own config.yaml.
  configured=os.environ.get('HERMES_PANEL_CONFIG_ROOT') or os.environ.get('DATA_DIR')
- roots=[Path(configured)] if configured else [Path('/vol1/@apphome/hermes-agent/data')]
+ roots=[Path(configured)] if configured else [Path('/vol3/@apphome/chates/data')]
  if os.environ.get('HERMES_HOME'):roots.append(Path(os.environ['HERMES_HOME']))
  for root in roots:
   root=root.absolute()

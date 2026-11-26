@@ -2,8 +2,26 @@
 
 "${TRIM_APPDEST}/cmd/main" stop 2>/dev/null || true
 
-pkill -f "bun.*monitor\.js" 2>/dev/null || true
-pkill -f "hermes.*gateway" 2>/dev/null || true
-pkill -f "hermes.*dashboard" 2>/dev/null || true
+# pkill 必须收窄到本应用自己的路径。
+# 宽匹配 "hermes.*gateway" 会把并行安装的原 Hermes 一起杀掉
+# （/vol1/@apphome/hermes-agent/data/venv/bin/hermes gateway 同样命中），
+# 2026-11-26 实测：两应用并跑时这是必然误杀。
+#
+# 三类进程的落点不同，要分别锚定：
+#   monitor.js  在 TRIM_APPDEST（/var/apps/<appname>）
+#   gateway/dashboard  在 TRIM_PKGHOME 的 venv 下（/vol<x>/@apphome/<appname>）
+# 任一变量为空就跳过对应那类，绝不退回宽匹配。
+APPDEST="${TRIM_APPDEST:-}"
+PKGHOME="${TRIM_PKGHOME:-}"
+
+if [ -n "$APPDEST" ]; then
+    pkill -f "${APPDEST}/.*monitor\.js" 2>/dev/null || true
+fi
+
+if [ -n "$PKGHOME" ]; then
+    pkill -f "${PKGHOME}/.*gateway"   2>/dev/null || true
+    pkill -f "${PKGHOME}/.*dashboard" 2>/dev/null || true
+    pkill -f "${PKGHOME}/.*mcp_stdio" 2>/dev/null || true
+fi
 
 exit 0

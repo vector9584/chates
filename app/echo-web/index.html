@@ -908,7 +908,7 @@
     if (t.sediment || t.status === 'dropped') {
       var sd = t.sediment || {};
       var st = sd.status || '';
-      var f = String(sd.file || '').replace('/vol1/@apphome/hermes-agent/data/', '');
+      var f = String(sd.file || '').replace('/vol3/@apphome/chates/data/', '');
       var txt = st === 'done'
         ? ('已沉淀 → ' + (f || '（没记路径）'))
         : st === 'pending'

@@ -1255,14 +1255,17 @@ function pollSessionSync(){
     .catch(function(){});
 }
 function _savedPathToUrl(p){
-  /* 历史消息里只存了「已保存到本机路径: /vol1/...」这种盘上路径，
+  /* 历史消息里只存了「已保存到本机路径: /volN/@apphome/<app>/data/...」这种盘上路径，
      而聊天气泡要的是能被 nginx 直取的 URL。把 data 前缀剥掉即可：
-     /vol1/@apphome/hermes-agent/data/uploads/files/x → /uploads/files/x（再补 BASE）。 */
+     <任意前缀>/data/uploads/files/x → /uploads/files/x（再补 BASE）。
+     不写死应用名和卷号 —— 同一个面板会装在 fnOS(/volN/@apphome/<app>)、
+     Windows(%APPDATA%\<app>) 等不同位置，认死一个路径就会静默丢图。 */
   if(!p) return '';
   p = String(p).trim();
-  if(/^\/vol1\/@apphome\/hermes-agent\/data\//.test(p)) p = p.replace('/vol1/@apphome/hermes-agent/data','');
+  var m = p.match(/^(?:\/[^\/]+)*\/data(\/.*)$/);
+  if(m) p = m[1];
   if(p.charAt(0) !== '/') return '';
-  if(/^\/vol1\//.test(p)) return '';   // 其它卷的裸路径取不到，别给空播放器
+  if(/^\/vol\d+\//.test(p)) return '';   // 仍是裸卷路径，浏览器取不到，别给空播放器
   return p;
 }
 /* 同一条消息里同一张图出现多次时只留第一处（2026-11-13 用户报「表情重复在发送」）。
@@ -1728,13 +1731,14 @@ function chatImgSrc(u){
   if(!u) return '';
   if(/^(https?:|data:|blob:)/i.test(u)) return u;
   /* 宿主机绝对路径必须映射到应用前缀，否则 BASE + '/vol1/...' 拼出
-     /app/hermes-agent/vol1/@apphome/... 必 404（2026-11-16 生图裂图根因：
-     image_generate 返回的是 /vol1/@apphome/hermes-agent/data/cache/images/x.png，
-     面板这里直接当相对路径补前缀，图就全裂了）。 */
-  var m = u.match(/^\/vol1\/@apphome\/hermes-agent\/data(\/.*)$/);
+     /app/<app>/vol1/@apphome/... 必 404（2026-11-16 生图裂图根因：
+     image_generate 返回的是宿主机 data 下的绝对路径，
+     面板这里直接当相对路径补前缀，图就全裂了）。
+     匹配任意 "<前缀>/data/..."，不认死应用名和卷号。 */
+  var m = u.match(/^(?:\/[^\/]+)*\/data(\/.*)$/);
   if(m) u = '/data' + m[1];
   // Session image links survive category changes and archive/restore.
-  var artifact = u.replace(/^\/app\/hermes-agent(?=\/data\/)/,'').match(/^\/data\/sessions\/(?:[^/]+\/)+([A-Za-z0-9_-]+)\/artifacts\/([^/?#]+)([?#].*)?$/);
+  var artifact = u.replace(/^\/app\/[^\/]+(?=\/data\/)/,'').match(/^\/data\/sessions\/(?:[^/]+\/)+([A-Za-z0-9_-]+)\/artifacts\/([^/?#]+)([?#].*)?$/);
   if(artifact)return BASE+'/api/workspace-ui/session-file/'+artifact[1]+'/artifacts/'+artifact[2]+(artifact[3]||'');
   if(BASE&&u.startsWith(BASE+'/'))return u;
   return BASE + u; // 相对路径（/tmp /uploads /workspace /data）补 BASE 前缀

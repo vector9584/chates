@@ -1,233 +1,7 @@
 model:
-  provider: custom_1bfaf012c4a0a3994c6e
-  default: deepseek-v4.1-flash-1017
-providers:
-  custom_umv9igjvr7sj9:
-    base_url: https://api.apikey.fan
-    api_key: [REDACTED]
-    name: fan
-    models:
-    - deepseek-flash
-    - deepseek-v4-pro
-    enabled: true
-    note: ''
-  custom_umw0jmqronmd7:
-    base_url: https://newapi.yimingtalk.online/v1
-    api_key: [REDACTED]
-    name: newapi
-    models:
-    - deepseek-v4-flash-free
-    - deepseek-v4.1-flash-free
-    - glm-5.3-flash
-    - qwen3.8-flash
-  custom_umw1usswyv8zb:
-    base_url: https://x666.me/v1
-    api_key: [REDACTED]
-    name: x666
-    models:
-    - grok-4.7
-  custom_97ff4903864f235a4025:
-    base_url: https://api.deepseek.com/v1
-    name: DeepSeek 官方 · 主用
-    api_key: [REDACTED]
-    models:
-    - id: deepseek-flash
-      name: DeepSeek Flash
-      enabled: true
-    - id: deepseek-v4-pro
-      name: DeepSeek V4 Pro
-      enabled: true
-    extra_body: {}
-    enabled: true
-    key_label: 主用
-    api_mode: chat_completions
-  custom_e08d6358445e0c57eea0:
-    base_url: https://direct.saviour.cc.cd
-    name: ZeroAPI · Gemini-稳定通道 0.23x
-    key_label: Gemini-稳定通道 0.23x
-    models:
-    - id: gemini-3-pro-image-preview
-      name: gemini-3-pro-image-preview
-      enabled: false
-    - id: gemini-3.1-flash-image
-      name: gemini-3.1-flash-image
-      enabled: false
-    - id: gemini-4-argon
-      name: gemini-4-argon
-      enabled: false
-    - id: gemini-4-carbon
-      name: gemini-4-carbon
-      enabled: true
-    - id: gemini-4-hydrogen
-      name: gemini-4-hydrogen
-      enabled: false
-    - id: gemini-nano-banana-2.1
-      name: gemini-nano-banana-2.1
-      enabled: false
-    - id: nano-banana-2
-      name: nano-banana-2
-      enabled: false
-    - id: nano-banana-2.1
-      name: nano-banana-2.1
-      enabled: true
-    - id: nano-banana-pro
-      name: nano-banana-pro
-      enabled: true
-    - id: gemini-2.5-flash
-      name: gemini-2.5-flash
-      enabled: false
-    - id: gemini-2.5-flash-lite
-      name: gemini-2.5-flash-lite
-      enabled: false
-    - id: gemini-3.1-flash-lite
-      name: gemini-3.1-flash-lite
-      enabled: false
-    - id: gemini-3.1-flash-lite-preview
-      name: gemini-3.1-flash-lite-preview
-      enabled: false
-    - id: gemini-3.5-flash-lite
-      name: gemini-3.5-flash-lite
-      enabled: false
-    - id: gemini-3.8-flash
-      name: gemini-3.8-flash
-      enabled: false
-    enabled: true
-    group: custom_e08d6358445e0c57eea0
-    api_key: [REDACTED]
-    extra_body: {}
-  custom_63305ded5b7034f4dfcc:
-    base_url: https://direct.saviour.cc.cd
-    name: ZeroAPI · DeepSeek官转 0.4x
-    group: custom_e08d6358445e0c57eea0
-    key_label: DeepSeek官转 0.4x
-    api_key: [REDACTED]
-    models:
-    - id: deepseek-flash
-      name: deepseek-flash
-      enabled: true
-    - id: deepseek-v4-pro
-      name: deepseek-v4-pro
-      enabled: true
-    - id: deepseek-v4.1-flash
-      name: deepseek-v4.1-flash
-      enabled: true
-    - id: deepseek-v4.1-flash-1017
-      name: deepseek-v4.1-flash-1017
-      enabled: true
-    extra_body: {}
-  custom_060a76be0d280ff01495:
-    base_url: https://direct.saviour.cc.cd
-    name: ZeroAPI · Claude【CT满分】0.45x
-    group: custom_e08d6358445e0c57eea0
-    key_label: Claude【CT满分】0.45x
-    models:
-    - id: claude-fable-5
-      name: claude-fable-5
-      enabled: false
-    - id: claude-fable-5-1
-      name: claude-fable-5-1
-      enabled: true
-    - id: claude-haiku-4-5
-      name: claude-haiku-4-5
-      enabled: false
-    - id: claude-opus-4-5
-      name: claude-opus-4-5
-      enabled: false
-    - id: claude-opus-4-6
-      name: claude-opus-4-6
-      enabled: false
-    - id: claude-opus-4-7
-      name: claude-opus-4-7
-      enabled: false
-    - id: claude-opus-4-8
-      name: claude-opus-4-8
-      enabled: false
-    - id: claude-opus-5
-      name: claude-opus-5
-      enabled: false
-    - id: claude-opus-5-5
-      name: claude-opus-5-5
-      enabled: false
-    - id: claude-sonnet-4-5
-      name: claude-sonnet-4-5
-      enabled: false
-    - id: claude-sonnet-4-6
-      name: claude-sonnet-4-6
-      enabled: false
-    - id: claude-sonnet-5
-      name: claude-sonnet-5
-      enabled: false
-    - id: claude-sonnet-5-5
-      name: claude-sonnet-5-5
-      enabled: false
-    extra_body: {}
-    api_key: [REDACTED]
-  custom_3adabca234ee1711a244:
-    base_url: https://direct.saviour.cc.cd
-    name: ZeroAPI · Gpt-特惠组 0.058x
-    group: custom_e08d6358445e0c57eea0
-    key_label: Gpt-特惠组 0.058x
-    api_key: [REDACTED]
-    extra_body: {}
-    models:
-    - id: codex-auto-review
-      name: codex-auto-review
-      enabled: false
-    - id: gpt-5.6-luna
-      name: gpt-5.6-luna
-      enabled: false
-    - id: gpt-5.6-sol
-      name: gpt-5.6-sol
-      enabled: false
-    - id: gpt-5.6-terra
-      name: gpt-5.6-terra
-      enabled: false
-    - id: gpt-6-astra
-      name: gpt-6-astra
-      enabled: false
-    - id: gpt-6-sol
-      name: gpt-6-sol
-      enabled: false
-    - id: gpt-6.1-sol
-      name: gpt-6.1-sol
-      enabled: false
-    - id: gpt-6.1-terra
-      name: gpt-6.1-terra
-      enabled: false
-    - id: gpt-6.2-astra
-      name: gpt-6.2-astra
-      enabled: true
-    - id: gpt-6.2-sol
-      name: gpt-6.2-sol
-      enabled: true
-    enabled: true
-  custom_1bfaf012c4a0a3994c6e:
-    base_url: https://direct.saviour.cc.cd
-    name: ZeroAPI · DeepSeek 0.13x
-    group: custom_e08d6358445e0c57eea0
-    key_label: DeepSeek 0.13x
-    api_key: [REDACTED]
-    extra_body: {}
-    models:
-    - id: deepseek-v4-pro
-      name: deepseek-v4-pro
-      enabled: true
-    - id: deepseek-v4.1-flash
-      name: deepseek-v4.1-flash
-      enabled: false
-    - id: deepseek-v4.1-flash-1017
-      name: deepseek-v4.1-flash-1017
-      enabled: true
-    - id: deepseek-v4-flash
-      name: deepseek-v4-flash
-      enabled: false
-    - id: deepseek-v4-flash-0731
-      name: deepseek-v4-flash-0731
-      enabled: false
-    - id: deepseek-v4-pro-0813
-      name: deepseek-v4-pro-0813
-      enabled: false
-    enabled: true
+  provider: ''
+  default: ''
+providers: {}
 toolsets:
 - hermes-cli
 - delegation
@@ -355,15 +129,7 @@ auxiliary:
     api_key: ''
     timeout: 120
     download_timeout: 30
-    fallback_chain:
-    - provider: custom_63305ded5b7034f4dfcc
-      model: deepseek-v4.1-flash-1017
-      base_url: https://direct.saviour.cc.cd
-      key_env: CUSTOM_63305DED5B7034F4DFCC_API_KEY
-    - provider: custom_97ff4903864f235a4025
-      model: deepseek-flash
-      base_url: https://api.deepseek.com/v1
-      key_env: CUSTOM_UMU5G7PYGOZES_API_KEY
+    fallback_chain: []
     model: ''
     base_url: ''
     reasoning_effort: none
@@ -490,14 +256,8 @@ dashboard:
 privacy:
   redact_pii: false
 tts:
-  provider: windows-indextts
-  providers:
-    windows-indextts:
-      type: command
-      command: /vol3/@apphome/chates/data/venv/bin/python /vol3/@apphome/chates/data/scripts/tts_windows.py {input_path} {output_path}
-      output_format: mp3
-      timeout: 900
-      max_text_length: 900
+  provider: edge
+  providers: {}
   edge:
     voice: zh-CN-XiaoxiaoNeural
 stt:
@@ -525,7 +285,7 @@ voice:
   silence_threshold: 200
   silence_duration: 3.0
 human_delay:
-  mode: off
+  mode: false
   min_ms: 800
   max_ms: 2500
 context:
@@ -555,12 +315,7 @@ skills:
   inline_shell: false
   inline_shell_timeout: 10
   guard_agent_created: false
-  external_dirs:
-    - /vol1/@appdata/hermes-agent/skills/baidu-map
-    - /vol1/@appdata/hermes-agent/skills/ctrip-wendao
-    - /vol1/@appdata/hermes-agent/skills/fliggy
-    - /vol1/@appdata/hermes-agent/skills/weread
-    - /vol1/@appdata/hermes-agent/skills/meituan-travel
+  external_dirs: []
 curator:
   enabled: true
   interval_hours: 168
@@ -671,7 +426,7 @@ network:
   force_ipv4: false
 gateway:
   strict: true
-  media_delivery_allow_dirs: '["/vol3/@apphome/chates/data/assets"]'
+  media_delivery_allow_dirs: []
   trust_recent_files: true
   trust_recent_files_seconds: 600
 streaming:
@@ -835,101 +590,8 @@ known_builtin_toolsets:
   - web
   - x_search
   - yuanbao
-mcp_servers:
-  zotero:
-    command: /vol3/@apphome/chates/data/.local/bin/zotero-mcp
-    timeout: 60
-    env:
-      ZOTERO_LIBRARY_ID: ${ZOTERO_LIBRARY_ID}
-      ZOTERO_API_KEY: ${ZOTERO_API_KEY}
-      ZOTERO_LIBRARY_TYPE: ${ZOTERO_LIBRARY_TYPE}
-      ZOTERO_WEBDAV_URL: ${ZOTERO_WEBDAV_URL}
-      ZOTERO_WEBDAV_USER: ${ZOTERO_WEBDAV_USER}
-      ZOTERO_WEBDAV_PASSWORD: ${ZOTERO_WEBDAV_PASSWORD}
-  notify-hub:
-    command: /vol1/@appdata/notify-hub/notify_hub_mcp.py
-    timeout: 30
-    env:
-      NOTIFY_HUB_TOKEN: ${NOTIFY_HUB_TOKEN}
-  telegram:
-    command: /vol3/@apphome/chates/data/bin/tg-mcp-locked
-    timeout: 60
-    enabled: 'false'
-  windows:
-    command: ''
-    url: http://127.0.0.1:8006/mcp
-    timeout: 180
-    connect_timeout: 60
-    headers:
-      Authorization: Bearer ${WINDOWS_MCP_TOKEN}
-  nekowhale-stickers:
-    command: /vol3/@apphome/chates/data/.local/bin/node
-    args:
-    - /vol3/@apphome/chates/data/.local/share/nk-stickers/node_modules/dsh-nekowhale-stickers/lib/cli.js
-    - mcp
-    - --data
-    - /vol3/@apphome/chates/data/assets/nekowhale-stickers
-    env:
-      HOME: /vol3/@apphome/chates/data
-      PATH: /vol3/@apphome/chates/data/.local/bin:/usr/local/bin:/usr/bin:/bin
-    timeout: 60
-    connect_timeout: 10
-  conn-tencent-news:
-    command: /vol3/@apphome/chates/data/node/bin/node
-    args:
-    - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
-    - tencent-news
-    - '8650'
-  tencent-meeting:
-    url: https://meeting.tencent.com/mcp
-    headers:
-      Authorization: Bearer lc1LUvvLuX81b4OsVS3b4SC952XDvGtARnrR5k3p6mR7OoHR
-  conn-baidu-map:
-    command: /vol3/@apphome/chates/data/node/bin/node
-    args:
-    - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
-    - baidu-map
-    - '8650'
-  conn-yuandian:
-    command: /vol3/@apphome/chates/data/node/bin/node
-    args:
-    - /vol1/@appdata/hermes-agent/mcp-stdio-bridge.js
-    - yuandian
-    - '8650'
-platforms:
-  qqbot:
-    extra:
-      app_id: [REDACTED]
-      client_secret: [REDACTED]
-      group_policy: open
-      dm_policy: open
-    allow_all_users: true
-    qq_markdown: true
-    show_thinking: false
-    show_tool_hints: false
-    profile: default
-    model: ''
-    skills:
-    - ''
-    system_prompt: ''
-    updated_at: 1792308380084
-    enabled: true
-    home_channel:
-      platform: qqbot
-      chat_id: ""
-      name: QQ 绑定会话
-      user_id: ""
-  weixin:
-    token: [REDACTED]
-    extra:
-      account_id: [REDACTED]
-      base_url: [REDACTED]
-      rate_limit_circuit_threshold: 4
-      rate_limit_circuit_window_seconds: 60
-      rate_limit_circuit_open_seconds: 15
-    updated_at: 1787074918732
-  discord:
-    channel_overrides: {}
+mcp_servers: {}
+platforms: {}
 onboarding:
   seen:
     busy_input_prompt: true
@@ -937,13 +599,7 @@ plugins:
   enabled:
   - feishu-platform
   - discord-platform
-fallback_providers:
-- provider: custom_97ff4903864f235a4025
-  model: deepseek-flash
-- provider: custom_63305ded5b7034f4dfcc
-  model: deepseek-v4-pro
-- provider: custom_97ff4903864f235a4025
-  model: deepseek-v4-pro
+fallback_providers: []
 moa:
   presets:
     panel-test:
@@ -956,23 +612,4 @@ moa:
         model: deepseek-flash
   default_preset: panel-test
   active_preset: ''
-image_gen:
-  provider: custom
-  custom:
-    provider_id: custom_umv9igjvr7sj9
-    model: gpt-image-2
-  targets:
-  - provider_id: custom_umv9igjvr7sj9
-    model: gpt-image-2
-  - provider_id: custom_e08d6358445e0c57eea0
-    model: gemini-3-pro-image-preview
-  - provider_id: custom_e08d6358445e0c57eea0
-    model: gemini-3.1-flash-image
-  - provider_id: custom_e08d6358445e0c57eea0
-    model: gemini-nano-banana-2.1
-  - provider_id: custom_e08d6358445e0c57eea0
-    model: nano-banana-2
-  - provider_id: custom_e08d6358445e0c57eea0
-    model: nano-banana-2.1
-  - provider_id: custom_e08d6358445e0c57eea0
-    model: nano-banana-pro
+image_gen: {}
