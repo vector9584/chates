@@ -182,7 +182,11 @@
    *
    * 想换地址只需改这一行，所有客户端下次更新自动跟随。
    */
-  var REPORT_URL = 'https://ruibing.wang/report/';
+  var REPORT_URL = '__CHATES_REPORT_URL__';
+  /* 上面是占位符，打包时由 release-tools 换成真实地址 —— 公开仓里不许出现
+     私有域名（脱敏闸按值反搜）。没被替换（直接从源码跑）就当没有上报，
+     只写本地收件箱，功能不残：本地那份才是用户自己看得见的。 */
+  if (REPORT_URL.indexOf('__CHATES') === 0) REPORT_URL = '';
 
   function pendingRead() {
     try {

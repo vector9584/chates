@@ -104,7 +104,9 @@ ok "双副本已同步（真源 app/，覆盖 hermes-src/server/ui）"
 # 注意 pipefail：grep 无匹配返回 1，管道整体就返回 1，set -e 会当场静默退出。
 # 必须用 { grep ... || true; } | wc -l 兜住（和上面 data-skeleton 凭据闸同一个坑）。
 LEAK_HITS=""
-SCAN_DIRS="app electron/resources/chates/app data-skeleton config/init"
+# electron/resources 是 assemble/build-exe 的生成物（.gitignore 里），会携带注入后的上报地址，
+# 不扫它；它本身由 app/ 复制而来，扫 app/ 就够。
+SCAN_DIRS="app data-skeleton config/init"
 for kw in '王瑞兵' '姜楠' '姜亚楠' '河南大学' '刘彦随' '8232B16C' '4157152D' 'ruibing.wang' '192.168.3.110'; do
   n=$( { grep -rl "$kw" $SCAN_DIRS 2>/dev/null || true; } | wc -l )
   if [ "${n:-0}" -gt 0 ]; then LEAK_HITS="$LEAK_HITS $kw($n)"; fi
@@ -166,6 +168,29 @@ cat > "$STAGE/app/version.json" <<JSON
 JSON
 ok "version.json  tag=$TAG  version=$VER_PLAIN"
 cp -a app/server app/ui "$STAGE/app/"
+# 上报地址注入：源码里是 __CHATES_REPORT_URL__ 占位符（公开仓不能带私有域名），
+# 打包时换成真地址。地址来自 env CHATES_REPORT_URL（CI 用仓库变量，本机来自 .env）。
+# 没给就留空 → 客户端只写本地收件箱，不静默发错地方。
+REPORT_BASE="${CHATES_REPORT_URL:-}"
+# 本机构建没有 CI secret：从 release-tools/.report-url（.gitignore 里）取。
+# 公开仓里两处都是占位符 + 这个被忽略的文件，谁也不会把域名带进 git。
+if [ -z "$REPORT_BASE" ] && [ -f release-tools/.report-url ]; then
+  REPORT_BASE=$(tr -d '\r\n ' < release-tools/.report-url)
+fi
+PJS="$STAGE/app/ui/js/panel-issues-ui.js"
+if [ -n "$REPORT_BASE" ]; then
+  python3 - "$PJS" "$REPORT_BASE" <<'PY'
+import sys
+p, base = sys.argv[1], sys.argv[2].rstrip('/') + '/'
+s = open(p, encoding='utf-8').read()
+n = s.count('__CHATES_REPORT_URL__')
+open(p, 'w', encoding='utf-8').write(s.replace('__CHATES_REPORT_URL__', base))
+print(f"  上报地址写入 {n} 处")
+PY
+  ok "上报地址已注入"
+else
+  warn "未给 CHATES_REPORT_URL，本包不上报（只写本地收件箱）"
+fi
 # 内核 hermes-src 不在 app/ 下，在 electron 组装产物里（88MB，61.8MB 压缩后）。
 # 它是整个包体积的主体；漏了这层，产物 8.9MB vs 应有的 68MB —— 一眼能看出不对。
 SRC_CANDIDATES="electron/resources/chates/app/hermes-src app/hermes-src"

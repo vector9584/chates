@@ -123,6 +123,10 @@ jobs:
           echo "内核文件数: $(find app/hermes-src -type f | wc -l)"
 
       - name: 构建 fpk
+        env:
+          # 公开仓不能带私有域名：源码里是 __CHATES_REPORT_URL__ 占位符，
+          # 打包时用仓库 secret 换成真地址。没配 secret 就打不出上报能力（只写本地收件箱）。
+          CHATES_REPORT_URL: ${{ secrets.CHATES_REPORT_URL }}
         run: |
           set -euo pipefail
           bash release-tools/build-fpk.sh --tag "${{ needs.gate.outputs.tag }}"
@@ -185,6 +189,7 @@ jobs:
         shell: bash
         env:
           PYTHONIOENCODING: utf-8
+          CHATES_REPORT_URL: ${{ secrets.CHATES_REPORT_URL }}
         run: |
           set -euo pipefail
           bash release-tools/build-exe.sh --tag "${{ needs.gate.outputs.tag }}"

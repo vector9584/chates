@@ -123,6 +123,26 @@ rm -rf "$RES"; mkdir -p "$RES"/{app,runtime,data}
 for d in server ui; do
   [ -d "app/$d" ] && cp -a "app/$d" "$RES/app/"
 done
+# 上报地址注入（与 build-fpk.sh 同一套）：源码用 __CHATES_REPORT_URL__ 占位符，
+# 打包时换成 env CHATES_REPORT_URL。源码里本来就有真地址时这一步是空操作。
+REPORT_BASE="${CHATES_REPORT_URL:-}"
+# 本机构建没有 CI secret：从 release-tools/.report-url（.gitignore 里）取。
+# 公开仓里两处都是占位符 + 这个被忽略的文件，谁也不会把域名带进 git。
+if [ -z "$REPORT_BASE" ] && [ -f release-tools/.report-url ]; then
+  REPORT_BASE=$(tr -d '\r\n ' < release-tools/.report-url)
+fi
+PJS="$RES/app/ui/js/panel-issues-ui.js"
+if [ -n "$REPORT_BASE" ] && [ -f "$PJS" ]; then
+  $PYEXE - "$PJS" "$REPORT_BASE" <<'PY'
+import sys
+p, base = sys.argv[1], sys.argv[2].rstrip('/') + '/'
+s = open(p, encoding='utf-8').read()
+n = s.count('__CHATES_REPORT_URL__')
+open(p, 'w', encoding='utf-8').write(s.replace('__CHATES_REPORT_URL__', base))
+print(f"  上报地址写入 {n} 处")
+PY
+  ok "上报地址已注入"
+fi
 # panel/server 用 ESM（import ... from），Node 靠这个 package.json 的 type:module 才认；
 # 漏了它 Windows 侧 monitor.js 会以 CJS 解析而报 "Cannot use import statement outside a module"。
 [ -f app/package.json ] && cp -a app/package.json "$RES/app/" || die "缺 app/package.json（ESM 需要 type:module）"
@@ -263,7 +283,9 @@ fi
 # 合成单文件后 NSIS 只搬一个条目，进度条单调递增。解开后的目录结构不变，
 # main.js 的 resolveRoots() 与 installer.nsh 的 customInstall 都按原布局取。
 c '1;36' "== 打运行时 tar =="
-TARF="$RES.tgz"
+# TARF 必须是绝对路径：下面 subshell 先 cd 进 $RES，相对路径会指向
+# $RES/electron/resources/... 这个不存在的层级 → 2026-11-27 CI 首跑就死在这。
+TARF="$(pwd)/$RES.tgz"
 rm -f "$TARF"
 ( cd "$RES" && tar -czf "$TARF" . ) || die "打 tar 失败"
 ok "chates.tgz $(du -h "$TARF" | cut -f1)  $(tar -tzf "$TARF" | wc -l) 条目"
