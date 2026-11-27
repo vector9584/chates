@@ -1080,7 +1080,7 @@ try {
     // ① 旧版 wheel 模式：hermes_cli/tui_dist/entry.js（0.19.0）
     // ② v0.20.0 源码模式：hermes-src/ui-tui/dist/entry.js（打包时预构建）
     const pyResult = spawnSync(
-      `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
+      join(VENV_BIN, PY_BIN), ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
       { stdout: "pipe", stderr: "pipe" }
     );
     const hermesCli = pyResult.stdout?.toString().trim();
@@ -2994,7 +2994,7 @@ function sessionActivity(){
    'rows=c.execute("select id,last_activity_at,coalesce(last_activity_description,\'\') from sessions'
     +' where coalesce(last_activity_at,0)>? order by last_activity_at desc limit 8",(time.time()-7200,)).fetchall()',
    'print(json.dumps(rows))'].join('\n');
-  const r=spawnSync(`${VENV_BIN}/python3`,['-c',probe,`${DATA_DIR}/state.db`],{encoding:'utf8',timeout:5000});
+  const r=spawnSync(join(VENV_BIN, PY_BIN),['-c',probe,`${DATA_DIR}/state.db`],{encoding:'utf8',timeout:5000});
   const rows=JSON.parse(String(r.stdout||'[]').trim()||'[]');
   const t=Math.floor(Date.now()/1000);
   let at=0, pick=null;
@@ -4389,7 +4389,7 @@ toolGuardLoad();
 
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
 const panelModelChecks = new ModelChecks({root: join(VAR_DIR, 'panel-state/model-checks'),
-  source: createModelSource({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), varRoot: VAR_DIR,
+  source: createModelSource({python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'), varRoot: VAR_DIR,
     getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; }})});
 let panelModelChecksLoadError = null;
 try { panelModelChecks.load(); } catch (error) { panelModelChecksLoadError = error; log('[model-checks] state cannot load: '+error.message); }
@@ -4399,10 +4399,10 @@ async function handleModelChecks(req, path) {
     return new Response(JSON.stringify({ok:false,error:'验证记录无法读取，原文件已保留，请检查存储'}), {status:503,headers:{'Content-Type':'application/json'}});
   return modelChecksHandler(req,path);
 }
-const handleAuxiliary = createAuxiliaryHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
+const handleAuxiliary = createAuxiliaryHandler({python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'),
   getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; },
   backupRoot: join(VAR_DIR, 'panel-state/auxiliary-backups'), checkToken});
-const handleSpeechConfig = createSpeechConfigHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
+const handleSpeechConfig = createSpeechConfigHandler({python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'),
   getConfig: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile), 'config.yaml') : HERMES_CONFIG; },
   lockRoot: join(VAR_DIR, 'panel-state'), checkToken});
 const handleConnectorTools = createConnectorToolsHandler({getConnector, readState: () => panelConnectorStore.all(), checkToken, call: callConnectorTool});
@@ -4426,8 +4426,8 @@ const handleMaintenance = createMaintenanceHandler({checkToken, repositories: [
     webUrlPath: '/hermes-study/fnos-hermes-agent/commits/main'},
   github: {owner: 'vector9584', repo: 'chates'},
 }});
-const handleUsage = createUsageHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
-const handleEcho = createEchoHandler({python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'),
+const handleUsage = createUsageHandler({python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'), dataRoot: DATA_DIR,panelRoot:join(VAR_DIR,'panel-state')});
+const handleEcho = createEchoHandler({python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'),
   queueFile: '/vol1/1000/飞牛文件/html/.acl/tasks/tasks.json', backupRoot: join(VAR_DIR, 'panel-state/echo-backups'),
   draftFile: join(VAR_DIR, 'panel-state/echo-drafts.json'), checkToken});
 const handleCronHistory = createCronHistoryHandler({checkToken, getHome: () => {
@@ -4439,7 +4439,7 @@ const handleCronHooks = createCronHookHandler({hooks: panelCronHooks, checkToken
   return (Array.isArray(raw) ? raw : raw.jobs).some(job => job.id === id);
 }});
 const handleCronUpdate = createCronUpdateHandler({
-  python: `${VENV_BIN}/python3`, serverRoot: join(APP_DIR, 'server'), nativeRoot: join(APP_DIR, 'hermes-src'),
+  python: join(VENV_BIN, PY_BIN), serverRoot: join(APP_DIR, 'server'), nativeRoot: join(APP_DIR, 'hermes-src'),
   backupRoot: join(VAR_DIR, 'panel-state/cron-backups'), checkToken,
   getHome: () => { const profile = _cronProfileName(); return profile && profile !== 'default' ? join(DATA_DIR, 'profiles', safeId(profile)) : DATA_DIR; },
 });
@@ -4742,8 +4742,8 @@ async function handleFetch(req) {
       // （无源码时退回旧版 PyPI 升级，用于旧包/热补丁场景）
       const srcMode = existsSync(`${APP_DIR}/hermes-src/pyproject.toml`);
       const installArgs = srcMode
-        ? ["pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--no-cache", "-e", `${APP_DIR}/hermes-src[all]`]
-        : ["pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--upgrade", "--no-cache", "hermes-agent[all]"];
+        ? ["pip", "install", "--python", join(VENV_BIN, PY_BIN), "--no-cache", "-e", `${APP_DIR}/hermes-src[all]`]
+        : ["pip", "install", "--python", join(VENV_BIN, PY_BIN), "--upgrade", "--no-cache", "hermes-agent[all]"];
       const proc = spawn(UV_BIN_PATH, installArgs, { env, stdio: ["ignore", "pipe", "pipe"] });
       updateProc = proc;
 
@@ -6647,7 +6647,7 @@ async function handleFetch(req) {
   function _findHermesRoot(){
     try {
       const pyResult = spawnSync(
-        `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
+        join(VENV_BIN, PY_BIN), ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
         { stdout: "pipe", stderr: "pipe" }
       );
       const root = (pyResult.stdout ? pyResult.stdout.toString() : "").trim();
@@ -9716,7 +9716,7 @@ function startServer() {
         // 真实 PTY：由 pty_bridge.py（pty.openpty + setsid + TIOCSCTTY）提供控制终端，
         // 修复 pipe spawn 下 bash -i 报 “cannot set terminal process group / no job control”，
         // Ctrl+C、前后台任务、vim 等全屏程序均可正常工作。
-        const pty = spawn(`${VENV_BIN}/python3`, [
+        const pty = spawn(join(VENV_BIN, PY_BIN), [
           `${APP_DIR}/server/pty_bridge.py`,
           "--shell", "/bin/bash",
           "--cwd", existsSync(cwd) ? cwd : WORKSPACE_DIR,

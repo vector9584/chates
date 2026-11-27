@@ -62,16 +62,32 @@ let quitting = false;
 function ensureRuntimeExtracted() {
   const target = path.join(RES, 'chates');
   const tarball = path.join(RES, 'chates.tgz');
-  if (fs.existsSync(path.join(target, 'app', 'server', 'monitor.js'))) return target;
+  // 2026-11-27：以前只查 monitor.js 就判定"解压完成"，结果被 Windows 的
+  // bsdtar 坑过一次——中途失败不回滚，app/ 和 runtime/python/ 目录都建好、
+  // monitor.js 也解出来了，唯独 python.exe 没落地。此后每次启动都认这半截，
+  // 模型配置 spawn 不到解释器 → /api/panel-models 直接 503 → 页面上 provider
+  // 一个都不显示（用户看到的就是"配置全没了"，其实 config.yaml 好端端躺着）。
+  // 判据要覆盖真正要用的可执行文件，缺一个就重解。
+  const mustHave = [
+    ['app', 'server', 'monitor.js'],
+    ['runtime', 'python', 'python.exe'],
+    ['runtime', 'node.exe'],
+  ];
+  const intact = () => mustHave.every((p) => fs.existsSync(path.join(target, ...p)));
+
+  if (intact()) return target;
   if (!fs.existsSync(tarball)) return null;
   try {
+    // 残缺目录不能就地叠加解压：bsdtar 不会清掉旧根目录，缺的那份可能一直补不上。
     console.log('[chates] extracting runtime tarball -> ' + target);
+    fs.rmSync(target, { recursive: true, force: true });
     fs.mkdirSync(target, { recursive: true });
     const { execFileSync } = require('child_process');
     // Windows 10 1803+ 自带 bsdtar，参数用 GNU 兼容写法
     execFileSync('tar', ['-xzf', tarball, '-C', target], { stdio: 'ignore', windowsHide: true });
-    if (fs.existsSync(path.join(target, 'app', 'server', 'monitor.js'))) return target;
-    console.error('[chates] tar 解开后仍找不到 monitor.js');
+    if (intact()) return target;
+    console.error('[chates] tar 解开后关键文件仍不全: ' +
+      mustHave.filter((p) => !fs.existsSync(path.join(target, ...p))).map((p) => p.join('/')).join(', '));
   } catch (e) {
     console.error('[chates] extract failed: ' + e.message);
   }
@@ -96,12 +112,24 @@ function resolveRoots() {
         appDir: path.join(r, 'app'),
         dataDir: dataRoot,
         varDir,
-        node: path.join(r, 'runtime', 'node.exe'),
-        python: path.join(r, 'runtime', 'python', 'python.exe'),
+        node: pickRuntime(r, 'node.exe'),
+        python: pickRuntime(path.join(r, 'runtime', 'python'), 'python.exe'),
       };
     }
   }
   return null;
+}
+
+/**
+ * 取运行时可执行文件：先看 <root>/<name>，再看 resources/<name>。
+ * 2026-11-27：chates.tgz 曾经只解出一半（目录建了、python.exe 没落地），
+ * 而真正完整的 runtime 一直躺在 resources/ 下。两条路都试，别一条不通就认死。
+ */
+function pickRuntime(root, name) {
+  const primary = path.join(root, name);
+  if (fs.existsSync(primary)) return primary;
+  const fallback = path.join(RES, name);
+  return fs.existsSync(fallback) ? fallback : primary;
 }
 
 function logLine(msg) {
@@ -207,8 +235,8 @@ function startBackend(roots) {
     //   python.exe  在 runtime/python/        （monitor 用它跑 panel-models.py 等脚本）
     //   hermes.exe  在 runtime/python/Scripts/（monitor 用它 --version / profile / gateway）
     // fpk 版两个在同一个 venv/Scripts 下，所以以前一个变量就够。
-    CHATES_PYTHON_ROOT: path.join(roots.root, 'runtime', 'python'),
-    CHATES_PYTHON_SCRIPT: path.join(roots.root, 'runtime', 'python', 'Scripts'),
+    CHATES_PYTHON_ROOT: path.dirname(roots.python),
+    CHATES_PYTHON_SCRIPT: path.join(path.dirname(roots.python), 'Scripts'),
   };
   // Electron 自己的 ELECTRON_RUN_AS_NODE 会污染子进程，必须清掉
   delete env.ELECTRON_RUN_AS_NODE;
