@@ -159,7 +159,10 @@ cat > "$RES/app/version.json" <<JSON
 JSON
 ok "version.json  tag=$TAG"
 [ -d app/echo-web ] && cp -a app/echo-web "$RES/app/"
-# 内核：优先仓内，其次 electron 已组装产物
+# 内核：优先仓内，其次 electron 已组装产物。
+# 内核只供 python 侧；前端一律用仓库 app/ui（第 124 行的 cp 已放好 $RES/app/ui）。
+# 内核包里若混进 app/ui（旧副本），静态托管仍读 $RES/app/ui，那份是死的，
+# 却让人以为"修复没进包"（2026-11-27 误判两轮）。这里最后再清一次，双保险。
 if [ -d app/hermes-src ]; then
   cp -a app/hermes-src "$RES/app/hermes-src"
 elif [ -d "$RES/app/hermes-src" ]; then
@@ -169,6 +172,9 @@ else
     [ -d "$cand" ] && cp -a "$cand" "$RES/app/hermes-src" && break
   done
 fi
+for d in "$RES/app/hermes-src/app/ui" "$RES/app/hermes-src/ui"; do
+  [ -d "$d" ] && rm -rf "$d" && warn "清掉内核里的前端死副本: ${d#$RES/}"
+done
 ok "app/       $(du -sh "$RES/app" 2>/dev/null | cut -f1)"
 
 # 2) data —— 脱敏骨架（绝不拷本机 data）

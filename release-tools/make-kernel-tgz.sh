@@ -12,6 +12,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/kernel/hermes-src.tgz"
+# kernel/ 不进 git（.gitignore 21/23 行），新克隆的仓库里没有这个目录。
+# 不建就直接 tar czf 写进去 → "Cannot open: No such file or directory"。
+mkdir -p "$ROOT/kernel"
 
 # 源码树候选：CI 从仓库解出来的，或本机组装产物
 SRC="${1:-}"
@@ -28,6 +31,14 @@ fi
 # 出厂前必须消失的东西
 # CLAUDE.md 是开发期笔记，含本机仓库绝对路径，对最终用户无用
 STRIP=( '*.bak-*' '__pycache__' '*.pyc' '.pytest_cache' '.mypy_cache' 'CLAUDE.md' )
+# 前端目录不进内核包。
+# 理由（2026-11-27）：生产源码树是从本机 hermes-agent 整棵复制来的，自带一份
+# app/ui。而 build-exe.sh 已经把仓库的 app/ui 拷到 $RES/app/ui，静态托管读的
+# 是后者（monitor.js: STATIC_DIR = ${APP_DIR}/ui）。于是包里出现两份 app/ui，
+# 内核那份是死的，却让人反复误判"修复没进包"。内核只提供 python 侧，
+# 前端一律以仓库为准，源码树里的副本在这里剥掉。
+# 剥掉后 build-exe.sh 的兜底分支也拿不到旧副本，误判不可能再发生。
+STRIP_DIRS=( 'app/ui' 'ui' 'app/echo-web' )
 # 不该出现在别人机器上的词（演示提示词、调试样例里的真实身份）
 NEUTRALIZE=( '王瑞兵:示例用户' '姜亚楠:示例用户' '姜楠:示例用户' )
 
@@ -67,6 +78,15 @@ if [ -f "$work/hermes-src/.env" ]; then
   echo "[kernel] 删除 .env"
 fi
 
+# 剥掉前端目录（内核只供 python 侧，前端以仓库 app/ui 为准）
+for d in "${STRIP_DIRS[@]}"; do
+  if [ -d "$work/hermes-src/$d" ]; then
+    n=$(find "$work/hermes-src/$d" -type f 2>/dev/null | wc -l || true)
+    rm -rf "$work/hermes-src/$d"
+    echo "[kernel] 剥离前端目录 $d: $n 个文件"
+  fi
+done
+
 (cd "$work" && tar czf "$OUT" hermes-src)
 
 files=$(tar tzf "$OUT" | grep -vc '/$' || true)
@@ -87,6 +107,11 @@ if tar xzf "$OUT" -O 2>/dev/null | grep -qE '/vol[0-9]/@apphome/hermes-agent'; t
 fi
 if [ "$size" -lt 20000000 ]; then
   echo "ERROR 产物只有 $size 字节，缺内核（正常约 29MB）" >&2; bad=1
+fi
+# 内核包里不许再有前端目录 —— 两份 app/ui 是 2026-11-27 那次误判的根因
+n=$(tar tzf "$OUT" | grep -cE '^hermes-src/(app/)?ui/' || true)
+if [ "$n" -gt 0 ]; then
+  echo "ERROR tgz 里还有 $n 个前端文件（应为 0，前端以仓库为准）" >&2; bad=1
 fi
 
 if [ "$bad" -eq 0 ]; then echo "[kernel] 自检通过"; else exit 1; fi
