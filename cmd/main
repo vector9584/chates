@@ -2,7 +2,20 @@
 # fnOS lifecycle entry. No name-based kills, recursive ownership changes or
 # socket permission widening. The helper serializes start/stop in application VAR.
 set -uo pipefail
-TRIM_APPDEST="${TRIM_APPDEST:-/var/apps/chates}"
+# 2026-11-27 修：默认值原来写 /var/apps/chates，而实际运行树在 /vol3/@appcenter/chates。
+# /var/apps/chates 只有 cmd/config/ICON/manifest 和 home、etc、meta 三个软链，**没有 server/**，
+# 于是启动时 `python3 -B /var/apps/chates/server/panel_lifecycle.py` 直接
+# "can't open file … No such file or directory"，应用中心点重启看着成功、进程其实没换。
+# 处理办法不是改死成 /vol3/@appcenter/chates（换卷就错），而是按优先级探：
+#   传入的 TRIM_APPDEST → /var/apps/chates（若真有 server/）→ /vol<N>/@appcenter/chates
+_resolve_appdest() {
+    local c
+    for c in "${TRIM_APPDEST:-}" /var/apps/chates "/vol1/@appcenter/chates" "/vol2/@appcenter/chates" "/vol3/@appcenter/chates" "/vol4/@appcenter/chates"; do
+        [ -n "$c" ] && [ -f "$c/server/panel_lifecycle.py" ] && { echo "$c"; return 0; }
+    done
+    return 1
+}
+TRIM_APPDEST="$(_resolve_appdest || echo "${TRIM_APPDEST:-/var/apps/chates}")"
 TRIM_PKGHOME="${TRIM_PKGHOME:-/var/apps/chates/home}"
 TRIM_PKGVAR="${TRIM_PKGVAR:-/vol3/@appdata/chates}"
 # CHATÈS 与同机 hermes-agent 并存，三个端口必须错开（monitor.js 读这些环境变量）

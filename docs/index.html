@@ -30,6 +30,22 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;scroll-padding-top:60px;-webkit-text-size-adjust:100%;overflow-x:clip}
+/* 滚动条：默认那根亮灰条在这套深色纸上像贴了块胶带 —— 页面底色 #0b0e14，
+   系统滚动条是浅灰，反差极大。统一改成暗色细条：轨道透明（不切一条色带出来），
+   滑块收窄到 10px、圆角、颜色比分隔线亮一档（--line #232b38 → #2f3949），
+   悬停再亮一档到 --faint。Firefox 走 scrollbar-width/color 两条属性。 */
+*{scrollbar-width:thin;scrollbar-color:#2f3949 transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2f3949;border-radius:6px;
+  border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#3c4859;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:active{background:var(--faint);border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}
+/* 内容盒（目录树、日志框、对话体）里的滚动条要更低调：它们本身就有边框，
+   再压出横竖两根 10px 会显得局促，收成 8px。 */
+.tree::-webkit-scrollbar,.logbox::-webkit-scrollbar,.bd-chat::-webkit-scrollbar{width:8px;height:8px}
+
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.7;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;overflow-x:clip}
 a{color:inherit;text-decoration:none}button,input,select{font-family:inherit}
 ::selection{background:var(--blue);color:#fff}
@@ -833,6 +849,10 @@ body{
 .dl-code{font:11px/1.75 var(--mono);color:var(--ink);overflow-wrap:anywhere}
 .dl-row{margin-top:10px;gap:6px}
 .dl-note{font-size:11.5px;line-height:1.8;color:var(--dim);margin-top:10px}
+.dl-cta{font-size:14px;padding:14px 26px;min-width:210px;letter-spacing:.03em;box-shadow:0 8px 20px rgba(0,0,0,.26)}
+.dl-qr{margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:5px}
+.dl-qr img{display:block;width:112px;height:112px;background:#fff;padding:5px;border-radius:3px}
+.dl-qr span{font:9px var(--mono);letter-spacing:.08em;color:var(--dim);white-space:nowrap}
 .dl-entry .dl-card{cursor:pointer;border-top:2px solid transparent;transition:border-color .2s,background .2s}
 .dl-entry{grid-template-columns:repeat(4,minmax(0,1fr))}
 .dl-entry .dl-card.on{border-top-color:var(--mark);background:rgba(196,129,63,.08)}
@@ -848,6 +868,8 @@ body{
   .dl-grid{grid-template-columns:minmax(0,1fr)}
   .dl-entry{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dl-down{width:100%;min-width:0}
+  .dl-cta{width:100%}
+  .dl-qr{margin-left:0;flex-direction:row;gap:10px}
   .dl-row>.btn{flex:1 1 0%;min-width:0}
 }
 
@@ -901,16 +923,31 @@ body{
 .cb-detail .btn{flex:1 1 0%;min-width:0}
 .cb-three{grid-template-columns:minmax(0,1fr)}
 
-/* ===== 11 · 留言（点击后才连 GitHub）===== */
-.cb-cmt{margin-top:16px;background:var(--card);border:1px solid var(--line2);min-width:0}
-.cb-cmt-bar{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:11px 13px;border-bottom:1px solid var(--line2)}
-.cb-cmt-bar b{font:500 clamp(14px,1.6vw,16px) var(--osw);letter-spacing:.06em;color:var(--ink)}
-.cb-cmt-bar span{font:10px var(--mono);letter-spacing:.1em;color:var(--dim)}
-.cb-cmt-body{padding:14px 13px;display:flex;flex-direction:column;gap:11px;align-items:flex-start;min-width:0}
-.cb-cmt-body iframe{width:100%!important;max-width:100%}
+/* ===== 11 · 留言 · 提问题（三行齐平，跟整页同调）===== */
 .cb-say{padding:13px;background:var(--card);border:1px solid var(--line2);border-left:3px solid var(--mark);min-width:0;margin-top:12px}
 .cb-say p{font-size:12px;line-height:1.85;color:var(--dim)}
 .cb-say .row{margin-top:11px}
+.cb-line{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.cb-line .btn{flex:0 0 auto}
+.cb-sel{font:12px var(--osw);padding:8px 10px;color:var(--ink);background:var(--card);
+  border:1px solid var(--line2);border-radius:2px;outline:none;min-width:132px}
+.cb-sel:focus{border-color:var(--mark)}
+.cb-ta{width:100%;box-sizing:border-box;min-height:76px;resize:vertical;font:12px/1.7 var(--osw);
+  padding:9px 11px;color:var(--ink);background:transparent;border:1px solid var(--line2);
+  border-radius:2px;outline:none;margin-top:9px}
+.cb-ta:focus{border-color:var(--mark)}
+.cb-note{font-size:11.5px;line-height:1.7;color:var(--dim);overflow-wrap:anywhere;margin-top:9px}
+.cb-note.ok{color:var(--mark)}
+.cb-note.err{color:#c4813f}
+/* 留言板：左昵称右正文，一行一条，和整页的横线节奏一致 */
+.wall-list{margin-top:14px;border-top:1px solid var(--line2)}
+.wall-item{padding:11px 2px 11px 0;border-bottom:1px solid var(--line2);display:grid;
+  grid-template-columns:96px 1fr;gap:12px;align-items:baseline}
+.wall-who{font-size:12px;color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wall-who small{display:block;font-weight:400;font-size:11px;color:var(--dim);margin-top:3px}
+.wall-txt{font-size:12.5px;line-height:1.85;color:var(--dim);white-space:pre-wrap;overflow-wrap:anywhere}
+.wall-empty{padding:16px 2px;font-size:12px;color:var(--dim)}
+@media(max-width:600px){.wall-item{grid-template-columns:1fr;gap:4px}}
 </style>
 </head>
 <body>
@@ -1279,15 +1316,15 @@ body{
       <span class="cm tl"></span><span class="cm tr"></span><span class="cm bl"></span><span class="cm br"></span></div>
     <div class="plate-txt"><div class="fk">10 · 下载</div>
       <div class="ft">封好的那一个</div>
-      <div class="fd">1.20.1，一个直接装进 fnOS 的包；校验值就在 Release 页的 SHA256SUMS 里。</div>
-      <div class="fb"><span>1.20.1</span><span>GPL-3.0</span></div></div>
+      <div class="fd"><span id="dlVerText">1.20.2</span>，Windows 装 exe、fnOS 装 fpk，都在同一个下载目录里；校验值就是目录里的 SHA256SUMS.txt。</div>
+      <div class="fb"><span id="dlVerBadge">1.20.2</span><span>GPL-3.0</span></div></div>
   </div>
   <div class="stage">
     <aside class="side rv" id="side9"><div class="no">10</div><h2>拿去装</h2><p class="one">包里没有密钥，装完自己配模型；和原来的实例并存，端口互不抢。</p>
       <div class="tags"><span>独立实例</span><span>包内无密钥</span><span>校验值</span></div><div class="hint"><i>↘</i> 下包 / 对校验 / 看入口</div></aside>
     <div class="rv" style="--d:90ms">
       <div class="spec">
-        <div class="spec-bar"><span class="nm">安装包 · v1.20.1</span><span class="st" id="st9">63.1 MB</span></div>
+        <div class="spec-bar"><span class="nm">安装包 · v<span id="dlVerNm">1.20.2</span></span><span class="st" id="st9">63.1 MB</span></div>
         <div class="spec-body">
           <div class="chips dl-tabs" id="dlTabs"></div>
           <div id="dlPane"></div>
@@ -1320,20 +1357,44 @@ body{
           <div class="rule"></div>
           <div class="row cb-links">
             <a class="btn" href="https://github.com/vector9584/chates/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">一起看规矩 ↗</a>
-            <a class="btn" href="https://github.com/vector9584/chates/blob/main/.github/PULL_REQUEST_TEMPLATE.md" target="_blank" rel="noopener">看模板 ↗</a>
-            <a class="btn" href="https://github.com/vector9584/chates/blob/main/.github/workflows/pr-checks.yml" target="_blank" rel="noopener">自动检查 ↗</a>
+            <a class="btn" href="https://github.com/vector9584/chates/compare" target="_blank" rel="noopener">开个 PR ↗</a>
+            <a class="btn" href="https://github.com/vector9584/chates/actions" target="_blank" rel="noopener">自动检查 ↗</a>
           </div>
 
-          <div class="cb-cmt" id="cbCmt">
-            <div class="cb-cmt-bar">
-              <b>留言</b>
-              <span>GitHub 账号 · 存在仓库的 Issues 里 · 点开才加载</span>
+          <div class="rule"></div>
+          <div class="cb-say">
+            <p><b style="color:var(--ink)">留言板</b>：不用账号，写完就在下面。想让人看见你遇到的问题、或者提一句想法，都行。留言是公开的，别写密钥和私人信息。</p>
+            <div class="cb-line">
+              <input class="cb-sel" id="cbIsName" maxlength="24" placeholder="昵称（可留空）" aria-label="昵称" style="flex:0 0 156px">
+              <select class="cb-sel" id="cbIsCat" aria-label="问题板块">
+                <option value="other-misc">其他</option>
+                <option value="runtime-start">运行 · 启动与连接</option>
+                <option value="runtime-update">运行 · 更新与升级</option>
+                <option value="runtime-perf">运行 · 卡顿与性能</option>
+                <option value="runtime-error">运行 · 报错与崩溃</option>
+                <option value="chat-input">对话 · 输入与发送</option>
+                <option value="chat-render">对话 · 消息渲染</option>
+                <option value="chat-stream">对话 · 流式输出</option>
+                <option value="panel-model">面板 · 模型与配置</option>
+                <option value="panel-nav">面板 · 导航与布局</option>
+                <option value="panel-theme">面板 · 主题与样式</option>
+                <option value="panel-file">面板 · 文件与上传</option>
+                <option value="panel-voice">面板 · 语音与朗读</option>
+                <option value="channel-recv">渠道 · 收不到消息</option>
+                <option value="channel-send">渠道 · 发不出消息</option>
+                <option value="channel-media">渠道 · 图片与语音</option>
+                <option value="other-feature">功能建议</option>
+                <option value="other-doc">文档与说明</option>
+              </select>
+              <button class="btn" id="cbIsGitHub" type="button">正经提个 issue &#8599;</button>
             </div>
-            <div class="cb-cmt-body" id="cbCmtBody">
-              <p class="cb-mini">评论存进 GitHub Issues，不进这台机器，也不进任何第三方统计。点下面按钮，才会连 GitHub；不想连就算了，去仓库直接提也一样。</p>
-              <button class="btn pri" id="cbCmtOpen" type="button">打开评论区</button>
+            <textarea class="cb-ta" id="cbIsBody" maxlength="800" placeholder="例：Windows 11 上点保存，转两秒后提示「未收到保存确认」，重开面板配置又回去了。"></textarea>
+            <div class="cb-line">
+              <button class="btn pri" id="cbIsSend" type="button">发布留言</button>
+              <span class="cb-note" id="cbIsMsg">写完点发布，立刻出现在下面。</span>
             </div>
           </div>
+          <div class="wall-list" id="wallList"><div class="wall-empty">正在读取留言…</div></div>
         </div>
       </div>
     </div>
@@ -1883,13 +1944,30 @@ document.getElementById('copy8').addEventListener('click',function(){
 })();
 
 (function(){
-  /* 校验值不写死：每次发版重新生成 SHA256SUMS.txt，页面写死一个旧值
-     等于发一版就错一版（上一版就是把旧包的哈希挂在新区块下面）。
-     这里只给指路，具体值去 Release 页拿。 */
-  var DL_URL='https://github.com/vector9584/chates/releases/latest',
-      HASH='见 Release 页 SHA256SUMS.txt', CMD='sha256sum chates_1.20.1.fpk';
-  // ghproxy.net 在 Windows 实测 371 KB/s，直连 objects.githubusercontent.com 只有 20-68 KB/s
-  var GH_PROXY='https://ghproxy.net/', PROXY_TESTED='2026-11-26 · Windows 实测 371 KB/s';
+  /* 下载直连飞牛分享目录：Windows exe 与 fnOS fpk 同在一个目录，
+     校验值就是该目录里的 SHA256SUMS.txt（每次发版跟着换）。 */
+  var FALLBACK_VERSION='1.20.2';
+  /* 只读公开仓库的 latest，无 token、无私有信息；UA 不设会被 GitHub 拒。 */
+  function fetchLatestVersion(done){
+    try{
+      fetch('https://api.github.com/repos/vector9584/chates/releases/latest',{headers:{Accept:'application/vnd.github+json'}})
+        .then(function(r){return r.ok?r.json():null})
+        .then(function(j){
+          var t=j&&j.tag_name?String(j.tag_name).replace(/^v/,''):'';
+          /* 只认 x.y.z 形状，防止 tag 命名变了把页面写成奇怪的东西 */
+          if(/^\d+\.\d+\.\d+$/.test(t)&&t!==V){V=t;done(t);}
+        })
+        .catch(function(){});
+    }catch(e){}
+  }
+  /* 版本号不再写死（2026-11-27）：以前这里硬编码 '1.20.1'，每发一版都要手改
+     docs/index.html + README + 徽章，漏一处就出现「页面上是旧版、下载下来是新版」。
+     改成页面加载时读 GitHub 最新 Release 的 tag，拿到就覆盖 FALLBACK 并重渲染。
+     断网、限流、API 改版都不能让下载区变白板，所以先按兜底版本正常渲染一遍。 */
+  var V=FALLBACK_VERSION,
+      DL_URL='https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6',
+      QR='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAACECAIAAADeJhTwAAACp0lEQVR42u3dwW7DMAwD0GXY//9yd90lgDWJaeo8Xps4RgiRkWW5x+v1+oJ74NsrQAYgAxmADGQAMvbAz9kPx3GMP+wsp/n7rL/XrMxhZcyV6+/wHkQGmQJkfKpndHR2RXPPfKI6n7Nxzq5Z8aez+STeg8ggU4CM3Tyjqn1T3/IrOUf1mqkcIvEeRAaZAmTs5hlprHhAJ7cQGYAMZMDneUbn2z+x1+sO+8dEBpkCZOzmGVdq6529ITE3kUGmABk7eEZibadaA5+qXXfGSa9xiQwyBci4OY53rcl09LdT957yMJFBpgAZPGNeQzu9F1P+MXVvugYjMsgUIOPmaK1Ndfokqjo+5Q0dX+zs9xUZZAqQ8cQ8I72mX60xVOeczqtEBpkCZMgz/q/F1THTPlQ21UaOJTLIFCDjiZ6xoqHpvKQ6/pV5UicHEhlkCpCxm2d0vqmn8o+pvu5EzXxqb67IIFOAjJsjvtc2cU7U1LPSdW/nTZEpQMZTPKNaw7hyb27aAxKeZG2KTAEyNsDp2lSidzrhTyuaXs0PVjDV2yEyyBQgYwfPSK/hdHKRKX9K5DcrdRd5BpkCZOzmGR0/SGhxNZ9I+FN6ziKDTAEydvCMxP+ndtagruwxnKqjWJsiU4CMp3jGlOZWNXTqe3+qLlLNb6r+ITLIFCDj5rjFubZTc0jU29NeKDLIFCBjhzwj3S891XvRuTdRF+l4ocggU4CMT/WMqW/nji539HpqnWqqVqE/g0wBMp7iGVUPSHjM1PnniWdNeZ7IIFOAjN08I4Er97Om/89DHziZAmTwjCyqvR2de6tjds7HlWeQKUDGZnjbf7t2vKTTL/KuMeUZZAqQ8ZQ8I7GHaqoWPXVu4BmmzjmXZ5ApQMbOeQaIDGQAMgAZyABkIAP+iV8vgjVQM5TVoAAAAABJRU5ErkJggg==',
+      HASH='见下载目录 SHA256SUMS.txt', CMD='sha256sum chates_'+V+'.fpk';
   var entries=[
     ['网页面板','NAS-IP:5666','从飞牛桌面图标进来；地址栏是 /app/hermes-agent/，和下面几个端口互不相干。'],
     ['面板直连','NAS-IP:8650','不经过应用中心时的入口，直接打开面板。桌面版也是这个端口。'],
@@ -1906,14 +1984,15 @@ document.getElementById('copy8').addEventListener('click',function(){
   function render(i){
     var h='';
     if(i===0){
-      h='<div class="dl-hero"><span class="dl-badge">v1.20.1</span>'+
-        '<span class="dl-file">CHATES-Setup-1.20.1.exe ｜ chates_1.20.1.fpk</span>'+
-        '<a class="btn pri dl-down" href="'+DL_URL+'" download target="_blank" rel="noopener">打开 Release 页 ↓</a>'+
-        '<span class="dl-sub">体积与校验值以 Release 页为准 · 包内不含任何 API Key</span></div>'+
+      h='<div class="dl-hero"><span class="dl-badge">v'+V+' · 2026-11-27</span>'+
+        '<span class="dl-file">CHATES-Setup-'+V+'.exe ｜ chates_'+V+'.fpk</span>'+
+        '<a class="btn pri dl-down dl-cta" href="'+DL_URL+'" target="_blank" rel="noopener">下载安装包 ↓</a>'+
+        '<div class="dl-qr"><img src="'+QR+'" alt="扫码下载 chates v'+V+'" width="112" height="112"><span>手机扫码下载</span></div>'+
+        '<span class="dl-sub">Windows 装 exe，fnOS 装 fpk · 包内不含任何 API Key · 直连下载，不用挂代理</span></div>'+
         '<div class="dl-grid">'+
-        card('Windows · 下 exe','CHATES-Setup-1.20.1.exe，双击一路下一步。装完桌面就一个图标。升级只换程序本体，%APPDATA%\\CHATÈS 里的 .env、config.yaml、笔记、知识库一个字节不动。')+
-        card('fnOS · 下 fpk','chates_1.20.1.fpk 走应用中心右上角「手动安装」。中途它会问一次 nodejs_v24 依赖变更，点确认就行。')+
-        card('下载慢就挂代理','直连 objects.githubusercontent.com 实测只有 20–68 KB/s。把原始下载链接前面拼上 https://ghproxy.net/ 再下，'+PROXY_TESTED+'。')+
+        card('Windows · 下 exe','CHATES-Setup-'+V+'.exe，双击一路下一步。装完桌面就一个图标。升级只换程序本体，%APPDATA%\\CHATÈS 里的 .env、config.yaml、笔记、知识库一个字节不动。')+
+        card('fnOS · 下 fpk','chates_'+V+'.fpk 走应用中心右上角「手动安装」。中途它会问一次 nodejs_v24 依赖变更，点确认就行。')+
+        card('下完先对校验','同一个目录里放着 SHA256SUMS.txt，下完先对一遍再装；手机扫上面的二维码，进的是同一个目录。')+
         '</div>';
     }else if(i===1){
       h='<div class="dl-card"><h3>SHA-256</h3><p class="dl-code">'+HASH+'</p></div>'+
@@ -1927,7 +2006,7 @@ document.getElementById('copy8').addEventListener('click',function(){
         '<div class="dl-card" style="margin-top:10px"><h3 id="dlEH">网页面板</h3><p id="dlEP">'+entries[0][2]+'</p></div>';
     }
     pane.innerHTML=h;
-    document.getElementById('st9').textContent=['Release','SHA-256','4 个入口'][i];
+    document.getElementById('st9').textContent=['安装包','SHA-256','4 个入口'][i];
     if(i===1){
       var b1=document.getElementById('dlHash'),b2=document.getElementById('dlCmd');
       b1.addEventListener('click',function(){cp(HASH,b1,'复制校验值 ⧉')});
@@ -1946,6 +2025,15 @@ document.getElementById('copy8').addEventListener('click',function(){
   }
   chips('dlTabs',['安装包','校验','装完去哪儿'],render,function(i){return i===0?' on':''});
   render(0);
+  /* 拿到最新 Release 之后：三条静态文案跟着换，再把当前页签重渲染一遍，
+     这样卡片里的文件名、二维码 alt、校验命令都会用上新版本。 */
+  fetchLatestVersion(function(v){
+    ['dlVerText','dlVerBadge','dlVerNm'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.textContent=v;
+    });
+    CMD='sha256sum chates_'+v+'.fpk';
+    render(0);
+  });
 })();
 /* ===== 11 一起维护 ===== */
 (function(){
@@ -2087,22 +2175,89 @@ document.getElementById('copy8').addEventListener('click',function(){
   render(0);
 })();
 
-/* ===== 11 · 留言（点击后注入 utterances）===== */
+/* ===== 11 · 留言板（本机收件箱，直接读回页面显示）===== */
 (function(){
-  var btn=document.getElementById('cbCmtOpen');if(!btn)return;
-  btn.addEventListener('click',function(){
-    var box=document.getElementById('cbCmtBody');
-    box.innerHTML='<p class="cb-mini">正在连 GitHub…</p>';
-    var st=document.createElement('script');
-    st.src='https://utteranc.es/client.js';
-    st.setAttribute('repo','vector9584/chates');
-    st.setAttribute('issue-term','url');
-    st.setAttribute('label','留言');
-    st.setAttribute('theme','github-dark');
-    st.setAttribute('crossorigin','anonymous');
-    st.async=true;
-    box.innerHTML='';box.appendChild(st);
+  var EP='__CHATES_REPORT_URL__';
+  var ta=document.getElementById('cbIsBody'), btn=document.getElementById('cbIsSend'),
+      gh=document.getElementById('cbIsGitHub'), msg=document.getElementById('cbIsMsg'),
+      sel=document.getElementById('cbIsCat'), nameIn=document.getElementById('cbIsName'),
+      list=document.getElementById('wallList');
+  if(!ta||!btn)return;
+
+  function say(t,ok){if(msg){msg.textContent=t;msg.className='cb-note'+(ok?' ok':(t?' err':''));}}
+  function catLabel(){
+    if(!sel||!sel.selectedIndex) return '其他';
+    return sel.options[sel.selectedIndex].text;
+  }
+  function esc(v){
+    return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  /* 时间按本地时区显示，后端存的是 ISO 带时区的 */
+  function when(at){
+    var d=new Date(at);
+    if(isNaN(d.getTime())) return '';
+    var p=function(n){return n<10?'0'+n:''+n;};
+    return (d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+  }
+  function paint(items){
+    if(!list) return;
+    if(!items||!items.length){
+      list.innerHTML='<div class="wall-empty">还没有留言，你可以是第一个。</div>';
+      return;
+    }
+    var h='';
+    for(var i=0;i<items.length;i++){
+      var it=items[i];
+      /* 正文和昵称都过 esc：这些内容来自别人，绝不当 HTML 拼 */
+      h+='<div class="wall-item"><div class="wall-who">'+esc(it.name||'匿名')+
+         '<small>'+esc(when(it.at))+'</small></div>'+
+         '<div class="wall-txt">'+esc(it.body)+'</div></div>';
+    }
+    list.innerHTML=h;
+  }
+  function load(){
+    if(!list) return;
+    fetch(EP+'?_='+Date.now(),{cache:'no-store'})
+      .then(function(r){return r.json().catch(function(){return null;});})
+      .then(function(d){
+        if(d&&d.ok){paint(d.items);}
+        else if(list){list.innerHTML='<div class="wall-empty">留言暂时读不出来，稍后再刷。</div>';}
+      })
+      .catch(function(){
+        if(list){list.innerHTML='<div class="wall-empty">留言暂时读不出来，稍后再刷。</div>';}
+      });
+  }
+
+  /* 「正经提个 issue」把当前输入带上，别让人白写一遍 */
+  gh&&gh.addEventListener('click',function(){
+    var b=ta.value.trim();
+    window.open('https://github.com/vector9584/chates/issues/new?title='+encodeURIComponent('['+catLabel()+'] ')+
+      '&body='+encodeURIComponent(b||'（在这里写清哪一步不对、期望怎样）'),'_blank','noopener');
   });
+
+  btn.addEventListener('click',function(){
+    var body=ta.value.trim();
+    if(body.length<2){say('写点内容再发。');ta.focus();return;}
+    btn.disabled=true;say('正在发布…');
+    fetch(EP,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:(nameIn&&nameIn.value.trim())||'',body:body})})
+    .then(function(r){return r.json().catch(function(){return {ok:false};});})
+    .then(function(d){
+      btn.disabled=false;
+      if(d&&d.ok){
+        ta.value='';
+        say(d.duplicate?'这条已经发过了，就在下面。':'发出去了，谢谢。',true);
+        load();
+      }else{
+        say('没发出去（'+(d&&d.error?d.error:'网络问题')+'），稍后再试。');
+      }
+    })
+    .catch(function(){btn.disabled=false;say('连不上留言服务，稍后再试。');});
+  });
+
+  load();
 })();
 
 tick();

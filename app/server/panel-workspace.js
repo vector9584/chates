@@ -125,6 +125,10 @@ async function validFileSession(sid){
  if(existsSync(join(VAR,'chat/archived-sessions',sid+'.json')))return false;
  let pending=fileSessionLookups.get(sid);
  if(!pending){
+  /* 2026-11-27：state.db 不存在时 python 直接抛错，被这里一律判成 503「无法核实会话」，
+     前端只能显示「获取会话目录失败」——用户完全看不出是库里根本没有表。
+     分开两种情况：库不在 → 明确说库没建立（并给出可操作的一句话）；库在但查不动 → 保留 503。 */
+  if(!existsSync(join(DATA,'state.db')))throw stateError('会话状态库还没建立，发一条消息或重启应用后会自动创建',503);
   pending=run(PYTHON,['-B','-c',DB_SESSION_QUERY,join(DATA,'state.db'),sid],{timeout:2000,maxBuffer:4096})
    .then(({stdout})=>stdout.trim()==='1',()=>{throw stateError('无法核实会话，暂不能访问会话文件',503);})
    .finally(()=>fileSessionLookups.delete(sid));

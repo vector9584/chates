@@ -64,6 +64,13 @@ for r in rooms.values():
         add('room', r['id'], r.get('title'), text(m.get('text')), i, m.get('ts'), m.get('kind'), m.get('id'))
 
 # ── 2. 渠道会话（state.db） ────────────────────────────────────────
+# 2026-11-27：state.db 不存在时，sqlite3.connect 在 ro 模式下抛错、被外层吞成 partial=True，
+# 前端拿到的是「0 条结果」——用户以为搜不到，实际是库根本没有。这里先判存在性，
+# 缺失就把原因带出去，让页面能显示「会话状态库还没建立」而不是假装搜完了。
+db_note = ''
+if not (root / 'state.db').exists():
+    partial = True
+    db_note = '会话状态库还没建立，发一条消息或重启应用后会自动创建'
 try:
     c = sqlite3.connect('file:' + str(root / 'state.db') + '?mode=ro', uri=True, timeout=2)
     deadline = time.monotonic() + 2.0
@@ -131,5 +138,6 @@ except sqlite3.Error:
 
 out.sort(key=lambda x: x['ts'], reverse=True)
 print(json.dumps({'results': out[offset:offset + 40], 'total': len(out), 'offset': offset,
-                  'has_more': offset + 40 < len(out), 'partial': partial, 'capped': capped},
+                  'has_more': offset + 40 < len(out), 'partial': partial, 'capped': capped,
+                  'note': db_note},
                  ensure_ascii=False))
