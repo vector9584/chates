@@ -1,5 +1,5 @@
 appname               = chates
-version               = 1.20.6
+version               = 1.20.7
 # install_dep_apps      = nodejs_v24
 # ↑ 声明依赖会让应用中心判定「dependency app changes」，只肯走 UI 装、且 UI 升级路径报 20002。
 #   改为在 desc 里写明前置条件，CLI 才能全自动安装。
