@@ -88,15 +88,9 @@ ok "manifest / app / cmd / 图标 齐"
 # 实测 electron/.../app/server/panel_ds_suite.py 里同样留着真实姓名
 # （fpk 组包取 hermes-src 那份、不受影响，但 Windows exe 打的就是这一份）。
 # 三棵都同步，漏一棵就等于漏一条发布通道。
-for d in hermes-src server ui; do
-  if [ -d "app/$d" ] && [ -d "electron/resources/chates/app/$d" ]; then
-    rsync -a \
-      --exclude='web_dist' --exclude='node_modules' --exclude='__pycache__' \
-      --exclude='*.pyc' --exclude='.git' \
-      "app/$d/" "electron/resources/chates/app/$d/" \
-      || die "双副本同步失败（app/$d -> electron/resources/chates/app/$d）"
-  fi
-done
+# 2026-11-27：同步逻辑抽到 sync-dual.sh，build-exe.sh 也调它。
+# 以前只在这里同步，打 exe 不经过这段 → 谁先跑决定 exe 拿到哪份代码。
+bash "$ROOT/release-tools/sync-dual.sh"
 ok "双副本已同步（真源 app/，覆盖 hermes-src/server/ui）"
 
 # ------------------------------------------------ 脱敏闸（2026-11-26 加）

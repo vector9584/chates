@@ -116,10 +116,14 @@ fi
 
 # ------------------------------------------------ 组装资源树
 c '1;36' "== 组装 resources/chates =="
+# 与 build-fpk.sh 同一个同步入口：app/ 是唯一真源。
+# 以前这段同步只写在 build-fpk.sh 里，只跑 build-exe 时不经过它，
+# exe 就会打到上一次 fpk 留下的旧副本 —— "FPK 修好、Windows 忘改"的根因。
+bash "$ROOT/release-tools/sync-dual.sh"
 RES="electron/resources/chates"
 rm -rf "$RES"; mkdir -p "$RES"/{app,runtime,data}
 
-# 1) app —— 面板与服务器代码
+# 1) app —— 面板与服务器代码（从真源 app/ 直接拷，不读副本）
 for d in server ui; do
   [ -d "app/$d" ] && cp -a "app/$d" "$RES/app/"
 done
