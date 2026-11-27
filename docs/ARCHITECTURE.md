@@ -93,13 +93,13 @@ log.txt              空文件，待删
 
 ## 版本号只有一个真源
 
-`win/version.json` 的 `version` 字段，形如 `1.20.5-win.1`：
+`win/version.json` 的 `version` 字段，形如 `1.20.6-win.1`：
 
-- `1.20.5` → fnOS 应用包版本（fnpack 只认三段整数）
+- `1.20.6` → fnOS 应用包版本（fnpack 只认三段整数）
 - `-win.1` → Windows 安装包构建序号，重打一次 +1，不影响 fpk 版本
 
-CI 拿这个值打 tag（`v1.20.5-win.1`），`build-fpk.sh` 从 tag 提 `1.20.5`，
-`build-exe.sh` 从 tag 提 `1.20.5-win.1`。**一个文件对，三端必然一致。**
+CI 拿这个值打 tag（`v1.20.6-win.1`），`build-fpk.sh` 从 tag 提 `1.20.6`，
+`build-exe.sh` 从 tag 提 `1.20.6-win.1`。**一个文件对，三端必然一致。**
 
 `release-tools/version.py` 只读这个文件，不再自己维护计数——历史上它靠
 `.version-state.json` 自增，CI 上没有该文件时永远算 `1.20.1`，与本地和 manifest

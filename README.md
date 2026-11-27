@@ -12,7 +12,7 @@
 
 <p align="center">
   <img alt="manifest" src="https://img.shields.io/badge/manifest-0.21.102-71dbc0">
-  <img alt="desktop" src="https://img.shields.io/badge/desktop-1.20.5-71dbc0">
+  <img alt="desktop" src="https://img.shields.io/badge/desktop-1.20.6-71dbc0">
   <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0-5e64f3">
   <img alt="platform" src="https://img.shields.io/badge/platform-fnOS%20%7C%20Windows-2f3a46">
   <img alt="tests" src="https://img.shields.io/badge/tests-192-71dbc0">
@@ -34,8 +34,8 @@
 
 | 你想要 | 去哪 |
 |---|---|
-| Windows 上双击就能用 | [下载 `CHATES-Setup-1.20.5.exe`](https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6)，一路下一步 |
-| fnOS 上装成应用中心里的一个 app | 同一个目录里拿 `chates_1.20.5.fpk`，应用中心右上角「手动安装」 |
+| Windows 上双击就能用 | [下载 `CHATES-Setup-1.20.6.exe`](https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6)，一路下一步 |
+| fnOS 上装成应用中心里的一个 app | 同一个目录里拿 `chates_1.20.6.fpk`，应用中心右上角「手动安装」 |
 | 只想在浏览器里点着看 | `node bin/hermes-panel.mjs --port 9000`，不装任何东西 |
 | 想改代码 | 看下面的[改代码](#改代码)和 [CONTRIBUTING.md](CONTRIBUTING.md) |
 
@@ -120,8 +120,8 @@ node dev/tests/interrupted-tools.cjs app/server/monitor.js
 
 ### 一、Windows 桌面版
 
-1. 从[下载目录](https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6)取 `CHATES-Setup-1.20.5.exe` 与 `SHA256SUMS.txt`
-2. `certutil -hashfile CHATES-Setup-1.20.5.exe SHA256` 对一遍
+1. 从[下载目录](https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6)取 `CHATES-Setup-1.20.6.exe` 与 `SHA256SUMS.txt`
+2. `certutil -hashfile CHATES-Setup-1.20.6.exe SHA256` 对一遍
 3. 双击安装，一路下一步；装完桌面一个图标
 4. 打开后在「模型」页填供应商 API Key，启动服务
 
@@ -131,7 +131,7 @@ node dev/tests/interrupted-tools.cjs app/server/monitor.js
 
 前提：fnOS、约 1 GB 空间、先在应用中心装好 `nodejs_v24`（包清单不声明这个依赖，不会自动装）。
 
-1. 同一个[下载目录](https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6)取 `chates_1.20.5.fpk`
+1. 同一个[下载目录](https://s27.fnnas.net/s/70bb0c6f5b3d4a88a6)取 `chates_1.20.6.fpk`
 2. `sha256sum -c` 对一遍校验值
 3. 应用中心 → 右上角「手动安装」→ 选文件 → 下一步到底；装完应用名是 `chates`
 4. 桌面图标打开面板，「模型」页填供应商 API Key，启动服务
