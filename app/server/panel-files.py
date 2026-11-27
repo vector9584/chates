@@ -22,6 +22,58 @@ LIMIT = 8 * 1024 * 1024
 NOFOLLOW = getattr(os, 'O_NOFOLLOW', 0)
 DIR_FLAGS = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | NOFOLLOW
 
+# ── Windows 兼容层（2026-11-27）────────────────────────────────────────
+# 这个文件原本是纯 POSIX 的 fd-relative 实现：拿目录 fd 当句柄，所有
+# stat/open/mkdir/unlink 都挂 dir_fd=parent。Windows CRT 不允许 os.open
+# 打开目录（直接 PermissionError: [Errno 13]），也根本没有 dir_fd 参数，
+# 于是「工作区文件面板」在桌面版上一律 403「此文件不在可访问的工作目录中」。
+#
+# 处理办法：平台分派。POSIX 保持原样（fnOS/Linux 的 ACL 与 O_NOFOLLOW
+# 语义一点不动，那套逐级 open 是安全边界）；Windows 改走绝对路径 + 单点
+# 校验，校验点放在 p() 里 —— 任何拼出来的路径都必须落在 root 之内、
+# 且路径段不含 '.'/'..'（调用方已做，这里兜底）。功能语义不变：能列、
+# 能读、能写、能归档，仍然拒绝链接、拒绝越界、拒绝隐藏文件。
+_IS_WIN = os.name == 'nt'
+
+
+class _WinDir:
+    """Windows 上代替目录 fd：只装一个绝对路径。"""
+    __slots__ = ('path',)
+
+    def __init__(self, path):
+        self.path = path
+
+    # os.close / os.fsync / os.dup 兼容
+    def __int__(self):
+        return -1
+
+
+def _pname(dir_fd, name):
+    """把 (目录句柄, 名字) 拼成绝对路径；POSIX 分支不会被调用。"""
+    if isinstance(dir_fd, _WinDir):
+        base = dir_fd.path
+    elif dir_fd is None:
+        base = ''
+    else:
+        base = str(dir_fd)
+    return os.path.join(base, name) if name else base
+
+
+def _guard(root, target):
+    """确认 target 在 root 之内，越界即 403。仅 Windows 分支使用。"""
+    real_root = os.path.normcase(os.path.realpath(root))
+    # 目标可能还不存在（mkdir / 新建文件）：退到父目录做真实路径，再拼回名字比对
+    real_tgt = os.path.normcase(os.path.realpath(target))
+    if not os.path.exists(target):
+        parent = os.path.dirname(target)
+        if not os.path.isdir(parent):
+            raise FileError('文件或目录不存在，请刷新列表', 404)
+        real_tgt = os.path.join(os.path.normcase(os.path.realpath(parent)),
+                                os.path.normcase(os.path.basename(target)))
+    if real_tgt != real_root and not real_tgt.startswith(real_root + os.sep):
+        raise FileError('文件路径或权限不允许此操作', 403)
+    return real_tgt
+
 
 class FileError(Exception):
     def __init__(self, message, status=400):
@@ -108,6 +160,24 @@ class Files:
             raise FileError('工作目录配置必须是绝对路径', 503)
         # Configured roots may be mount aliases; trust that resolved root only.
         actual = os.path.normpath(source['path'])
+
+        # ── Windows：没有目录 fd，直接发绝对路径句柄 ────────────────
+        # 返回的三元组要和 POSIX 同语义：root=根目录、parent=目标所在目录、
+        # name=目标名。POSIX 里 parent 是父目录的 fd，所以这里必须是父目录，
+        # 不能把完整目标路径当 parent 发出去（否则 mkdir 会拼成 a/a）。
+        if _IS_WIN:
+            target = os.path.join(actual, *parts) if parts else actual
+            _guard(actual, target)                      # 防越界
+            # mkdir / 新建写入时目标本来就不存在，父目录在即合法
+            if not os.path.exists(target):
+                if not write or not os.path.isdir(os.path.dirname(target)):
+                    raise FileError('文件或目录不存在，请刷新列表', 404)
+            root_stat = os.stat(actual)
+            revision = digest(encode([root_id, actual, root_stat.st_dev, root_stat.st_ino]))
+            parent_dir = os.path.dirname(target) if parts else actual
+            yield source, _WinDir(actual), _WinDir(parent_dir), parts[-1] if parts else '', revision
+            return
+
         descriptors = [os.open('/', DIR_FLAGS)]
         try:
             for component in actual.strip('/').split('/'):
@@ -143,6 +213,13 @@ class Files:
         # cache 原文件 + artifacts 的硬链接副本（st_nlink=2），旧逻辑把它当危险品
         # 整批跳过，于是「10 个链接或特殊文件已跳过」、画板里的图一张都看不见。
         # 展示放宽不影响写操作 —— 删除/移动/改名仍走 read_only=False，照样拒。
+        if _IS_WIN:
+            target = _pname(parent, name)
+            st = os.stat(target, follow_symlinks=False)
+            # Windows 上没有 lstat 式的 st_nlink 语义，符号链接靠 reparse 标记识别
+            if stat.S_ISLNK(st.st_mode) or not (stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode)):
+                raise FileError('链接或特殊文件不在面板中操作', 403)
+            return st
         st = os.stat(name, dir_fd=parent, follow_symlinks=False)
         if stat.S_ISLNK(st.st_mode) or not (stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode)):
             raise FileError('链接或特殊文件不在面板中操作', 403)
@@ -153,6 +230,14 @@ class Files:
     def child_count(self, parent, name):
         # 目录行显示「N 项」用：scandir 惰性取，封顶 1000，避免大目录把列表拖慢。
         try:
+            if _IS_WIN:
+                with os.scandir(_pname(parent, name)) as entries:
+                    total = 0
+                    for _ in entries:
+                        total += 1
+                        if total >= 1000:
+                            break
+                    return total
             fd = os.open(name, DIR_FLAGS, dir_fd=parent)
         except OSError:
             return None
@@ -180,10 +265,14 @@ class Files:
     def listing(self, body):
         path = body.get('path', '')
         with self.location(body['root'], path) as (source, root, parent, name, revision):
-            directory = os.open(name, DIR_FLAGS, dir_fd=parent) if name else os.dup(root)
+            if _IS_WIN:
+                directory = _WinDir(_pname(parent, name))
+            else:
+                directory = os.open(name, DIR_FLAGS, dir_fd=parent) if name else os.dup(root)
             try:
                 items, skipped = [], 0
-                for entry in os.listdir(directory):
+                entries = os.listdir(_pname(directory, '')) if _IS_WIN else os.listdir(directory)
+                for entry in entries:
                     if entry.startswith('.'):
                         continue
                     try:
@@ -199,7 +288,8 @@ class Files:
                         'root_revision': revision, 'editable': bool(source.get('editable')), 'items': items[offset:offset+80],
                         'total': len(items), 'next': offset+80 if offset+80 < len(items) else None, 'skipped': skipped}
             finally:
-                os.close(directory)
+                if not _IS_WIN:
+                    os.close(directory)
 
     @contextlib.contextmanager
     def opened(self, root, path):
@@ -207,6 +297,14 @@ class Files:
             source, root_fd, parent, name, revision = located
             if not name:
                 raise FileError('请选择一个文件')
+            if _IS_WIN:
+                target = _pname(parent, name)
+                st = os.stat(target, follow_symlinks=False)
+                if not stat.S_ISREG(st.st_mode):
+                    raise FileError('只能读取普通文件，不读取链接或设备', 403)
+                with open(target, 'rb') as stream:
+                    yield stream.fileno(), st, revision, source
+                return
             fd = os.open(name, os.O_RDONLY | NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
             try:
                 st = os.fstat(fd)
@@ -231,10 +329,22 @@ class Files:
             parent_source={'id':'upload-parent','path':os.path.dirname(source['path'])}
             parent_files=Files([parent_source],self.state)
             with parent_files.location('upload-parent') as (_,parent,_,_,_):
-                try:os.mkdir(os.path.basename(source['path']),0o700,dir_fd=parent)
-                except FileExistsError:pass
-                os.fsync(parent)
+                if _IS_WIN:
+                    try:os.mkdir(_pname(parent, os.path.basename(source['path'])),0o700)
+                    except FileExistsError:pass
+                else:
+                    try:os.mkdir(os.path.basename(source['path']),0o700,dir_fd=parent)
+                    except FileExistsError:pass
+                    os.fsync(parent)
         with self.location(body['root']) as (_,root,_,_,revision):
+            if _IS_WIN:
+                target = _pname(root, kind)
+                os.makedirs(target, 0o700, exist_ok=True)
+                flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, 'O_BINARY', 0)
+                fd=os.open(os.path.join(target, name),flags,0o600)
+                with os.fdopen(fd,'wb') as stream:
+                    stream.write(content);stream.flush();os.fsync(stream.fileno())
+                return {'bytes':len(content),'path':os.path.join(source['path'],kind,name)}
             try:os.mkdir(kind,0o700,dir_fd=root)
             except FileExistsError:pass
             directory=os.open(kind,DIR_FLAGS,dir_fd=root)
@@ -350,7 +460,10 @@ class Files:
                       'after_hash':digest(after), 'created_at':int(time.time()*1000), 'status':'prepared'}
             json_file(record_path, record)
             temp = '.panel-save-'+uuid.uuid4().hex
-            descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IMODE(previous.st_mode) if previous else 0o600, dir_fd=parent)
+            if _IS_WIN:
+                descriptor = os.open(_pname(parent,temp), os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os,'O_BINARY',0), stat.S_IMODE(previous.st_mode) if previous else 0o600)
+            else:
+                descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IMODE(previous.st_mode) if previous else 0o600, dir_fd=parent)
             try:
                 with os.fdopen(descriptor, 'wb') as stream:
                     stream.write(after)
@@ -362,15 +475,22 @@ class Files:
                     latest_stat = self.metadata(parent, name)
                     if latest['revision'] != digest(before) or (latest_stat.st_dev,latest_stat.st_ino) != (previous.st_dev,previous.st_ino):
                         raise FileError('保存前原文件发生变化，请合并后重试', 409)
-                    os.replace(temp, name, src_dir_fd=parent, dst_dir_fd=parent)
+                    if _IS_WIN:
+                        os.replace(_pname(parent,temp), _pname(parent,name))
+                    else:
+                        os.replace(temp, name, src_dir_fd=parent, dst_dir_fd=parent)
                 else:
                     exclusive_rename(temp, name, parent, parent)
-                os.fsync(parent)
+                if not _IS_WIN:
+                    os.fsync(parent)
                 record['status'] = 'committed'
                 json_file(record_path, record)
             finally:
                 try:
-                    os.unlink(temp, dir_fd=parent)
+                    if _IS_WIN:
+                        os.unlink(_pname(parent,temp))
+                    else:
+                        os.unlink(temp, dir_fd=parent)
                 except FileNotFoundError:
                     pass
         return {**self.read(body), 'change_id':body['request_id']}
@@ -381,10 +501,14 @@ class Files:
             if not name:
                 raise FileError('目录名称不能为空')
             try:
-                os.mkdir(name, 0o700, dir_fd=parent)
+                if _IS_WIN:
+                    os.mkdir(_pname(parent,name), 0o700)
+                else:
+                    os.mkdir(name, 0o700, dir_fd=parent)
             except FileExistsError:
                 raise FileError('已有同名文件或目录，请换一个名称', 409)
-            os.fsync(parent)
+            if not _IS_WIN:
+                os.fsync(parent)
         return {'path': body['path']}
 
     def archive(self, body):

@@ -77,10 +77,14 @@ try:
     c.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 20000)
 
     # 标题命中：sessions 表很小，保持全扫
+    # 2026-11-27：去掉 source!='api_server'。桌面版（Windows/macOS 打包版）的会话
+    # 一律由网关以 api_server 写进 state.db，不存在 var/chat/sessions/*.json，
+    # 原来那条过滤把用户全部真实会话排除干净——搜「Desktop」「casm」一律 0 条。
+    # 保留 kind='channel' 便于前端跳转，语义上它现在就是「state.db 里的会话」。
     try:
         for sid, title, ts in c.execute(
             "SELECT id,COALESCE(title,display_name,''),last_activity_at FROM sessions "
-            "WHERE source!='api_server' AND instr(lower(COALESCE(title,display_name,'')),lower(?))>0 LIMIT 50", (q,)):
+            "WHERE instr(lower(COALESCE(title,display_name,'')),lower(?))>0 LIMIT 50", (q,)):
             add('channel', sid, title, title, -1, (ts or 0) * 1000)
     except sqlite3.Error: partial = True
 
@@ -90,7 +94,7 @@ try:
         query = '"' + q.replace('"', '""') + '"'
         sql = ("SELECT " + cols + " FROM messages_fts_trigram f JOIN messages m ON m.id=f.rowid "
                "JOIN sessions s ON s.id=m.session_id WHERE messages_fts_trigram MATCH ? "
-               "AND s.source!='api_server' AND m.role IN ('user','assistant') AND m.active=1 "
+               "AND m.role IN ('user','assistant') AND m.active=1 "
                "ORDER BY m.timestamp DESC LIMIT " + str(LIMIT))
         args = (query,)
     else:
@@ -99,7 +103,7 @@ try:
         # 改成分批 + 早停：一批 60 个会话，凑够 200 条或超过 1.5s 就收手，
         # 延迟有上界，热门词第一批就命中。
         recent = [r[0] for r in c.execute(
-            "SELECT id FROM sessions WHERE source!='api_server' "
+            "SELECT id FROM sessions "
             "ORDER BY COALESCE(last_activity_at,0) DESC LIMIT 600")]
         t0 = time.monotonic()
         for i in range(0, len(recent), 60):
