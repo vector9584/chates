@@ -1269,7 +1269,7 @@ body{
               <div class="svc"><div class="sh"><span class="dot g"></span><span class="sn">Gateway</span><span class="st" id="gwSt">Port 8742 · 运行中</span><div class="tog on" id="gw7"></div></div><div class="mini" style="margin-top:7px">工具调用 / 会话 / 消息通道 / 模型请求的入口</div></div>
               <div class="svc"><div class="sh"><span class="dot g"></span><span class="sn">Dashboard</span><span class="st" id="dbSt">Port 9219 · 运行中</span><div class="tog on" id="db7"></div></div><div class="mini" style="margin-top:7px">面板本身 · Monitor 代理与 socket 自愈</div></div>
             </div>
-            <div class="sysinfo"><div><b>10 分钟</b><span>运行时长</span></div><div><b>1035 MB</b><span>内存</span></div><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.1</b><span>应用版本</span></div></div>
+            <div class="sysinfo"><div><b>10 分钟</b><span>运行时长</span></div><div><b>1035 MB</b><span>内存</span></div><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.2</b><span>应用版本</span></div></div>
             <div class="sect-t" style="margin-top:12px">Monitor 日志</div>
             <div class="row" style="margin-bottom:7px"><span class="mini">级别</span><div class="chips" id="lv7"></div></div>
             <div class="row cp-row" style="margin-bottom:9px"><span class="mini">组件</span><div class="chips" id="cp7"></div><span class="spacer"></span><button class="btn sm" id="live7">开启刷新</button></div>
@@ -1801,7 +1801,7 @@ function drawUsage(){var u=[['deepseek-v4-flash',72,'128.4k'],['deepseek-v4-pro'
   document.getElementById('usage7').innerHTML='<div class="sect-t">用量统计 · 按模型 · 近 30 天</div><div class="usage">'+
     u.map(function(x){return '<div class="ubar"><span>'+x[0]+'</span><i style="--w:'+x[1]+'%"></i><b>'+x[2]+'</b></div>'}).join('')+'</div>'+
     '<div class="sysinfo" style="margin-top:13px"><div><b>101.2%</b><span>上下文占用</span></div><div><b>3 批</b><span>归档</span></div><div><b>38%</b><span>缓存命中</span></div><div><b>$0.00</b><span>本地推理</span></div></div>';}
-function drawVersion(){document.getElementById('usage7').innerHTML='<div class="sysinfo" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.1</b><span>应用版本</span></div><div><b>8742 / 9219</b><span>Gateway / Dashboard</span></div><div><b>GPL-3.0</b><span>许可证</span></div></div><div class="tiny" style="margin-top:11px">部署脚本自动回写资源版本号；结构门禁会在改动破坏规矩时报错。</div>';}
+function drawVersion(){document.getElementById('usage7').innerHTML='<div class="sysinfo" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.2</b><span>应用版本</span></div><div><b>8742 / 9219</b><span>Gateway / Dashboard</span></div><div><b>GPL-3.0</b><span>许可证</span></div></div><div class="tiny" style="margin-top:11px">部署脚本自动回写资源版本号；结构门禁会在改动破坏规矩时报错。</div>';}
 function setSvc(id,on,el,name,port){el.textContent='Port '+port+' · '+(on?'运行中':'已停止');el.classList.toggle('stop',!on);
   document.getElementById(id).classList.toggle('on',on);
   logs.unshift(['17:19:0'+(logs.length%9),on?'INFO':'WARNING','MONITOR',name+' '+(on?'started':'stopped')+' by user',1]);drawLog();
