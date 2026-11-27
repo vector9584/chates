@@ -1269,7 +1269,7 @@ body{
               <div class="svc"><div class="sh"><span class="dot g"></span><span class="sn">Gateway</span><span class="st" id="gwSt">Port 8742 · 运行中</span><div class="tog on" id="gw7"></div></div><div class="mini" style="margin-top:7px">工具调用 / 会话 / 消息通道 / 模型请求的入口</div></div>
               <div class="svc"><div class="sh"><span class="dot g"></span><span class="sn">Dashboard</span><span class="st" id="dbSt">Port 9219 · 运行中</span><div class="tog on" id="db7"></div></div><div class="mini" style="margin-top:7px">面板本身 · Monitor 代理与 socket 自愈</div></div>
             </div>
-            <div class="sysinfo"><div><b>10 分钟</b><span>运行时长</span></div><div><b>1035 MB</b><span>内存</span></div><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.7</b><span>应用版本</span></div></div>
+            <div class="sysinfo"><div><b>10 分钟</b><span>运行时长</span></div><div><b>1035 MB</b><span>内存</span></div><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.8</b><span>应用版本</span></div></div>
             <div class="sect-t" style="margin-top:12px">Monitor 日志</div>
             <div class="row" style="margin-bottom:7px"><span class="mini">级别</span><div class="chips" id="lv7"></div></div>
             <div class="row cp-row" style="margin-bottom:9px"><span class="mini">组件</span><div class="chips" id="cp7"></div><span class="spacer"></span><button class="btn sm" id="live7">开启刷新</button></div>
@@ -1316,15 +1316,15 @@ body{
       <span class="cm tl"></span><span class="cm tr"></span><span class="cm bl"></span><span class="cm br"></span></div>
     <div class="plate-txt"><div class="fk">10 · 下载</div>
       <div class="ft">封好的那一个</div>
-      <div class="fd"><span id="dlVerText">1.20.7</span>，Windows 装 exe、fnOS 装 fpk，都在同一个下载目录里；校验值就是目录里的 SHA256SUMS.txt。</div>
-      <div class="fb"><span id="dlVerBadge">1.20.7</span><span>GPL-3.0</span></div></div>
+      <div class="fd"><span id="dlVerText">1.20.8</span>，Windows 装 exe、fnOS 装 fpk，都在同一个下载目录里；校验值就是目录里的 SHA256SUMS.txt。</div>
+      <div class="fb"><span id="dlVerBadge">1.20.8</span><span>GPL-3.0</span></div></div>
   </div>
   <div class="stage">
     <aside class="side rv" id="side9"><div class="no">10</div><h2>拿去装</h2><p class="one">包里没有密钥，装完自己配模型；和原来的实例并存，端口互不抢。</p>
       <div class="tags"><span>独立实例</span><span>包内无密钥</span><span>校验值</span></div><div class="hint"><i>↘</i> 下包 / 对校验 / 看入口</div></aside>
     <div class="rv" style="--d:90ms">
       <div class="spec">
-        <div class="spec-bar"><span class="nm">安装包 · v<span id="dlVerNm">1.20.7</span></span><span class="st" id="st9">63.1 MB</span></div>
+        <div class="spec-bar"><span class="nm">安装包 · v<span id="dlVerNm">1.20.8</span></span><span class="st" id="st9">63.1 MB</span></div>
         <div class="spec-body">
           <div class="chips dl-tabs" id="dlTabs"></div>
           <div id="dlPane"></div>
@@ -1801,7 +1801,7 @@ function drawUsage(){var u=[['deepseek-v4-flash',72,'128.4k'],['deepseek-v4-pro'
   document.getElementById('usage7').innerHTML='<div class="sect-t">用量统计 · 按模型 · 近 30 天</div><div class="usage">'+
     u.map(function(x){return '<div class="ubar"><span>'+x[0]+'</span><i style="--w:'+x[1]+'%"></i><b>'+x[2]+'</b></div>'}).join('')+'</div>'+
     '<div class="sysinfo" style="margin-top:13px"><div><b>101.2%</b><span>上下文占用</span></div><div><b>3 批</b><span>归档</span></div><div><b>38%</b><span>缓存命中</span></div><div><b>$0.00</b><span>本地推理</span></div></div>';}
-function drawVersion(){document.getElementById('usage7').innerHTML='<div class="sysinfo" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.7</b><span>应用版本</span></div><div><b>8742 / 9219</b><span>Gateway / Dashboard</span></div><div><b>GPL-3.0</b><span>许可证</span></div></div><div class="tiny" style="margin-top:11px">部署脚本自动回写资源版本号；结构门禁会在改动破坏规矩时报错。</div>';}
+function drawVersion(){document.getElementById('usage7').innerHTML='<div class="sysinfo" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b>v0.20.x</b><span>Hermes 内核</span></div><div><b>1.20.8</b><span>应用版本</span></div><div><b>8742 / 9219</b><span>Gateway / Dashboard</span></div><div><b>GPL-3.0</b><span>许可证</span></div></div><div class="tiny" style="margin-top:11px">部署脚本自动回写资源版本号；结构门禁会在改动破坏规矩时报错。</div>';}
 function setSvc(id,on,el,name,port){el.textContent='Port '+port+' · '+(on?'运行中':'已停止');el.classList.toggle('stop',!on);
   document.getElementById(id).classList.toggle('on',on);
   logs.unshift(['17:19:0'+(logs.length%9),on?'INFO':'WARNING','MONITOR',name+' '+(on?'started':'stopped')+' by user',1]);drawLog();
@@ -1946,7 +1946,7 @@ document.getElementById('copy8').addEventListener('click',function(){
 (function(){
   /* 下载直连飞牛分享目录：Windows exe 与 fnOS fpk 同在一个目录，
      校验值就是该目录里的 SHA256SUMS.txt（每次发版跟着换）。 */
-  var FALLBACK_VERSION='1.20.7';
+  var FALLBACK_VERSION='1.20.8';
   /* 只读公开仓库的 latest，无 token、无私有信息；UA 不设会被 GitHub 拒。 */
   function fetchLatestVersion(done){
     try{
