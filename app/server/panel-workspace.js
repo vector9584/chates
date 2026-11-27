@@ -5,6 +5,7 @@ import {join,dirname,relative,sep} from 'path';
 import {randomUUID,createHash} from 'crypto';
 import {StateFile, SessionDrafts, atomicWrite, safeId, stateError, digest} from './panel-state.js';
 import {createSessionReasoning} from './panel-session-reasoning.js';
+import {pythonPath} from './python-runtime.js';
 import {existingSessionWorkdir, ensureDirectory} from './panel-session-media.js';
 import {openStaticFile} from './panel-files.js';
 import {planSystem} from './panel-plans.js';
@@ -15,7 +16,9 @@ const run=promisify(execFile);
 const DATA=process.env.DATA_DIR||'/vol3/@apphome/chates/data';
 const VAR=process.env.VAR_DIR||'/vol1/@appdata/hermes-agent';
 const APP=process.env.APP_DIR||'/vol1/@appcenter/hermes-agent';
-const PYTHON=process.env.PANEL_PYTHON||join(DATA,'venv/bin/python3');
+// Python 路径不能写死 POSIX 布局：Windows 上 venv 在 Scripts\，独立桌面版
+// 根本没有 data/venv（runtime 在安装目录下）。统一走 python-runtime.js。
+const PYTHON=pythonPath();
 const SERVER_ROOT=process.env.PANEL_SERVER_ROOT||APP;
 const FILE=join(DATA,'panel-workspace.json');
 const ROOT=join(VAR,'panel-state');

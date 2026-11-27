@@ -2,6 +2,7 @@ import {mkdtempSync,writeFileSync,readFileSync,rmSync,statSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {runSpeechProcess} from './panel-speech-process.js';
+import {pythonPath} from './python-runtime.js';
 import {randomUUID} from 'node:crypto';
 import {stateError} from './panel-state.js';
 const idPattern=/^[a-zA-Z0-9_-]{8,100}$/;
@@ -20,12 +21,12 @@ export function createSpeechService({data,voice,windowsCurrent,execute=runSpeech
    dir=mkdtempSync(join(temp,'hermes-panel-speech-'));const input=join(dir,'text.txt'),output=join(dir,'speech.mp3');writeFileSync(input,text,{mode:0o600});
    if(engine==='windows'){
     const current=await windowsCurrent(controller.signal);controller.signal.throwIfAborted();
-    await execute(join(data,'venv/bin/python3'),[join(data,'scripts/tts_windows.py'),input,output],{timeout:180000,maxBuffer:2*1024*1024,signal:controller.signal,killSignal:'SIGKILL',env:{...process.env,WINDOWS_TTS_TIMEOUT:'150',WINDOWS_TTS_EMO_AUTO:current?.emo_auto===false?'0':'1'}});
+    await execute(pythonPath(),[join(data,'scripts/tts_windows.py'),input,output],{timeout:180000,maxBuffer:2*1024*1024,signal:controller.signal,killSignal:'SIGKILL',env:{...process.env,WINDOWS_TTS_TIMEOUT:'150',WINDOWS_TTS_EMO_AUTO:current?.emo_auto===false?'0':'1'}});
    }else{
     const selected=body.voice||voice().system_voice||'zh-CN-XiaoxiaoNeural';
     if(!/^[a-z]{2}-[A-Z]{2}-[A-Za-z]+Neural$/.test(selected))throw stateError('系统音色配置不正确');
     const script='import asyncio,edge_tts,sys\nfrom pathlib import Path\nasyncio.run(edge_tts.Communicate(Path(sys.argv[1]).read_text(),sys.argv[3]).save(sys.argv[2]))';
-    await execute(join(data,'venv/bin/python3'),['-c',script,input,output,selected],{timeout:90000,maxBuffer:1024*1024,signal:controller.signal,killSignal:'SIGKILL'});
+    await execute(pythonPath(),['-c',script,input,output,selected],{timeout:90000,maxBuffer:1024*1024,signal:controller.signal,killSignal:'SIGKILL'});
    }
    controller.signal.throwIfAborted();const stat=statSync(output);if(!stat.isFile()||stat.size<100||stat.size>maxAudio)throw stateError('语音合成结果为空或超过大小限制',502);
    // Both providers promise MP3. Decode it before publishing success; file size

@@ -11,6 +11,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { pythonPath } from "./python-runtime.js";
 
 const SESSION_ID_RE = /^[A-Za-z0-9._-]{1,80}$/;
 
@@ -22,10 +23,7 @@ export function createChatCompress(options = {}) {
   const running = new Set(); // 同一会话不允许并发压缩（会互相覆盖写回）
 
   const scriptPath = options.scriptPath || (serverDir ? join(serverDir, "panel-chat-compress.py") : "panel-chat-compress.py");
-  const pythonBin = (() => {
-    const cand = dataDir ? join(dataDir, "venv", "bin", "python") : "";
-    return cand && existsSync(cand) ? cand : "python3";
-  })();
+  const pythonBin = pythonPath();
 
   function runScript(args, timeoutMs) {
     return new Promise((resolve) => {

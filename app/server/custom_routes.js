@@ -14,6 +14,7 @@ import { randomBytes } from "crypto";
 import { resolve as resolvePath, dirname as pathDirname, basename as pathBasename } from "path";
 import { fileURLToPath } from "url";
 import { Readable } from "stream";
+import {pythonPath} from "./python-runtime.js";
 import {configReaderWriter,configRequestContext} from "./panel-config-txn.js";
 import {envReaderWriter,channelConfigWriter} from "./panel-env-txn.js";
 import {parseEnv,envValue,setEnvValue} from "./panel-env-format.js";
@@ -27,8 +28,9 @@ const APP_DIR        = process.env.APP_DIR       || process.env.TRIM_APPDEST || 
 const APP_NAME       = pathBasename(APP_DIR);
 const DATA_DIR       = process.env.DATA_DIR      || `${APP_DIR}/home/data`;
 const VAR_DIR        = process.env.VAR_DIR       || `${APP_DIR}/var`;
-const VENV_BIN       = `${DATA_DIR}/venv/bin`;
-const HERMES_BIN     = `${VENV_BIN}/hermes`;
+// 这里以前写死 `${DATA_DIR}/venv/bin`，Windows 上不存在。
+// PYTHON_TXN 是 config/env/channel 三个写入器共用的解释器。
+const PYTHON_TXN     = pythonPath();
 const HERMES_CONFIG  = `${DATA_DIR}/config.yaml`;
 const HERMES_ENV     = `${DATA_DIR}/.env`;
 const CONFIG_VERSION = "1.0";
@@ -689,9 +691,9 @@ function _writeEnvFile(content) {
 }
 function _getEnvValue(content,key){return envValue(content,key);}
 function _setEnvValue(content,key,value){return setEnvValue(content,key,String(value??""));}
-const configRW=configReaderWriter({python:VENV_BIN+'/python3',serverRoot:APP_DIR+'/server',state:VAR_DIR+'/panel-state',getFile:()=>HERMES_CONFIG,reason:'通讯平台配置'});
-const envRW=envReaderWriter({python:VENV_BIN+'/python3',serverRoot:APP_DIR+'/server',state:VAR_DIR+'/panel-state',getFile:()=>HERMES_ENV});
-const channelRW=channelConfigWriter({python:VENV_BIN+'/python3',serverRoot:APP_DIR+'/server',state:VAR_DIR+'/panel-state',getConfig:()=>HERMES_CONFIG,getEnv:()=>HERMES_ENV});
+const configRW=configReaderWriter({python:PYTHON_TXN,serverRoot:APP_DIR+'/server',state:VAR_DIR+'/panel-state',getFile:()=>HERMES_CONFIG,reason:'通讯平台配置'});
+const envRW=envReaderWriter({python:PYTHON_TXN,serverRoot:APP_DIR+'/server',state:VAR_DIR+'/panel-state',getFile:()=>HERMES_ENV});
+const channelRW=channelConfigWriter({python:PYTHON_TXN,serverRoot:APP_DIR+'/server',state:VAR_DIR+'/panel-state',getConfig:()=>HERMES_CONFIG,getEnv:()=>HERMES_ENV});
 function _readHermesConfig(){return channelRW.active?channelRW.read('yaml'):configRW.read();}
 function _writeHermesConfig(content){if(channelRW.active)channelRW.write('yaml',content);else configRW.write(content);return true;}
 // ── YAML 标量安全引用（保留 token 中的 : # 等字符） ──
@@ -812,7 +814,7 @@ function _setPlatformConfig(id, obj) {
 function _findHermesRoot() {
   try {
     const pyResult = spawnSync(
-      `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
+      PYTHON_TXN, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
       { stdout: "pipe", stderr: "pipe" }
     );
     const root = (pyResult.stdout ? pyResult.stdout.toString() : "").trim();
