@@ -82,9 +82,21 @@ function ensureRuntimeExtracted() {
     console.log('[chates] extracting runtime tarball -> ' + target);
     fs.rmSync(target, { recursive: true, force: true });
     fs.mkdirSync(target, { recursive: true });
-    const { execFileSync } = require('child_process');
-    // Windows 10 1803+ 自带 bsdtar，参数用 GNU 兼容写法
-    execFileSync('tar', ['-xzf', tarball, '-C', target], { stdio: 'ignore', windowsHide: true });
+    const { spawnSync } = require('child_process');
+    // Windows 10 1803+ 自带 bsdtar，参数用 GNU 兼容写法。
+    // 2026-11-27：不能用 execFileSync —— bsdtar 解这个包时只要遇到一个它处理
+    // 不了的条目（186MB 里的 acl/xattr 之类）就返回 exit=1，而实际文件已经
+    // 全解出来了。execFileSync 一抛异常，下面的 intact() 根本没机会跑，
+    // 于是 ensureRuntimeExtracted 返回 null，应用空壳启动、三个端口都不监听。
+    // 实测：exit=1、19354 个文件、python.exe/node.exe/monitor.js 全在。
+    // 所以判据只认 intact()，tar 的退出码仅当日志。
+    const r = spawnSync('tar', ['-xzf', tarball, '-C', target], {
+      stdio: 'ignore', windowsHide: true, timeout: 10 * 60 * 1000,
+    });
+    if (r.status !== 0) {
+      console.warn('[chates] tar exit=' + r.status +
+        (r.signal ? ' signal=' + r.signal : '') + '（继续按文件判据校验）');
+    }
     if (intact()) return target;
     console.error('[chates] tar 解开后关键文件仍不全: ' +
       mustHave.filter((p) => !fs.existsSync(path.join(target, ...p))).map((p) => p.join('/')).join(', '));
