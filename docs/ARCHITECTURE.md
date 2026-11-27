@@ -5,7 +5,7 @@
 
 一句话判据：**根目录散落的 `*.py`、`agent/`、`hermes_cli/`、`tools/`、`skills/`、`web/`
 都是上游内核本来的样子，不要动**；名字里带 `app/ electron/ win/ cmd/ config/ wizard/
-release-tools/ data-skeleton/ kernel/ fpk-bin/` 的才是 CHATÈS 加的。
+release-tools/ data-skeleton/ kernel/ fpk-bin/` 的才是 CHATES 加的。
 
 ---
 
@@ -42,7 +42,7 @@ mcp-research-data/  docs/
 `eslint.config.shared.mjs` `.prettier*` `.hadolint.yaml` `.mailmap` `.npmrc` `.nvmrc`
 `.python-version` `.dockerignore` `.envrc` `.plans/`
 
-## B 区 · CHATÈS 加的（这个项目真正的产出）
+## B 区 · CHATES 加的（这个项目真正的产出）
 
 ```
 app/                    控制面板（唯一真源）
@@ -115,10 +115,10 @@ fpk 工具链的档案，日常开发与安装都以本仓库的 `app/` 为准�
 ## 安装后与源码的对应
 
 ```
-%APPDATA%\CHATÈS\app\hermes-src\   ← 本仓库的源码树
-%APPDATA%\CHATÈS\app\ui\           ← app/ui
-%APPDATA%\CHATÈS\app\server\       ← app/server
-%APPDATA%\CHATÈS\data\             ← 数据（不入库，升级不覆盖）
+%APPDATA%\CHATES\app\hermes-src\   ← 本仓库的源码树
+%APPDATA%\CHATES\app\ui\           ← app/ui
+%APPDATA%\CHATES\app\server\       ← app/server
+%APPDATA%\CHATES\data\             ← 数据（不入库，升级不覆盖）
 ```
 
 `install.ps1` 会把 `app/ui`、`app/server` 复制过去，并在 venv 的 site-packages 里写

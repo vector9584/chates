@@ -77,7 +77,14 @@
 !macro customInstall
   IfFileExists "$INSTDIR\resources\chates.tgz" 0 chates_no_tar
     DetailPrint "Expanding runtime (this takes a minute)..."
-    nsExec::ExecToLog 'tar -xzf "$INSTDIR\resources\chates.tgz" -C "$INSTDIR\resources"'
+    ; 2026-11-27 fix: used to extract to $INSTDIR\resources (flat), which produced
+    ; resources\app + resources\runtime + resources\data, while main.js extracts
+    ; the SAME tarball to resources\chates\ and resolveRoots() only looks there.
+    ; Result: two parallel layouts, ~100 MB duplicated, and the runtime the shell
+    ; actually used (resources\chates\runtime) was a second copy. Extract to the
+    ; one place the code reads: resources\chates\.
+    CreateDirectory "$INSTDIR\resources\chates"
+    nsExec::ExecToLog 'tar -xzf "$INSTDIR\resources\chates.tgz" -C "$INSTDIR\resources\chates"'
     Pop $0
     ; 0 = success, 2 = partial. Anything else is worth surfacing in the log
     ; but must not abort: main.js extracts again on first run as a fallback.

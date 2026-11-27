@@ -189,9 +189,9 @@ import json, sys, re
 tag = sys.argv[1]
 # 版本号就是 tag 本体：新写法 1.20.8 / 老写法 v1.20.8-win.3 都认。
 # 剥掉可选的 v 前缀，不带 -win.N 之后文件名、顶栏、version.json 全用同一个号。
-m = re.match(r'v?(\d+\.\d+\.\d+)$', tag)
+m = re.match(r'v?(\d+\.\d+\.\d+(?:-test\d+)?)$', tag)
 if not m:
-    print(f"tag 格式不符: {tag}（要 1.20.8 或 v1.20.8）", file=sys.stderr); sys.exit(1)
+    print(f"tag 格式不符: {tag}（要 1.20.8 / v1.20.8 / 1.20.8-test1）", file=sys.stderr); sys.exit(1)
 ver = m.group(1)
 p = 'electron/resources/chates/app/version.json'
 try:
@@ -297,6 +297,9 @@ c '1;36' "== 打运行时 tar =="
 # $RES/electron/resources/... 这个不存在的层级 → 2026-11-27 CI 首跑就死在这。
 TARF="$(pwd)/$RES.tgz"
 rm -f "$TARF"
+# tgz 打的是 $RES 的根内容（./app ./runtime ./data），installer 和 main.js 都解到
+# resources/chates/ 下（见 installer.nsh customInstall 与 main.js ensureRuntimeExtracted），
+# 全应用只有这一处 runtime，没有重复。
 ( cd "$RES" && tar -czf "$TARF" . ) || die "打 tar 失败"
 ok "chates.tgz $(du -h "$TARF" | cut -f1)  $(tar -tzf "$TARF" | wc -l) 条目"
 rm -rf "$RES"

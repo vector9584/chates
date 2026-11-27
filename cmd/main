@@ -18,7 +18,7 @@ _resolve_appdest() {
 TRIM_APPDEST="$(_resolve_appdest || echo "${TRIM_APPDEST:-/var/apps/chates}")"
 TRIM_PKGHOME="${TRIM_PKGHOME:-/var/apps/chates/home}"
 TRIM_PKGVAR="${TRIM_PKGVAR:-/vol3/@appdata/chates}"
-# CHATÈS 与同机 hermes-agent 并存，三个端口必须错开（monitor.js 读这些环境变量）
+# CHATES 与同机 hermes-agent 并存，三个端口必须错开（monitor.js 读这些环境变量）
 export UI_PORT=8660
 export GATEWAY_PORT=8752
 export DASHBOARD_PORT=9239

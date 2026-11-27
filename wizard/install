@@ -4,11 +4,11 @@
         "items": [
             {
                 "type": "tips",
-                "helpText": "<b>CHATÈS</b><br>开源 AI Agent，支持多平台消息网关、内置学习循环、技能系统和 MCP 扩展。"
+                "helpText": "<b>CHATES</b><br>开源 AI Agent，支持多平台消息网关、内置学习循环、技能系统和 MCP 扩展。"
             },
             {
                 "type": "tips",
-                "helpText": "<br >安装完成后，打开 CHATÈS 控制面板，完成模型添加即可开始对话。"
+                "helpText": "<br >安装完成后，打开 CHATES 控制面板，完成模型添加即可开始对话。"
             }
         ]
     }

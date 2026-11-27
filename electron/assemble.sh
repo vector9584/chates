@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 把 CHATÈS 装成 Electron 的 resources/chates/ 布局。
+# 把 CHATES 装成 Electron 的 resources/chates/ 布局。
 #
 # 关键取舍（2026-11-25 实测后定）：
 #   1. python 运行时必须内嵌。Windows 的 venv 不是自包含的 ——
@@ -47,7 +47,7 @@ echo '{"type":"module"}' > "$OUT/app/server/package.json"
 
 # ── 3. 出厂数据（默认脱敏骨架）──────────────────────────────
 # 铁律：装进 exe 的 data 必须是干净的。真实 .env / 技能库 / 个人知识库
-# 只允许落在使用者自己的 %APPDATA%\CHATÈS\data 里，不进分发包。
+# 只允许落在使用者自己的 %APPDATA%\CHATES\data 里，不进分发包。
 #
 # 以前这里无条件解 hermes-win-data/data.zip（52MB，含 142 条真凭据），
 # win.8 就是这么带出去的。现在默认 data-skeleton，真数据要显式 opt-in。
@@ -174,7 +174,7 @@ if [ -f "$SP/hermes_root.pth" ]; then
 fi
 # 用 sitecustomize 兜底：比 .pth 稳定，且能做条件判断
 cat > "$SP/chates_bootstrap.py" <<'PY'
-"""CHATÈS 启动引导：把内核目录挂上 sys.path。
+"""CHATES 启动引导：把内核目录挂上 sys.path。
 
 写在 site-packages 里、由 .pth 的 import 行拉起，因此不能依赖 __file__ 之外的
 上下文。内核路径 = 本文件向上 4 层（site-packages → Lib → python → runtime → chates）

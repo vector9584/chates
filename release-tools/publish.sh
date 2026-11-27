@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# publish.sh — CHATÈS 一条命令发布：同时产出 fpk（fnOS）和 exe（Windows）
+# publish.sh — CHATES 一条命令发布：同时产出 fpk（fnOS）和 exe（Windows）
 #
 # 为什么要有它：以前每次发版都是手工串——NAS 上 assemble 出 516MB 资源、切块传到
 # Windows、跑 electron-builder、再手工拼 fpk、再分别上传两个 Release。步骤一多就漏，

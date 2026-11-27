@@ -7,7 +7,7 @@
  *   实际坏的是整片。
  *
  *   典型报错（2026-11-27 Windows 实测）：
- *     spawn C:\Users\...\CHATÈS\data\venv\bin\python3 ENOENT
+ *     spawn C:\Users\...\CHATES\data\venv\bin\python3 ENOENT
  *
  * 三种运行时形态（monitor.js:570 早写过，但只有它自己知道）：
  *   fpk / Linux       <data>/venv/bin/python3

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""version.py — 读 CHATÈS 版本号
+"""version.py — 读 CHATES 版本号
 
 唯一真源：win/version.json 的 "version" 字段
 --------------------------------------------

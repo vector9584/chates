@@ -3,7 +3,7 @@
 # TRIM_APPDEST = /var/apps/<appname>，本应用专属，不含兄弟应用。
 # 不能用 "node.*monitor.js" / "hermes.*gateway" 这类宽匹配：
 # 并行装了原 Hermes 时，那些进程同样叫 hermes gateway，
-# 升级 CHATÈS 会把正在跑的 Hermes 一起杀掉（2026-11-26 实测确认）。
+# 升级 CHATES 会把正在跑的 Hermes 一起杀掉（2026-11-26 实测确认）。
 APPDEST="${TRIM_APPDEST:-}"
 PKGHOME="${TRIM_PKGHOME:-}"
 

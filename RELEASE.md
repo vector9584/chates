@@ -1,4 +1,4 @@
-# CHATÈS 发布流程
+# CHATES 发布流程
 
 一条命令同时产出 **fpk（fnOS）** 和 **exe（Windows）**，同一 tag 合并到一个 Release。
 

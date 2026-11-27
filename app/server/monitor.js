@@ -75,7 +75,7 @@ const { WebSocketServer, WebSocket } = wsLib;
 
 // APP_DIR 的默认值不能写死成兄弟应用（/var/apps/hermes-agent）：
 // 并行安装时它会去读那个应用的 manifest 和数据库记录，把别人的版本号
-// 显示成自己的，甚至改写别人的 manifest（2026-11-26 实测：CHATÈS 装上
+// 显示成自己的，甚至改写别人的 manifest（2026-11-26 实测：CHATES 装上
 // 后版本号显示 0.21.149，正是同机 hermes-agent 的版本）。
 // 优先环境变量，其次 TRIM_APPDEST，最后从本文件位置（<APP_DIR>/server/monitor.js）推导。
 const APP_DIR        = process.env.APP_DIR       || process.env.TRIM_APPDEST || dirname(dirname(fileURLToPath(import.meta.url)));
@@ -4408,7 +4408,7 @@ const handleSpeechConfig = createSpeechConfigHandler({python: join(VENV_BIN, PY_
 const handleConnectorTools = createConnectorToolsHandler({getConnector, readState: () => panelConnectorStore.all(), checkToken, call: callConnectorTool});
 const handleConnectorConfig = createConnectorHandler({catalog: CONNECTOR_CATALOG, store: panelConnectorStore, checkToken, probe: probeConnector});
 const handleMaintenance = createMaintenanceHandler({checkToken, repositories: [
-  {id: 'panel', name: 'CHATÈS 全量源码仓', path: GITEA_REPO_DIR},
+  {id: 'panel', name: 'CHATES 全量源码仓', path: GITEA_REPO_DIR},
 ], releases: {
   /* 直接读 Gitea 自己的仓库目录（本机 8418 那套 Gitea 的实体，gitea:AppUsers 755 只读可进）。
      不绕工作副本：工作副本在 /vol3 上，要穿软链，权限链一断维护页就哑。
@@ -4965,7 +4965,7 @@ async function handleFetch(req) {
         // 覆盖应用目录（bin/server/ui/hermes-src/package.json 等；config 为 fnOS 只读模板不覆盖）
         execSync(`cp -rf ${stage}/bin ${stage}/server ${stage}/ui ${stage}/hermes-src ${stage}/package.json ${APP_DIR}/ 2>/dev/null; true`, { timeout: 600000, encoding: "utf8" });
         // 更新 fnOS 应用壳 manifest —— 只能写自己的（/var/apps/${APP_NAME}/manifest）。
-        // 原来写死 hermes-agent，并行安装时更新 CHATÈS 会把兄弟应用的版本号覆盖掉。
+        // 原来写死 hermes-agent，并行安装时更新 CHATES 会把兄弟应用的版本号覆盖掉。
         try { execSync(`sudo -n cp ${stage}/manifest /var/apps/${APP_NAME}/manifest && sudo -n chown root:root /var/apps/${APP_NAME}/manifest 2>/dev/null; true`, { timeout: 15000 }); } catch {}
         execSync(`rm -rf ${stage}`, { timeout: 30000 });
       } catch (e) {

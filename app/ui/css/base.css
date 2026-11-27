@@ -592,6 +592,10 @@
     .vs-desc{font-size:11px;color:var(--text3);margin-top:3px;line-height:1.5}
     .vs-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);margin-top:2px;cursor:pointer}
     .msg-act-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    /* 选中文字悬浮复制按钮（2026-11-27）：position:fixed 挂 body，跟随选区末尾定位 */
+    .sel-copy-btn{position:fixed;z-index:9999;display:none;align-items:center;gap:5px;padding:5px 11px;border-radius:8px;border:1px solid var(--accent);background:var(--bg1);color:var(--accent);font-size:12px;font-weight:500;line-height:1;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.18);white-space:nowrap;user-select:none;transition:background .12s,color .12s}
+    .sel-copy-btn:hover{background:var(--accent);color:var(--white)}
+    .sel-copy-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     /* 引用消息样式 —— 单一色阶（同一 hue：浅底 + 同色竖条 + 同色标签），内外统一圆角 */
     .quote-block{border:0;background:var(--accent-bg);box-shadow:inset 3px 0 0 0 var(--accent);
       padding:8px 12px 8px 13px;margin:0 0 8px;border-radius:10px;font-size:12px;line-height:1.55;

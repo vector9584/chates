@@ -146,12 +146,12 @@ export async function resolveSessionFileDir(sid){
 }
 export async function ensureSessionUploadDir(sid){
  const workdir=await resolveSessionFileDir(sid);
- const dir=relative(DATA,workdir);
+ const dir=relative(DATA,workdir).split(sep).join('/');
  /* 只建 uploads：上传接口要立刻可写。artifacts/code 由 session_dir.py 按需建，
     不预建 —— 几百个会话各建三个空目录等于把树撑爆（用户原话：别建很多空文件夹）。 */
  const base=ensureDirectory(DATA,...dir.split('/'));
  const dirs={};
- for(const sub of SESSION_SUBDIRS)dirs[sub]=relative(DATA,join(base,sub));
+ for(const sub of SESSION_SUBDIRS)dirs[sub]=relative(DATA,join(base,sub)).split(sep).join('/');
  ensureDirectory(base,'uploads');
  return {group:dir.split('/').slice(1,-1).join('/'),dir,uploads:dirs.uploads,dirs,abs:join(DATA,...dirs.uploads.split('/'))};
 }

@@ -2041,6 +2041,92 @@ function copyMsg(btn){
     try{ var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){}
   }
 }
+
+/* ── 选中气泡文字 → 悬浮复制按钮（2026-11-27）──
+   只对 .msg 气泡内的文本选区生效；选区末尾下方弹出按钮，点击复制选中文字到剪贴板。 */
+function _copyTextToClipboard(text, done){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(function(){ _execCopyFallback(text, done); });
+  } else {
+    _execCopyFallback(text, done);
+  }
+}
+function _execCopyFallback(text, done){
+  try{
+    var ta=document.createElement('textarea'); ta.value=text;
+    ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    done();
+  }catch(e){ done(); }
+}
+var _selCopyBtn = null;
+var _selCopyText = '';
+function _hideSelCopy(){ if(_selCopyBtn){ _selCopyBtn.remove(); _selCopyBtn = null; } }
+function _selCopyTarget(){
+  var sel = window.getSelection();
+  if(!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  var text = sel.toString();
+  if(!text || !text.trim()) return null;
+  var range = sel.getRangeAt(0);
+  var node = range.commonAncestorContainer;
+  var el = (node.nodeType === 1) ? node : node.parentElement;
+  if(!el || !el.closest) return null;
+  var msg = el.closest('.msg');
+  if(!msg) return null;
+  return { sel:sel, text:text, range:range, msg:msg };
+}
+function _showSelCopy(){
+  var hit = _selCopyTarget();
+  if(!hit){ _hideSelCopy(); return; }
+  var endRange = hit.range.cloneRange();
+  endRange.collapse(false);
+  var rect = endRange.getBoundingClientRect();
+  if(!rect || (rect.left===0 && rect.top===0 && rect.right===0 && rect.bottom===0)){ _hideSelCopy(); return; }
+  if(!_selCopyBtn){
+    _selCopyBtn = document.createElement('button');
+    _selCopyBtn.type = 'button';
+    _selCopyBtn.className = 'sel-copy-btn';
+    _selCopyBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制';
+    /* mousedown 时选区还在（preventDefault 拦住焦点转移、保住这一刻的选区），先把文字存成快照；
+       mouseup 时浏览器照样清选区（preventDefault 只拦 mousedown 那一拍），click 里再读 getSelection 就空了
+       —— 所以复制必须用 mousedown 存的快照，不能临时读。 */
+    _selCopyBtn.addEventListener('mousedown', function(e){
+      e.preventDefault(); e.stopPropagation();
+      _selCopyText = (window.getSelection() || {}).toString() || '';
+    });
+    /* mouseup 也要 stopPropagation：否则冒泡到 document 的 mouseup 监听，_showSelCopy 一看选区已空
+       （mouseup 时浏览器已清掉选区）就把按钮删了，click 还没轮到就没了。 */
+    _selCopyBtn.addEventListener('mouseup', function(e){ e.stopPropagation(); });
+    _selCopyBtn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      var t = _selCopyText || (window.getSelection() || {}).toString() || '';
+      var btn = _selCopyBtn;
+      _copyTextToClipboard(t, function(){
+        if(btn){ btn.innerHTML = '✓ 已复制'; setTimeout(_hideSelCopy, 800); }
+      });
+      var s = window.getSelection();
+      if(s) s.removeAllRanges();
+    });
+    document.body.appendChild(_selCopyBtn);
+  }
+  var bw = _selCopyBtn.offsetWidth || 60;
+  var left = rect.left + rect.width/2 - bw/2;
+  var top = rect.bottom + 8;
+  var vw = window.innerWidth;
+  if(left < 8) left = 8;
+  if(left + bw > vw - 8) left = vw - bw - 8;
+  _selCopyBtn.style.left = left + 'px';
+  _selCopyBtn.style.top = top + 'px';
+  _selCopyBtn.style.display = 'inline-flex';
+}
+document.addEventListener('mouseup', function(){ setTimeout(_showSelCopy, 0); });
+document.addEventListener('keyup', function(e){ if(e.shiftKey) setTimeout(_showSelCopy, 0); });
+document.addEventListener('mousedown', function(e){
+  if(_selCopyBtn && !_selCopyBtn.contains(e.target)) _hideSelCopy();
+});
+window.addEventListener('scroll', _hideSelCopy, true);
+
 /* ── 滚动跟随：唯一判据「现在是不是贴着底部」（2026-11-13 第 39 条整体重写）
    ─────────────────────────────────────────────────────────────────────────
    用户原话：只有滚动到底部才触发自动跟随；消息已经停止、没有变化，不该自己跳。

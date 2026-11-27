@@ -104,7 +104,7 @@ EOF
 )
   REL_JSON=$(python3 - "$TAG" "$BODY" <<'PY'
 import json, sys
-print(json.dumps({"tag_name": sys.argv[1], "name": f"CHATÈS {sys.argv[1]}",
+print(json.dumps({"tag_name": sys.argv[1], "name": f"CHATES {sys.argv[1]}",
                   "body": sys.argv[2], "draft": False, "prerelease": False}))
 PY
 )

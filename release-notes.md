@@ -1,10 +1,10 @@
-# CHATÈS
+# CHATES
 
 ## 安装
 
 **Windows**：下载 `.exe`，双击安装，不需要另装 Node / Python。
 
-已有用户升级时，配置保留在 `%APPDATA%\CHATÈS\data`，不会被覆盖。
+已有用户升级时，配置保留在 `%APPDATA%\CHATES\data`，不会被覆盖。
 
 **fnOS**：下载 `.fpk`，应用中心「手动安装」上传。
 

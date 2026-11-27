@@ -247,7 +247,7 @@
       },{passive:true,capture:true});
       document.addEventListener('touchend',function(){bottomY=null;},{passive:true,capture:true});
 
-      /* 点击顶部 CHATÈS 词标也唤出（2026-11-17 用户要求）。
+      /* 点击顶部 CHATES 词标也唤出（2026-11-17 用户要求）。
          滑动是最容易失手的那条路：短会话没得滑、戴手套、列表卡在动画里都拉不出来。
          给一个「想找菜单就点一下顶部」的确定性入口，比调灵敏度靠谱。
          不拦默认事件 —— 词标本身还挂着连接状态文案的点击语义。 */

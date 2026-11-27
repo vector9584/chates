@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="app/ui/images/logo-cat-full-light.png">
-    <img src="app/ui/images/logo-cat-full-dark.png" alt="CHATÈS — 一只猫拉着小车" width="300">
+    <img src="app/ui/images/logo-cat-full-dark.png" alt="CHATES — 一只猫拉着小车" width="300">
   </picture>
 </p>
 
@@ -26,7 +26,7 @@
   <a href="JOURNEY.md">改造历程</a>
 </p>
 
-<img src="promo/img/panel-overview.png" alt="CHATÈS 面板：左侧八个板块，中间会话列表，右侧对话">
+<img src="promo/img/panel-overview.png" alt="CHATES 面板：左侧八个板块，中间会话列表，右侧对话">
 
 ---
 
@@ -125,7 +125,7 @@ node dev/tests/interrupted-tools.cjs app/server/monitor.js
 3. 双击安装，一路下一步；装完桌面一个图标
 4. 打开后在「模型」页填供应商 API Key，启动服务
 
-升级只换程序本体，`%APPDATA%\CHATÈS` 里的 `.env`、`config.yaml`、笔记、知识库一个字节不动。
+升级只换程序本体，`%APPDATA%\CHATES` 里的 `.env`、`config.yaml`、笔记、知识库一个字节不动。
 
 ### 二、fnOS 上装 `.fpk`（常规用法）
 

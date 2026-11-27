@@ -21,7 +21,7 @@ log_msg "TRIM_USERNAME=${TRIM_USERNAME:-<empty>}"
 log_msg "--- 目录状态 (安装前) ---"
 ls -la "${TRIM_APPDEST}" 2>&1 | while IFS= read -r line; do log_msg "  $line"; done
 
-# 强制 kill 可能残留的进程 —— 只认 CHATÈS 自己的路径，
+# 强制 kill 可能残留的进程 —— 只认 CHATES 自己的路径，
 # 绝不能用 "node.*monitor.js" / "hermes.*gateway" 这种宽匹配：
 # 那会把同机的 hermes-agent 一起杀掉（2026-11-26 踩过）。
 pkill -9 -f "@appcenter/chates/.*monitor\.js" 2>/dev/null || true
@@ -61,13 +61,13 @@ for _d in "${TRIM_PKGHOME}/data" "/var/apps/chates/home/data" "/vol3/@apphome/ch
 done
 log_msg "运行时状态清理完成"
 
-# 端口冲突清理：只清理 CHATÈS 自己的端口（8660 UI / 8752 gateway / 9239 dashboard）。
+# 端口冲突清理：只清理 CHATES 自己的端口（8660 UI / 8752 gateway / 9239 dashboard）。
 # 绝不能碰 8650/8742/9219 —— 那是同机 hermes-agent 的端口，抢了就把原应用打断。
 for PORT in 8660 8752 9239; do
     PID=$(ss -tlnp 2>/dev/null | grep ":${PORT} " | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
     if [ -n "$PID" ]; then
-        # 端口是 CHATÈS 专属的，占着就是自己的残留
-        log_msg "端口 ${PORT} 被 pid=${PID} 占用（CHATÈS 专属端口），清理残留"
+        # 端口是 CHATES 专属的，占着就是自己的残留
+        log_msg "端口 ${PORT} 被 pid=${PID} 占用（CHATES 专属端口），清理残留"
         kill -9 "$PID" 2>/dev/null || true
     fi
 done

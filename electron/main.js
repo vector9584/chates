@@ -1,4 +1,4 @@
-// CHATÈS 主进程
+// CHATES 主进程
 //
 // 设计要点（都是为了「双击就是完整应用」这一条）：
 //
@@ -44,7 +44,7 @@ const RES = process.resourcesPath;           // 打包后 = <app>/resources
 // userData 默认按 app.getName() 落在 %APPDATA%\<name>。
 // 不显式改的话打包态会叫 chates-desktop，用户找不到自己的配置放哪。
 // 必须在任何 getPath('userData') 调用之前设定。
-app.setName('CHATÈS');
+app.setName('CHATES');
 const PORT = Number(process.env.CHATES_PORT || 8650);
 const HOST = '127.0.0.1';
 
@@ -68,12 +68,21 @@ function ensureRuntimeExtracted() {
   // 模型配置 spawn 不到解释器 → /api/panel-models 直接 503 → 页面上 provider
   // 一个都不显示（用户看到的就是"配置全没了"，其实 config.yaml 好端端躺着）。
   // 判据要覆盖真正要用的可执行文件，缺一个就重解。
+  // 2026-11-27 起 runtime/ 不再进 tar（它单独摆在 resources/runtime/，见 build-exe.sh
+  // 的 --exclude=./runtime），所以判据必须跟着改：应用本体在 chates.tgz 里，
+  // 运行时可执行文件在 resources/ 下。两边各认各的，别拿一个条件卡另一个。
   const mustHave = [
     ['app', 'server', 'monitor.js'],
-    ['runtime', 'python', 'python.exe'],
-    ['runtime', 'node.exe'],
   ];
-  const intact = () => mustHave.every((p) => fs.existsSync(path.join(target, ...p)));
+  // 运行时可以落在 target/runtime（老包装出来的布局）或 RES/runtime（新布局），
+  // 与 pickRuntime() 的回落顺序保持一致，缺哪个都算没装全。
+  const runtimePresent = (rel) =>
+    fs.existsSync(path.join(target, 'runtime', rel)) ||
+    fs.existsSync(path.join(RES, 'runtime', rel));
+  const intact = () =>
+    mustHave.every((p) => fs.existsSync(path.join(target, ...p))) &&
+    runtimePresent(path.join('python', 'python.exe')) &&
+    runtimePresent('node.exe');
 
   if (intact()) return target;
   if (!fs.existsSync(tarball)) return null;
@@ -124,8 +133,14 @@ function resolveRoots() {
         appDir: path.join(r, 'app'),
         dataDir: dataRoot,
         varDir,
-        node: pickRuntime(r, 'node.exe'),
-        python: pickRuntime(path.join(r, 'runtime', 'python'), 'python.exe'),
+        // runtime/ 不再进 chates.tgz，统一在 resources/runtime/ 下；
+        // 老包装出的布局在 resources/chates/runtime/ 下。两条路都试。
+        node: pickRuntime(
+          path.join(r, 'runtime', 'node.exe'),
+          path.join(RES, 'runtime', 'node.exe')),
+        python: pickRuntime(
+          path.join(r, 'runtime', 'python', 'python.exe'),
+          path.join(RES, 'runtime', 'python', 'python.exe')),
       };
     }
   }
@@ -137,22 +152,42 @@ function resolveRoots() {
  * 2026-11-27：chates.tgz 曾经只解出一半（目录建了、python.exe 没落地），
  * 而真正完整的 runtime 一直躺在 resources/ 下。两条路都试，别一条不通就认死。
  */
-function pickRuntime(root, name) {
-  const primary = path.join(root, name);
-  if (fs.existsSync(primary)) return primary;
-  const fallback = path.join(RES, name);
-  return fs.existsSync(fallback) ? fallback : primary;
+// 取运行时可执行文件：按候选顺序返回第一个真实存在的。
+// 2026-11-27 血案：这个函数原来写死"先 <root>/<name>、再 resources/<name>"，
+// 但 runtime 实际落在 resources/runtime/ 下，回落少算一层 runtime，永远找不到，
+// 返回的那个不存在的 resources/chates/node.exe 就成了 startBackend 报的
+// "找不到 node 运行时"。改成显式候选列表，调用方把老布局/新布局两条路都列出来。
+function pickRuntime(...candidates) {
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return candidates[0]; // 都不在：返回第一个，让上层报出可读的路径
+}
+
+// shell.log 落点缓存。
+// 2026-11-27 血案：这个函数曾经每次调用都走 resolveRoots()，而 resolveRoots()
+// 第一行是 ensureRuntimeExtracted()（会跑 tar、会 console.log）。只要解压那一步
+// 出点岔子，logLine → resolveRoots → ensureRuntimeExtracted → 日志 → logLine
+// 就是一条无限递归链：进程活着、窗口不出、shell.log 里只有一行 roots root=，
+// 用户看到的就是"启动卡死、后端根本没起"。日志函数必须是纯叶子，不许回读业务路径。
+let _logDir = null;
+function logDir() {
+  if (_logDir) return _logDir;
+  try {
+    _logDir = path.join(app.getPath('userData'), 'var');
+    fs.mkdirSync(_logDir, { recursive: true });
+  } catch {
+    _logDir = null;
+  }
+  return _logDir;
 }
 
 function logLine(msg) {
   const line = `[chates] ${new Date().toISOString()} ${msg}`;
   console.log(line);
   try {
-    const r = resolveRoots();
-    if (r) {
-      fs.mkdirSync(r.varDir, { recursive: true });
-      fs.appendFileSync(path.join(r.varDir, 'shell.log'), line + '\r\n');
-    }
+    const d = logDir();
+    if (d) fs.appendFileSync(path.join(d, 'shell.log'), line + '\r\n');
   } catch {}
 }
 
@@ -202,7 +237,7 @@ async function waitPanelReady(deadlineMs = 60000) {
 // 不能当运行时数据目录用：
 //   1. 安装到 AppData\Local\Programs 后，升级会整个覆盖，用户配置全丢；
 //   2. 那目录对普通用户可能只读，写 log/pid/会话会失败。
-// 所以首次启动把出厂 data 拷到 %APPDATA%\CHATÈS\data，之后只认用户目录。
+// 所以首次启动把出厂 data 拷到 %APPDATA%\CHATES\data，之后只认用户目录。
 // 用 app.getPath('userData') 而不是硬拼路径 —— 用户改了 APPDATA 也不会错。
 function resolveUserData(factory) {
   const stamped = path.join(app.getPath('userData'), '.seeded');
@@ -267,7 +302,7 @@ function startBackend(roots) {
     logLine(`backend exited code=${code} sig=${sig} quitting=${quitting}`);
     child = null;
     if (!quitting) {
-      dialog.showErrorBox('CHATÈS 后端已退出',
+      dialog.showErrorBox('CHATES 后端已退出',
         `面板服务意外停止（code=${code}）。\n\n详细日志：${path.join(roots.varDir, 'shell.log')}`);
       app.quit();
     }
@@ -324,7 +359,7 @@ function createMainWindow() {
     minHeight: 600,
     show: false,
     backgroundColor: '#0b1220',
-    title: 'CHATÈS',
+    title: 'CHATES',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -335,7 +370,7 @@ function createMainWindow() {
   });
 
   // 页面 <title> 不要覆盖窗口标题（2026-11-26 用户报"窗口左上角怎么还
-  // 写的 Hermes"）。虽然 index.html 的 <title> 已经改成 CHATÈS，但只要
+  // 写的 Hermes"）。虽然 index.html 的 <title> 已经改成 CHATES，但只要
   // 网页里任何脚本改了 document.title，Electron 默认就会同步到窗口，
   // 左上角又跑偏。这里显式接管：窗口标题永远是我们设的那个。
   mainWindow.on('page-title-updated', (e) => { e.preventDefault(); });
@@ -598,7 +633,7 @@ async function boot() {
       return;
     }
     dialog.showErrorBox('端口被占用',
-      `端口 ${PORT} 被其他程序占用，CHATÈS 无法启动。\n\n请关闭占用该端口的程序后重试。`);
+      `端口 ${PORT} 被其他程序占用，CHATES 无法启动。\n\n请关闭占用该端口的程序后重试。`);
     app.quit();
     return;
   }

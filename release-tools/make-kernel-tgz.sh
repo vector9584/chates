@@ -39,6 +39,12 @@ STRIP=( '*.bak-*' '__pycache__' '*.pyc' '.pytest_cache' '.mypy_cache' 'CLAUDE.md
 # 前端一律以仓库为准，源码树里的副本在这里剥掉。
 # 剥掉后 build-exe.sh 的兜底分支也拿不到旧副本，误判不可能再发生。
 STRIP_DIRS=( 'app/ui' 'ui' 'app/echo-web' )
+# 聊天素材不进安装包（2026-11-27 主人要求）。
+# hermes_cli/web_dist/assets/stickers 是 194 个表情包 jpg/gif，属聊天内容产物，
+# 不是程序功能。除了体积，中文文件名在 Windows 解压时还会整批报
+# "Invalid empty pathname"（tar 对 UTF-8 中文名返回 exit=1），直接拖垮安装。
+# 内核只提供 python 侧，这些素材由用户自己积累，不预置。
+STRIP_DIRS_GLOB=( 'hermes_cli/web_dist/assets/stickers' 'hermes_cli/web_dist/stickers' )
 # 不该出现在别人机器上的词（演示提示词、调试样例里的真实身份）
 NEUTRALIZE=( '王瑞兵:示例用户' '姜亚楠:示例用户' '姜楠:示例用户' )
 
@@ -79,7 +85,7 @@ if [ -f "$work/hermes-src/.env" ]; then
 fi
 
 # 剥掉前端目录（内核只供 python 侧，前端以仓库 app/ui 为准）
-for d in "${STRIP_DIRS[@]}"; do
+for d in "${STRIP_DIRS[@]}" "${STRIP_DIRS_GLOB[@]}"; do
   if [ -d "$work/hermes-src/$d" ]; then
     n=$(find "$work/hermes-src/$d" -type f 2>/dev/null | wc -l || true)
     rm -rf "$work/hermes-src/$d"
@@ -113,5 +119,15 @@ n=$(tar tzf "$OUT" | grep -cE '^hermes-src/(app/)?ui/' || true)
 if [ "$n" -gt 0 ]; then
   echo "ERROR tgz 里还有 $n 个前端文件（应为 0，前端以仓库为准）" >&2; bad=1
 fi
+# 聊天素材不进包（2026-11-27 主人要求）：表情包是用户产物，不是功能
+n=$(tar tzf "$OUT" | grep -c '/stickers/' || true)
+if [ "$n" -gt 0 ]; then
+  echo "ERROR tgz 里还有 $n 项聊天素材（stickers 应为 0）" >&2; bad=1
+fi
 
 if [ "$bad" -eq 0 ]; then echo "[kernel] 自检通过"; else exit 1; fi
+
+# 出厂审计：按路径/类别判定"这类东西压根不该进包"（stickers/uploads/sessions/.env…）。
+# 和上面几条内联检查分工不同：内联的盯具体垃圾和历史教训，这个脚本是通用门禁，
+# 加新禁入类别改 audit_kernel_tgz.py 的 FORBIDDEN_DIRS 一处即可。
+python3 "$ROOT/release-tools/audit_kernel_tgz.py" "$OUT" || exit 1
