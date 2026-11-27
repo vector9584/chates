@@ -20,7 +20,7 @@
  * 所以不能"找不到 venv 就当 python3 在 PATH 里"——Windows 上 PATH 没有 python3。
  */
 
-import {existsSync} from 'fs';
+import {existsSync, statSync} from 'fs';
 import {join} from 'path';
 
 const IS_WIN = process.platform === 'win32';
@@ -31,12 +31,28 @@ function candidates() {
   const out = [];
 
   // 1. Electron 壳显式注入（独立桌面版唯一来源，最可信）
+  //    注意：注入的可能是「目录」也可能是「可执行文件」，必须两种都展开。
+  //    2026-11-27 实测踩过两次：
+  //      a) 只推原值 → existsSync(目录) 通过 → spawn(目录) ENOENT
+  //      b) 用 /python$/ 判断"是不是文件" → 目录恰好叫 python（真实现状
+  //         resources/runtime/python）被误判成可执行文件 → 又回到 a)
+  //    所以只认「真文件」：用 statSync 判 isFile，不靠名字猜。
   const injected = process.env.CHATES_PYTHON_ROOT || process.env.PANEL_PYTHON;
   if (injected) {
-    out.push(injected);
-    if (!/\.exe$/i.test(injected)) {
-      out.push(join(injected, IS_WIN ? 'python.exe' : 'python3'));
-      out.push(join(injected, IS_WIN ? 'Scripts' : 'bin', IS_WIN ? 'python.exe' : 'python3'));
+    const exeName = IS_WIN ? 'python.exe' : 'python3';
+    // 注入值本身是不是真文件（而不是目录或不存在）
+    let injectedIsFile = false;
+    try {
+      injectedIsFile = existsSync(injected) && statSync(injected).isFile();
+    } catch {
+      injectedIsFile = false;
+    }
+    if (injectedIsFile) {
+      out.push(injected);
+    } else {
+      out.push(join(injected, exeName));                        // 目录 → 直接子文件
+      out.push(join(injected, IS_WIN ? 'Scripts' : 'bin', exeName));
+      out.push(injected);            // 兜底（理论上不该命中，会被 isFile 挡掉）
     }
   }
 
@@ -67,13 +83,21 @@ export function resolvePython() {
     if (!p) continue;
     tried.push(p);
     try {
-      if (existsSync(p)) {
-        // 目录不算（CHATES_PYTHON_ROOT 可能只给了目录）
-        const src = p.includes('runtime') ? 'desktop-runtime'
-          : p.includes('/venv/') || p.includes('\\venv\\') ? 'venv'
-          : 'injected';
-        return {path: p, source: src};
+      if (!existsSync(p)) continue;
+      // 目录绝不能当解释器返回：spawn(目录) 在 Windows 上是 ENOENT，
+      // 在 Linux 上是 EACCES，两种都炸。2026-11-27 真机踩过。
+      let isDir = false;
+      try {
+        isDir = statSync(p).isDirectory();
+      } catch {
+        continue;
       }
+      if (isDir) continue;
+
+      const src = p.includes('runtime') ? 'desktop-runtime'
+        : p.includes('/venv/') || p.includes('\\venv\\') ? 'venv'
+        : 'injected';
+      return {path: p, source: src};
     } catch {
       /* 权限之类，跳过 */
     }
