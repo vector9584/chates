@@ -121,3 +121,20 @@ body.theme-light #railScroll{
 #railScroll .pw-tree-node[data-tree-key^="folder:"][data-depth="2"]>.pw-tree-head .pw-tree-toggle,
 #railScroll .pw-tree-node[data-tree-key^="folder:"][data-depth="3"]>.pw-tree-head .pw-tree-toggle,
 #railScroll .pw-tree-node[data-tree-key^="folder:"][data-depth="4"]>.pw-tree-head .pw-tree-toggle{font-size:12px;font-weight:400;color:var(--text3)}
+
+/* emoji 图标的兜底（2026-11-27）
+   本机字体栈里没有 emoji 字体，Windows 会回退到 Segoe UI Emoji 的彩色字形。
+   彩色 emoji 不吃 CSS color，被赋色时要么渲成黑色剪影、要么直接豆腐块 ——
+   会话树的「未分类」原来用 🗂，在 Windows 上就是一块黑方块。
+   治本是把图标全换成内联 SVG（已换）；这条规则兜住剩下的零星 emoji，
+   用文字表现（text presentation）逼系统退化成可上色的黑白字形。
+   注意别加 "Noto Color Emoji"：那个全家都是彩色，加了反而更糟。 */
+.pw-tree-ico,.pw-tree-toggle,.connector-card .icon,.ext-card .icon,.pop-item .ico{
+  font-family:"Apple Symbols","Segoe UI Symbol","Noto Sans Symbols 2","DejaVu Sans","Segoe UI",sans-serif;
+  font-variant-emoji:text;
+}
+/* 「未分类」节点没有 data-depth，四档层级色都匹配不到，会退成继承色（深色主题下就是黑）。
+   它代表「不属于任何文件夹」，用最深那档灰蓝表示游离于层级之外。 */
+#railScroll .pw-tree-node[data-tree-key="folder:none"]>.pw-tree-head .pw-tree-ico{
+  color:var(--text2);background:var(--bg3)
+}
